@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Fixture App</title></head>
+<body>
+  <h1>Fixture App</h1>
+  <nav><a href="/pricing.html">Pricing</a></nav>
+  <form onsubmit="event.preventDefault()">
+    <label for="name">Product Name</label>
+    <input id="name" name="name" placeholder="e.g. Blue Shirt">
+    <label for="env">Environment</label>
+    <select id="env"><option>Dev</option><option>Stage</option><option>Prod</option></select>
+    <button type="button" id="save" onclick="document.getElementById('status').textContent='Saved: '+document.getElementById('name').value; console.log('saved', document.getElementById('name').value)">Save</button>
+  </form>
+  <section aria-label="Duplicates">
+    <button type="button">Delete</button>
+    <button type="button">Delete</button>
+    <button type="button" style="display:none">Hidden Only</button>
+  </section>
+  <p id="status" role="status"></p>
+  <button type="button" onclick="console.error('boom'); fetch('/missing.json')">Break</button>
+</body>
+</html>
