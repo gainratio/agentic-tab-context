@@ -3,3 +3,12 @@ dist/
 coverage/
 .tabctx/
 *.log
+.dagger/.venv/
+.dagger/.mypy_cache/
+.dagger/.pytest_cache/
+.dagger/.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+

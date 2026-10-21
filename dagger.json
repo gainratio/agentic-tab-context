@@ -1,0 +1,15 @@
+{
+  "name": "agentic-browser-tab",
+  "engineVersion": "v0.21.8",
+  "sdk": {
+    "source": "python"
+  },
+  "dependencies": [
+    {
+      "name": "foundation",
+      "source": "github.com/gainratio/ci/modules/portfolio-foundation@8420264d5560b0817579d9c5323ae3a69ce4558d",
+      "pin": "8420264d5560b0817579d9c5323ae3a69ce4558d"
+    }
+  ],
+  "source": ".dagger"
+}

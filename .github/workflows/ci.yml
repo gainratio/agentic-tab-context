@@ -1,26 +1,58 @@
-name: ci
+name: CI
 
 on:
   push:
     branches: [main]
   pull_request:
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
+  gitleaks:
+    name: Secret scan / gitleaks
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    env:
+      GITLEAKS_VERSION: "8.30.1"
+      GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Install gitleaks (pinned, checksum verified)
+        run: |
+          tarball="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSL -o "$tarball" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${tarball}"
+          echo "${GITLEAKS_SHA256}  ${tarball}" | sha256sum --check --strict
+          tar -xzf "$tarball" gitleaks
+          sudo install -m 0755 gitleaks /usr/local/bin/gitleaks
+      - name: Scan full history
+        run: |
+          commits="$(git rev-list --count --all)"
+          gitleaks git --redact --no-banner --log-opts="--all" .
+          echo "gitleaks swept FULL HISTORY: all ${commits} commits."
+
   check:
+    name: Quality & Browser E2E Gate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: 22
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
+      - name: Audit dependencies
+        run: npm audit --audit-level=moderate
       - name: Install Chromium for e2e
         run: npx playwright-core install --with-deps chromium
-      - name: Point tests at the installed Chromium
-        run: echo "TABCTX_CHROMIUM_PATH=$(node -e "console.log(require('playwright-core').chromium.executablePath())")" >> "$GITHUB_ENV"
-      - run: npm run typecheck
-      - run: npm test
+      - name: Run build, typecheck, unit, and e2e gate
+        run: npm run gate
