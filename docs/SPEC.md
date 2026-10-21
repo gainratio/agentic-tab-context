@@ -1,48 +1,18 @@
-# TabContext (`tabctx`) — spec
+# Agentic Browser Tab (`abt` / `tabctx`) — Specification
 
-TabContext is a small, browser-agnostic CLI that gives coding assistants a **persistent browser
-tab/session**. The assistant creates a context once (`tabctx open chromium` → `ctx_7f21`) and keeps
-operating on it across commands. The human establishes identity (logs in, MFA, SSO, passkeys) in that
-same visible browser; the agent establishes navigation; TabContext preserves context. tabctx never
-handles credentials.
+Agentic Browser Tab (`abt`, aliased as `agentic-browser-tab` and `tabctx`) is a deterministic, browser-agnostic CLI, local daemon, and Manifest V3 WebExtension that gives coding assistants a **persistent, sticky browser tab** — binding directly to the tab the user already has open rather than launching redundant browser windows.
 
-## Core principles
-- **Sticky context.** A context lives until `tabctx close` or until its browser disappears.
-- **Optional current context.** `tabctx use ctx_7f21` makes later commands target it implicitly.
-- **Deterministic, never guess.** Ambiguous targets fail with `AMBIGUOUS_TARGET` and the match count;
-  missing targets fail with `TARGET_NOT_FOUND`. `--nth N` is the explicit escape hatch.
-- **JSON only.** Every command prints exactly one JSON object on stdout; exit code 0 iff `"ok": true`.
-- **Browser-native IDs stay internal.** Only `ctx_*` IDs cross the CLI boundary.
-- **Not** an agent, MCP server, browser, workflow engine, auth manager, or RPA platform.
+## Core Principles
+- **Bind first, never open a redundant browser.** `abt bind` discovers open tabs across the WebExtension bridge (`127.0.0.1:43919`), macOS native browsers (`osascript` JXA), and managed Playwright contexts, binding to the matching tab in place.
+- **Sticky context.** A context (`ctx_<hex>`) lives in the background daemon until `abt close` or until its tab/browser closes.
+- **Deterministic, never guess.** Ambiguous tab queries or DOM locators fail closed with `AMBIGUOUS_TARGET` and the match count/candidates; missing targets fail with `TARGET_NOT_FOUND`. `--tab <tabId>` (for `bind`) and `--nth N` (for DOM actions) are explicit escape hatches.
+- **JSON only.** Every command prints **exactly one line** of compact JSON on `stdout`; exit code is `0` iff `"ok": true`.
+- **Zero credentials.** Humans authenticate in their own browser window; `abt` never stores or echoes credentials and redacts typed values from error responses.
 
 ## Architecture
-`assistant --shell--> tabctx CLI --unix socket NDJSON--> daemon (context registry, sticky state,
-driver management) --> BrowserDriver (chromium now; safari/firefox later) --> persistent browser`.
-
-The CLI auto-starts the daemon on first use. Contracts live in `src/contracts/`.
-
-## Commands (MVP)
-| Command | Result |
-|---|---|
-| `tabctx open <browser> [--profile P] [--headless] [--use]` | `{ok, context}` |
-| `tabctx list` | `{ok, contexts: [...], current}` |
-| `tabctx use <ctx>` / `tabctx current` | `{ok, context}` |
-| `tabctx close [ctx]` | `{ok, context}` |
-| `tabctx goto [--context C] <url>` (relative URLs resolve against the current page) | `{ok, url, title}` |
-| `tabctx back|forward|reload` | `{ok, url, title}` |
-| `tabctx inspect` | `{ok, url, title, aria}` |
-| `tabctx screenshot [--out F] [--full-page]` | `{ok, path, bytes}` |
-| `tabctx click <target>` | `{ok, matched: 1}` |
-| `tabctx type <target> --value V` / `tabctx select <target> --value V` | `{ok, matched: 1}` |
-| `tabctx console [--since N]` / `tabctx network [--since N]` | `{ok, entries, next}` |
-
-Targets: `--role R [--name N]`, `--label L`, `--text T`, `--placeholder P`, `--testid ID`,
-`--selector CSS`, each with optional `--nth N` (0-based). Names/labels/text match **exactly**, and only
-**visible** elements count.
-
-## Browser support
-- **Chromium** (MVP): Playwright `launchPersistentContext` with a per-profile user-data dir, headed by
-  default so the human can log in. `TABCTX_CHROMIUM_PATH` overrides the executable.
-- **Safari / Firefox**: return `UNSUPPORTED_BROWSER` for now. Safari's WebDriver runs in an isolated
-  automation window that locks out manual input, which conflicts with "human logs in manually"; this
-  must be solved before Safari ships.
+1. **CLI (`src/cli/`)**: Strict, zero-dependency argument parser (`args.ts`), one-step skill/extension installer (`setup.ts`), and auto-starting Unix socket client (`client.ts`).
+2. **Daemon (`src/daemon/`)**: Manages the sticky `ContextRegistry` (`registry.ts`), live tab aggregator & deterministic selector (`tabs.ts`), per-context serialized request router (`server.ts`), and command handlers (`service.ts`).
+3. **Drivers (`src/drivers/`)**:
+   - `ExtensionDriver` + `ExtensionBridge` (`src/drivers/extension/`): Drives tabs in any browser running the Manifest V3 WebExtension (`extension/`) over `http://127.0.0.1:43919`.
+   - `MacosTabDriver` (`src/drivers/macos/`): Zero-config live tab discovery and binding for macOS Chrome, Safari, Brave, and Edge via JXA.
+   - `PlaywrightDriver` (`src/drivers/playwright/`): Cross-browser persistent context driver supporting `chromium`, `chrome`, `brave`, `edge`, `firefox`, `safari`, and `webkit`.

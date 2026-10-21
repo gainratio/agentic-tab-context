@@ -1,172 +1,208 @@
-# tabctx — a persistent, sticky browser context for coding assistants
+# Agentic Browser Tab (`abt`)
 
-`tabctx` (TabContext) is a small, browser-agnostic CLI that gives coding assistants a **persistent
-browser tab/session**. The assistant creates a context once (`tabctx open chromium` → `ctx_7f21`) and
-keeps operating on it across separate shell commands. The human establishes identity (logs in, MFA, SSO,
-passkeys) in that same visible browser; the agent establishes navigation; TabContext preserves the
-context in between. Every command prints exactly one JSON object, and tabctx never handles credentials.
+> **Stop coding assistants from opening redundant browser windows and tabs.** When you say *"look at my browser"*, `abt` finds the exact tab you already have open, binds to it in place, and gives Claude Code, Codex, and Antigravity a sticky, deterministic JSON session across commands.
 
-## Install and build
+---
 
-Requires Node.js 22 or newer.
+## TL;DR
 
-```sh
-npm install
-npm run build
-npm link        # puts `tabctx` on your PATH
+1. **What it is:** A lightweight, zero-credential CLI (`abt`, `agentic-browser-tab`, and `tabctx`) + WebExtension + coding-assistant skill that binds AI coding assistants directly to the browser tab you already have open across **Chrome, Safari, Firefox, Brave, Edge, and WebKit/Chromium**.
+2. **Why it works:** Coding assistants normally launch a fresh headless browser or open a new tab on every turn — losing your login session, MFA state, DevTools state, and open page. `abt` keeps a lightweight local daemon (`~/.tabctx/daemon.sock`) that discovers your live tabs (via the Manifest V3 WebExtension on `127.0.0.1:43919`, macOS native JXA tab discovery, or managed Playwright sessions), binds to the matching tab (`ctx_<hex>`), and runs every subsequent `inspect`, `click`, `type`, `select`, `console`, `network`, and `screenshot` command against that exact tab.
+3. **Worked example — *"Look at my browser"*:**
+   ```sh
+   # 1. Discover and bind to the tab you already have open (by query, URL, title, or active tab):
+   abt bind "localhost"
+   # => {"ok":true,"context":"ctx_7f21","tabId":"macos:chrome:1:3","browser":"chrome","source":"macos","url":"http://localhost:5181/","title":"EdgeReco","current":true,"reused":false}
+
+   # 2. Inspect the live ARIA tree and interact with deterministic locators:
+   abt inspect
+   # => {"ok":true,"context":"ctx_7f21","url":"http://localhost:5181/","title":"EdgeReco","aria":"- heading \"EdgeReco\"..."}
+
+   abt click --role button --name "Save"
+   # => {"ok":true,"context":"ctx_7f21","matched":1}
+
+   abt console --since 0
+   # => {"ok":true,"context":"ctx_7f21","entries":[],"next":0}
+   ```
+4. **Core invariants:**
+   - **Bind first, never open a redundant tab:** `abt bind` attaches to your existing tab; if multiple tabs match, it fails closed with `AMBIGUOUS_TARGET` and returns the candidate list rather than guessing.
+   - **Deterministic visible-only locators:** `click`, `type`, and `select` match only visible elements with exact names/labels. Multiple matches fail closed with `AMBIGUOUS_TARGET` unless disambiguated with `--nth N`.
+   - **One line of JSON per command:** Every command prints exactly one compact JSON object to `stdout` and exits `0` iff `"ok": true`.
+   - **Zero credential handling:** Humans log in (passwords, SSO, MFA, passkeys) in their own browser; typed values are automatically redacted from error output.
+
+---
+
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph Assistants["Coding Assistants"]
+    CC["Claude Code"]
+    CX["Codex"]
+    AG["Antigravity"]
+  end
+
+  subgraph CLI["CLI (1 JSON line / cmd)"]
+    ABT["abt / agentic-browser-tab / tabctx"]
+  end
+
+  subgraph Daemon["Local Daemon (~/.tabctx/daemon.sock)"]
+    REG["Sticky Context Registry (ctx_*)"]
+    TABS["Tab Discovery & Deterministic Binder"]
+    BRG["Extension Bridge (127.0.0.1:43919)"]
+  end
+
+  subgraph Browsers["Live & Managed Browsers"]
+    EXT["WebExtension (Chrome, Brave, Edge, Firefox)"]
+    MAC["macOS Live Tabs (Chrome, Safari, Brave, Edge)"]
+    PW["Playwright Persistent Profiles (Chromium, Chrome, Firefox, Safari/WebKit)"]
+  end
+
+  Assistants -->|"SKILL.md"| ABT
+  ABT -->|"NDJSON over Unix Socket"| REG
+  REG --> TABS
+  TABS --> BRG
+  BRG <-->|"HTTP Long-Poll"| EXT
+  TABS -->|"osascript JXA"| MAC
+  TABS -->|"launchPersistentContext"| PW
 ```
 
-Chromium is driven through `playwright-core`, which does not download browsers. Point
-`TABCTX_CHROMIUM_PATH` at a Chromium/Chrome executable if Playwright cannot find one.
+---
 
-## Core workflow
+## 1-Command Install
+
+Requires Node.js 22+.
 
 ```sh
-tabctx open chromium --use                 # {"ok":true,"context":"ctx_7f21",...}  headed window appears
-tabctx goto https://app.example.com/login  # {"ok":true,"url":"...","title":"Sign in"}
-
-# The human now signs in by hand in that window (password, MFA, SSO, passkey).
-# tabctx never sees or types credentials.
-
-tabctx goto /settings/billing              # relative URLs resolve against the current page
-tabctx inspect                             # {"ok":true,"url":...,"title":...,"aria":"<ARIA snapshot>"}
-tabctx type --label "Company name" --value "Acme"
-tabctx select --label "Plan" --value "Pro"
-tabctx click --role button --name "Save"
-tabctx console --since 0                   # {"ok":true,"entries":[...],"next":17}
-tabctx network --since 0                   # look for failed requests / 4xx / 5xx
-tabctx reload
-tabctx inspect                             # verify the change stuck
-tabctx close                               # when done; the login stays in the profile
+./install.sh
 ```
 
-Because the session lives in a background daemon, each line above can be a separate process (or a
-separate assistant turn) and the tab, its history and its form state are still there.
+`./install.sh` builds the TypeScript source, links `abt`, `agentic-browser-tab`, and `tabctx` onto your `PATH`, installs the `agentic-browser-tab` skill into:
+- `~/.claude/skills/agentic-browser-tab/SKILL.md` (Claude Code)
+- `~/.codex/skills/agentic-browser-tab/SKILL.md` (OpenAI Codex)
+- `~/.gemini/antigravity/skills/agentic-browser-tab/SKILL.md` (Google Antigravity)
+- `~/.agents/skills/agentic-browser-tab/SKILL.md` (Universal Agent Skills)
 
-## Command reference
+and runs `abt doctor` to verify your installed browsers and live tab discovery.
+
+You can also run setup or diagnostics anytime:
+
+```sh
+abt setup
+abt doctor
+```
+
+---
+
+## Connecting to Your Existing Browser Tab
+
+`abt` supports three complementary ways to work with browsers:
+
+### 1. Zero-Config macOS Live Tab Discovery (`source: "macos"`)
+Out of the box on macOS, `abt tabs` and `abt bind` immediately discover all open windows and tabs across **Google Chrome**, **Safari**, **Brave Browser**, and **Microsoft Edge** with zero permission popups:
+
+```sh
+abt tabs
+abt bind "aml-filter"          # or: abt bind --active
+abt goto http://localhost:5182/customers
+```
+
+> **Note for DOM inspection (`inspect`, `click`, `type`, `select`) on macOS live tabs:** Either load the unpacked WebExtension below (recommended, works on all platforms) or enable **View → Developer → Allow JavaScript from Apple Events** in Chrome/Safari.
+
+### 2. Universal Browser Extension (`source: "extension"`, Chrome / Brave / Edge / Firefox)
+For full DOM inspection, clicks, form fills, screenshots, and console/network capture in your everyday browser without enabling Apple Events or `--remote-debugging-port`:
+
+1. Open `chrome://extensions` (or `brave://extensions` / `edge://extensions`).
+2. Enable **Developer mode** (top right) and click **Load unpacked**.
+3. Select the `extension/` folder inside this repository (printed by `abt setup`).
+4. Click the **Agentic Browser Tab** toolbar icon to pin your active tab, or run `abt bind --active` from the terminal.
+
+### 3. Managed Persistent Multi-Browser Profiles (`source: "managed"`)
+When you want a dedicated persistent browser window where logins/cookies survive across runs:
+
+```sh
+abt open chrome --use          # or: chromium | firefox | safari | webkit | brave | edge
+abt open firefox --headless --use
+abt open safari --use
+```
+
+---
+
+## Command Reference
 
 | Command | Result |
 |---|---|
-| `tabctx open <browser> [--profile P] [--headless] [--use]` | `{ok, context, ...}` — `browser` is one of `chromium`, `chrome`, `safari`, `firefox` |
-| `tabctx list` | `{ok, contexts: [...], current}` |
-| `tabctx use <ctx>` | `{ok, context}` — make `<ctx>` the current context |
-| `tabctx current` | `{ok, context}` (or `NO_CURRENT_CONTEXT`) |
-| `tabctx close [ctx]` | `{ok, context}` — closes `<ctx>`, or the current context |
-| `tabctx goto <url>` | `{ok, url, title}` — relative URLs resolve against the current page |
-| `tabctx back` / `forward` / `reload` | `{ok, url, title}` |
-| `tabctx inspect` | `{ok, url, title, aria}` — ARIA snapshot (YAML) of the page |
-| `tabctx screenshot [--out F] [--full-page]` | `{ok, path, bytes}` — default path under `$TABCTX_HOME/screenshots` |
-| `tabctx console [--since N]` | `{ok, entries, next}` — pass `--since <next>` to get only newer entries |
-| `tabctx network [--since N]` | `{ok, entries, next}` |
-| `tabctx click <target>` | `{ok, matched: 1}` |
-| `tabctx type <target> --value V` | `{ok, matched: 1}` |
-| `tabctx select <target> --value V` | `{ok, matched: 1}` |
-| `tabctx shutdown` | stops the background daemon (`{ok, running: false}` if none was running) |
-| `tabctx help` / `--help` / `-h` | `{ok, usage: [...]}` |
+| `abt bind [query] [--query Q] [--url U] [--title T] [--browser B] [--tab ID] [--active] [--use]` | `{ok, context, tabId, browser, source, url, title, current, reused}` — binds to an already-open tab |
+| `abt tabs [query] [--browser B] [--query Q] [--active]` | `{ok, tabs: [...]} ` — lists all open tabs across extension, macOS, and managed browsers |
+| `abt open <browser> [--profile P] [--headless] [--use]` | `{ok, context, browser, profile, current}` — `browser`: `chromium`, `chrome`, `brave`, `edge`, `firefox`, `safari`, `webkit`, `extension` |
+| `abt list` | `{ok, contexts: [...], current}` |
+| `abt use <ctx>` | `{ok, context}` — make `<ctx>` the current context |
+| `abt current` | `{ok, context}` (or `NO_CURRENT_CONTEXT`) |
+| `abt close [ctx] [--context C]` | `{ok, context}` — closes `<ctx>` or the current context |
+| `abt goto <url> [--context C]` | `{ok, context, url, title}` — relative URLs resolve against the current page |
+| `abt back` / `forward` / `reload` | `{ok, context, url, title}` |
+| `abt inspect [--context C]` | `{ok, context, url, title, aria}` — ARIA snapshot (YAML) of visible elements |
+| `abt screenshot [--out F] [--full-page]` | `{ok, context, path, bytes}` — writes PNG (default under `$ABT_HOME/screenshots`) |
+| `abt console [--since N]` | `{ok, context, entries, next}` — pass `--since <next>` for incremental logs |
+| `abt network [--since N]` | `{ok, context, entries, next}` |
+| `abt click <target>` | `{ok, context, matched: 1}` |
+| `abt type <target> --value V` | `{ok, context, matched: 1}` |
+| `abt select <target> --value V` | `{ok, context, matched: 1}` |
+| `abt doctor` | `{ok, pid, home, current, openContexts, liveTabs, extensionBridge, browsers}` |
+| `abt setup` | `{ok, cli, installedSkills, extensionPath, browsers}` |
+| `abt shutdown` | Stops the background daemon (`{ok, running: false}` if none was running) |
+| `abt help` / `--help` / `-h` | `{ok, usage: [...]}` |
 
-Every page command (`goto` through `select`, plus `close`) accepts `--context C` (short: `-c C`) to
-target a specific context instead of the current one. Context IDs always look like `ctx_<hex>`.
+---
 
-Argument rules (the parser is strict and never guesses):
+## Targets and Determinism
 
-- Both `--flag value` and `--flag=value` work. Use `--flag=value` for values that start with `--`.
-- `--` ends flag parsing; everything after it is positional (e.g. `tabctx goto -- -odd-path`).
-- Unknown commands or flags, duplicate flags, missing values, extra positionals, bad integers and
-  unknown browsers fail with `INVALID_ARGUMENT` before anything is sent to the daemon.
-- `--profile` must match `^[A-Za-z0-9_-]{1,64}$` (default profile: `default`).
-
-## Targets and determinism
-
-`click`, `type` and `select` need exactly one locator:
+`click`, `type`, and `select` require **exactly one** locator flag:
 
 | Flag | Matches |
 |---|---|
-| `--role R [--name N]` | elements with ARIA role `R` (and accessible name `N`) |
-| `--label L` | form controls labelled `L` |
-| `--text T` | elements whose text is `T` |
-| `--placeholder P` | inputs with placeholder `P` |
-| `--testid ID` | elements with that test id |
-| `--selector CSS` | a raw CSS selector |
+| `--role R [--name N]` | Visible elements with ARIA role `R` (and exact accessible name `N`) |
+| `--label L` | Visible form controls labelled `L` |
+| `--text T` | Visible elements whose exact text is `T` |
+| `--placeholder P` | Visible inputs with placeholder `P` |
+| `--testid ID` | Visible elements with `data-testid="ID"` |
+| `--selector CSS` | Visible elements matching CSS selector `CSS` |
 
-plus optional `--nth N` (0-based, non-negative integer). `--name` is only valid with `--role`. Zero or
-several locator flags is `INVALID_ARGUMENT`.
+Add `--nth N` (0-based integer) to disambiguate when multiple visible elements match.
 
-tabctx never guesses:
+---
 
-- Names, labels and text match **exactly**, and only **visible** elements count.
-- More than one match fails with `AMBIGUOUS_TARGET` and the match count, e.g.
-  `{"ok":false,"error":"AMBIGUOUS_TARGET","message":"...","matched":2}`.
-- No match fails with `TARGET_NOT_FOUND`.
-- `--nth N` is the explicit escape hatch: pick the N-th of the visible exact matches.
+## Multi-Browser Support Matrix
 
-## Output and exit codes
+| Browser Target | Live Tab Discovery & Bind | Managed Persistent Context (`abt open`) | Engine |
+|---|---|---|---|
+| `chrome` | ✅ Extension + macOS JXA | ✅ System Chrome / Playwright Chromium | Blink |
+| `chromium` | ✅ Extension + macOS JXA | ✅ Playwright Chromium | Blink |
+| `brave` | ✅ Extension + macOS JXA | ✅ System Brave / Playwright Chromium | Blink |
+| `edge` | ✅ Extension + macOS JXA | ✅ System Edge / Playwright Chromium | Blink |
+| `firefox` | ✅ Extension | ✅ Playwright Firefox / System Firefox | Gecko |
+| `safari` | ✅ macOS JXA + Extension | ✅ Playwright WebKit | WebKit |
+| `webkit` | ✅ Managed | ✅ Playwright WebKit | WebKit |
+| `extension` | ✅ Active Extension Tab | ✅ Binds active extension tab | Any |
 
-- Every invocation prints **exactly one line** of compact JSON on stdout and nothing else.
-- Exit code is `0` iff the object has `"ok": true`, otherwise `1`.
-- Failures look like `{"ok":false,"error":"<CODE>","message":"...", ...details}`, where `<CODE>` is one
-  of: `INVALID_ARGUMENT`, `UNSUPPORTED_BROWSER`, `CONTEXT_NOT_FOUND`, `CONTEXT_CLOSED`,
-  `NO_CURRENT_CONTEXT`, `TARGET_NOT_FOUND`, `AMBIGUOUS_TARGET`, `NAVIGATION_FAILED`, `ACTION_FAILED`,
-  `TIMEOUT`, `DAEMON_UNAVAILABLE`, `INTERNAL`.
-- The CLI waits up to 120 s for a daemon reply (`TIMEOUT` after that).
+---
 
-## The daemon
-
-The first command that needs it starts a detached background daemon (`node dist/daemon/main.js`)
-listening on `$TABCTX_HOME/daemon.sock`; the CLI waits up to 10 s for it to answer `ping`, otherwise it
-fails with `DAEMON_UNAVAILABLE` and points at the daemon log. `tabctx shutdown` stops it (and never
-starts one). The daemon owns the context registry, the current-context pointer and the browser
-processes; the CLI is a thin client that sends one NDJSON request and prints the one response.
-
-## Environment variables
+## Environment Variables
 
 | Variable | Effect |
 |---|---|
-| `TABCTX_HOME` | State directory (default `~/.tabctx`). Separate homes give fully separate daemons. |
-| `TABCTX_HEADLESS` | `1` makes `open` headless by default (`--headless` always forces headless). |
-| `TABCTX_CHROMIUM_PATH` | Chromium/Chrome executable to launch. |
+| `ABT_HOME` / `TABCTX_HOME` | State directory (default `~/.tabctx`). Separate homes run isolated daemons. |
+| `ABT_HEADLESS` / `TABCTX_HEADLESS` | `1` makes `open` headless by default (`--headless` always forces headless). |
+| `ABT_BROWSER_PATH` / `TABCTX_CHROMIUM_PATH` | Explicit browser executable override. |
+| `ABT_BRIDGE_PORT` | Localhost port for the WebExtension HTTP bridge (default `43919`). |
 
-`TABCTX_HEADLESS` and `TABCTX_CHROMIUM_PATH` are read by the daemon, so they take effect when the daemon
-starts; run `tabctx shutdown` after changing them.
+---
 
-## Files under `TABCTX_HOME`
-
-| Path | Contents |
-|---|---|
-| `daemon.sock` | Unix socket the CLI talks to (mode `0600`) |
-| `daemon.log` | Daemon log (JSON lines) |
-| `state.json` | Registry snapshot: contexts and the current context |
-| `profiles/<name>/` | Browser user-data directory per profile (cookies, logins) |
-| `screenshots/` | Default screenshot output directory |
-
-## Security notes
-
-- The daemon listens only on a local Unix socket, created with mode `0600` inside a `0700` directory.
-  There is no TCP listener.
-- tabctx never asks for, stores or types credentials. Humans log in themselves in the visible window.
-- Profiles **persist logins on disk**: anything in `~/.tabctx/profiles` (or `$TABCTX_HOME/profiles`) is
-  as sensitive as the browser sessions it holds. Do not commit, share or back it up casually; delete a
-  profile directory to forget its logins.
-- `inspect`, `console`, `network` and screenshots can expose whatever the page shows. Treat their output
-  like the page itself.
-
-## Browser support
-
-| Browser | Status |
-|---|---|
-| `chromium`, `chrome` | Supported. Playwright `launchPersistentContext` with one user-data dir per profile, headed by default so the human can log in. |
-| `safari` | Planned; returns `UNSUPPORTED_BROWSER`. Safari's WebDriver runs in an isolated automation window that locks out manual input, which conflicts with "the human logs in manually"; that must be solved before Safari ships. |
-| `firefox` | Planned; returns `UNSUPPORTED_BROWSER`. |
-
-## Non-goals
-
-tabctx is **not** an agent, an MCP server, a browser, a workflow engine, an auth/credential manager or
-an RPA platform. It keeps one browser context alive between commands and reports on it in
-deterministic JSON; deciding what to do next is the assistant's job.
-
-## Development
+## Development & Verification
 
 ```sh
+npm run build
 npm run typecheck
-npm run test:unit
-npm run test:e2e     # needs a Chromium executable (TABCTX_CHROMIUM_PATH)
+npm test
+npm audit
 ```

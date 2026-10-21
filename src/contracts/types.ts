@@ -1,23 +1,56 @@
 /**
- * Shared contracts for tabctx. Every module (cli, daemon, drivers) imports from
- * here and never from each other's internals. Browser-native identifiers (CDP
- * targets, WebDriver handles, Playwright objects) never cross this boundary.
+ * Shared contracts for agentic-browser-tab (abt / tabctx). Every module (cli,
+ * daemon, drivers) imports from here and never from each other's internals.
  */
 
-export const BROWSERS = ["chromium", "chrome", "safari", "firefox"] as const;
+export const BROWSERS = [
+  "chromium",
+  "chrome",
+  "brave",
+  "edge",
+  "firefox",
+  "safari",
+  "webkit",
+  "extension",
+] as const;
 export type BrowserName = (typeof BROWSERS)[number];
 
 export type ContextStatus = "open" | "closed";
+export type TabSource = "extension" | "managed" | "macos";
 
 /** The public, stable view of one browser context. */
 export interface TabContext {
   id: string; // "ctx_7f21"
   browser: BrowserName;
   status: ContextStatus;
-  profile: string; // profile name; same profile => same cookies/logins across contexts and restarts
+  profile: string;
+  source?: TabSource;
+  tabId?: string;
   url?: string;
   title?: string;
   createdAt: string; // ISO-8601
+}
+
+/** One live open tab discovered across extension, managed, or OS browsers. */
+export interface LiveTab {
+  tabId: string;
+  browser: BrowserName;
+  source: TabSource;
+  url: string;
+  title: string;
+  active: boolean;
+  context?: string;
+}
+
+/** Filter for finding and binding to an already-open browser tab. */
+export interface BindOptions {
+  tab?: string;
+  query?: string;
+  url?: string;
+  title?: string;
+  browser?: BrowserName;
+  active?: boolean;
+  use?: boolean;
 }
 
 /** How a command picks exactly one element. Exactly one locator kind is set. */
@@ -32,7 +65,7 @@ export type Target =
 export interface PageState {
   url: string;
   title: string;
-  /** Playwright ARIA snapshot (YAML) of the page body: roles, names, values. */
+  /** ARIA snapshot (YAML) of the page body: roles, names, values. */
   aria: string;
 }
 
@@ -46,11 +79,11 @@ export interface ScreenshotResult {
 }
 
 export interface ConsoleEntry {
-  seq: number; // monotonically increasing per context
-  type: string; // "log" | "error" | "warning" | "pageerror" | ...
+  seq: number;
+  type: string;
   text: string;
   url?: string;
-  at: string; // ISO-8601
+  at: string;
 }
 
 export interface NetworkEntry {
@@ -58,7 +91,7 @@ export interface NetworkEntry {
   method: string;
   url: string;
   resourceType: string;
-  status?: number; // absent when the request failed or has not completed
+  status?: number;
   failure?: string;
   at: string;
 }
@@ -78,7 +111,6 @@ export interface BrowserDriver {
   readonly name: BrowserName;
   open(options: OpenOptions): Promise<BrowserSession>;
   close(session: BrowserSession): Promise<void>;
-  /** Registers a callback fired once when the underlying browser/page disappears. */
   onDisconnect(session: BrowserSession, callback: () => void): void;
   navigate(session: BrowserSession, url: string): Promise<void>;
   back(session: BrowserSession): Promise<void>;
@@ -92,6 +124,8 @@ export interface BrowserDriver {
   screenshot(session: BrowserSession, path: string, fullPage: boolean): Promise<ScreenshotResult>;
   console(session: BrowserSession, sinceSeq: number): Promise<ConsoleEntry[]>;
   network(session: BrowserSession, sinceSeq: number): Promise<NetworkEntry[]>;
+  listTabs?(): Promise<LiveTab[]>;
+  bindTab?(tabId: string): Promise<BrowserSession>;
 }
 
 export type DriverFactory = (browser: BrowserName) => BrowserDriver;

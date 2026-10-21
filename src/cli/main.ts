@@ -1,14 +1,14 @@
 /**
- * tabctx CLI entry: parse argv, send one request to the daemon, print exactly
- * one line of compact JSON on stdout, and return the exit code (0 iff ok).
+ * abt / tabctx CLI entry: parse argv, send one request to the daemon (or run local
+ * setup), print exactly one line of compact JSON on stdout, and return the exit code.
  */
 import { isTabCtxError } from "../contracts/errors.js";
 import { resolvePaths } from "../contracts/paths.js";
 import type { ErrorResponse, Paths, Request, Response } from "../contracts/protocol.js";
 import { parseArgs, USAGE } from "./args.js";
 import { sendRequest } from "./client.js";
+import { runSetup } from "./setup.js";
 
-/** Delivers one request to the daemon. Injectable so tests need no socket. */
 export type Transport = (request: Request, paths: Paths, env: NodeJS.ProcessEnv) => Promise<Response>;
 
 export interface MainIo {
@@ -39,8 +39,6 @@ function serialize(response: Response): string {
 }
 
 function writeProcessStdout(line: string): Promise<void> {
-  // Wait for the flush: bin/tabctx.js calls process.exit() right after main()
-  // resolves, which would truncate large output on asynchronous pipes.
   return new Promise((resolve) => {
     process.stdout.write(line, () => resolve());
   });
@@ -50,6 +48,7 @@ async function run(argv: string[], env: NodeJS.ProcessEnv, transport: Transport)
   try {
     const parsed = parseArgs(argv);
     if ("help" in parsed) return { ok: true, usage: [...USAGE] };
+    if ("setup" in parsed) return runSetup(env);
     return await transport(parsed, resolvePaths(env), env);
   } catch (error) {
     return errorResponse(error);

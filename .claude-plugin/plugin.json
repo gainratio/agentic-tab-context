@@ -1,0 +1,6 @@
+{
+  "name": "agentic-browser-tab",
+  "version": "0.1.0",
+  "description": "Discover and bind to the user's already-open browser tab across Chrome, Safari, Firefox, Brave, and Edge without opening redundant browser windows.",
+  "skills": "./skills"
+}

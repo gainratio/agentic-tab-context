@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Agentic Browser Tab</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="card">
+      <header class="header">
+        <div class="brand">
+          <span class="dot" id="status-dot"></span>
+          <h1>Agentic Browser Tab</h1>
+        </div>
+        <span class="badge" id="status-badge">Checking…</span>
+      </header>
+
+      <section class="tab-box">
+        <div class="label">Active Tab</div>
+        <div class="tab-title" id="tab-title">—</div>
+        <div class="tab-url" id="tab-url">—</div>
+      </section>
+
+      <button type="button" class="primary-btn" id="bind-btn">
+        Bind Active Tab to Coding Assistant
+      </button>
+
+      <div class="feedback" id="feedback" hidden></div>
+
+      <footer class="footer">
+        <code>abt bind --active</code> · <code>abt inspect</code>
+      </footer>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

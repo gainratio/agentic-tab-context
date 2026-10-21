@@ -1,16 +1,11 @@
 /**
  * ContextRegistry: the daemon's single source of truth for TabContext records.
- *
- * Holds the public `TabContext` view of every context ever created in this
- * TABCTX_HOME, the live driver `BrowserSession` for each open one, and the
- * `current` context id. Every mutation is persisted atomically to
- * `paths.state` (public fields only; sessions never touch disk).
  */
 import { randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { TabCtxError } from "../contracts/errors.js";
-import { BROWSERS, type BrowserName, type BrowserSession, type TabContext } from "../contracts/types.js";
+import { BROWSERS, type BrowserName, type BrowserSession, type TabContext, type TabSource } from "../contracts/types.js";
 
 /** Returns `size` random bytes. Injectable so tests can force id collisions. */
 export type RandomSource = (size: number) => Uint8Array;
@@ -24,6 +19,8 @@ export interface NewContext {
   browser: BrowserName;
   profile: string;
   createdAt: string;
+  source?: TabSource;
+  tabId?: string;
 }
 
 export interface RegistrySnapshot {
@@ -62,6 +59,13 @@ export class ContextRegistry {
     return this.sessions.get(id);
   }
 
+  findOpenByTabId(tabId: string): TabContext | undefined {
+    for (const ctx of this.contexts.values()) {
+      if (ctx.status === "open" && ctx.tabId === tabId) return { ...ctx };
+    }
+    return undefined;
+  }
+
   /** Contexts sorted by `createdAt`, then `id`. Returned objects are copies. */
   list(): TabContext[] {
     return [...this.contexts.values()].map((ctx) => ({ ...ctx })).sort(compareContexts);
@@ -74,7 +78,15 @@ export class ContextRegistry {
 
   create(input: NewContext, session: BrowserSession): TabContext {
     const id = this.nextId();
-    const ctx: TabContext = { id, browser: input.browser, status: "open", profile: input.profile, createdAt: input.createdAt };
+    const ctx: TabContext = {
+      id,
+      browser: input.browser,
+      status: "open",
+      profile: input.profile,
+      ...(input.source === undefined ? {} : { source: input.source }),
+      ...(input.tabId === undefined ? {} : { tabId: input.tabId }),
+      createdAt: input.createdAt,
+    };
     this.contexts.set(id, ctx);
     this.sessions.set(id, session);
     this.persist();
@@ -91,10 +103,6 @@ export class ContextRegistry {
     this.persist();
   }
 
-  /**
-   * Marks a context closed, forgets its session and clears `current` if it
-   * pointed here. Returns the session that was attached, if any. Idempotent.
-   */
   markClosed(id: string): BrowserSession | undefined {
     const ctx = this.contexts.get(id);
     if (ctx === undefined) return undefined;
@@ -138,7 +146,6 @@ export class ContextRegistry {
       this.contexts.set(ctx.id, { ...ctx, status: "closed" });
       this.usedIds.add(ctx.id);
     }
-    // Every loaded browser died with the previous daemon, so nothing can be current.
     this.currentId = null;
     this.persist();
   }
@@ -170,7 +177,7 @@ function readStateFile(path: string): unknown {
   try {
     return JSON.parse(text) as unknown;
   } catch {
-    return undefined; // Corrupt snapshot: start empty; the next write replaces it.
+    return undefined;
   }
 }
 
@@ -186,13 +193,15 @@ function parseContexts(raw: unknown): TabContext[] {
 
 function toTabContext(item: unknown): TabContext | undefined {
   if (!isRecord(item)) return undefined;
-  const { id, browser, profile, createdAt, url, title } = item;
+  const { id, browser, profile, createdAt, url, title, source, tabId } = item;
   if (typeof id !== "string" || !ID_PATTERN.test(id)) return undefined;
   if (typeof browser !== "string" || !isBrowserName(browser)) return undefined;
   if (typeof profile !== "string" || typeof createdAt !== "string") return undefined;
   const ctx: TabContext = { id, browser, status: "closed", profile, createdAt };
   if (typeof url === "string") ctx.url = url;
   if (typeof title === "string") ctx.title = title;
+  if (source === "extension" || source === "managed" || source === "macos") ctx.source = source;
+  if (typeof tabId === "string") ctx.tabId = tabId;
   return ctx;
 }
 

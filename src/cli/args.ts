@@ -1,21 +1,21 @@
 /**
- * Strict, dependency-free argv parser for the tabctx CLI.
- *
- * Every malformed invocation fails with `INVALID_ARGUMENT` and a precise
- * message. The parser never guesses: unknown commands or flags, duplicates,
- * missing values, extra positionals and bad integers are all rejected.
+ * Strict, dependency-free argv parser for the abt / tabctx CLI.
  */
 import { resolve } from "node:path";
 import { TabCtxError } from "../contracts/errors.js";
 import { CONTEXT_ID_PATTERN, PROFILE_PATTERN } from "../contracts/patterns.js";
 import type { Request } from "../contracts/protocol.js";
-import { BROWSERS, type BrowserName, type Target } from "../contracts/types.js";
+import { BROWSERS, type BindOptions, type BrowserName, type Target } from "../contracts/types.js";
 
 export interface HelpRequest {
   help: true;
 }
 
-export type ParseResult = Request | HelpRequest;
+export interface SetupRequest {
+  setup: true;
+}
+
+export type ParseResult = Request | HelpRequest | SetupRequest;
 
 const NON_NEGATIVE_INT = /^(0|[1-9][0-9]*)$/;
 
@@ -38,11 +38,17 @@ const FLAG_KINDS = {
   testid: "string",
   selector: "string",
   nth: "string",
+  browser: "string",
+  query: "string",
+  url: "string",
+  title: "string",
+  tab: "string",
+  active: "boolean",
 } as const satisfies Record<string, FlagKind>;
 
 type FlagName = keyof typeof FLAG_KINDS;
 
-const SHORT_ALIASES: Readonly<Record<string, FlagName>> = { c: "context" };
+const SHORT_ALIASES: Readonly<Record<string, FlagName>> = { c: "context", q: "query", b: "browser", a: "active" };
 
 const LOCATOR_FLAGS = ["role", "label", "text", "placeholder", "testid", "selector"] as const;
 type LocatorFlag = (typeof LOCATOR_FLAGS)[number];
@@ -56,19 +62,14 @@ interface Parsed {
 }
 
 interface CommandSpec {
-  /** Positional names, in order. A trailing `?` marks the positional optional. */
   positionals: readonly string[];
   flags: readonly FlagName[];
-  build: (parsed: Parsed) => Request;
+  build: (parsed: Parsed) => ParseResult;
 }
 
 function invalid(message: string): never {
   throw new TabCtxError("INVALID_ARGUMENT", message);
 }
-
-// ---------------------------------------------------------------------------
-// Value helpers
-// ---------------------------------------------------------------------------
 
 function nonEmpty(parsed: Parsed, flag: FlagName): string | undefined {
   const value = parsed.values.get(flag);
@@ -101,6 +102,13 @@ function contextFlag(parsed: Parsed): { context?: string } {
   return id === undefined ? {} : { context: checkContextId(parsed.command, "--context", id) };
 }
 
+function checkBrowser(command: string, raw: string): BrowserName {
+  if (!(BROWSERS as readonly string[]).includes(raw)) {
+    invalid(`${command}: unknown browser "${raw}"; expected one of ${BROWSERS.join(", ")}`);
+  }
+  return raw as BrowserName;
+}
+
 function positional(parsed: Parsed, index: number): string | undefined {
   return parsed.positionals[index];
 }
@@ -110,10 +118,6 @@ function requiredPositional(parsed: Parsed, index: number, name: string): string
   if (value === undefined || value === "") invalid(`${parsed.command}: missing required <${name}>`);
   return value;
 }
-
-// ---------------------------------------------------------------------------
-// Targets
-// ---------------------------------------------------------------------------
 
 function pickLocator(parsed: Parsed): LocatorFlag {
   const present = LOCATOR_FLAGS.filter((flag) => parsed.values.has(flag));
@@ -162,18 +166,9 @@ function requiredValue(parsed: Parsed): string {
   return value;
 }
 
-// ---------------------------------------------------------------------------
-// Command builders
-// ---------------------------------------------------------------------------
-
 function buildOpen(parsed: Parsed): Request {
-  const browser = requiredPositional(parsed, 0, "browser");
-  if (!(BROWSERS as readonly string[]).includes(browser)) {
-    invalid(`open: unknown browser "${browser}"; expected one of ${BROWSERS.join(", ")}`);
-  }
-  const params: { browser: BrowserName; profile?: string; headless?: boolean; use?: boolean } = {
-    browser: browser as BrowserName,
-  };
+  const browser = checkBrowser("open", requiredPositional(parsed, 0, "browser"));
+  const params: { browser: BrowserName; profile?: string; headless?: boolean; use?: boolean } = { browser };
   const profile = nonEmpty(parsed, "profile");
   if (profile !== undefined) {
     if (!PROFILE_PATTERN.test(profile)) {
@@ -184,6 +179,39 @@ function buildOpen(parsed: Parsed): Request {
   if (parsed.booleans.has("headless")) params.headless = true;
   if (parsed.booleans.has("use")) params.use = true;
   return { method: "open", params };
+}
+
+function buildTabs(parsed: Parsed): Request {
+  const rawBrowser = nonEmpty(parsed, "browser");
+  const browser = rawBrowser === undefined ? undefined : checkBrowser("tabs", rawBrowser);
+  const query = nonEmpty(parsed, "query") ?? positional(parsed, 0);
+  return {
+    method: "tabs",
+    params: {
+      ...(browser === undefined ? {} : { browser }),
+      ...(query === undefined || query === "" ? {} : { query }),
+      ...(parsed.booleans.has("active") ? { active: true } : {}),
+    },
+  };
+}
+
+function buildBind(parsed: Parsed): Request {
+  const rawBrowser = nonEmpty(parsed, "browser");
+  const browser = rawBrowser === undefined ? undefined : checkBrowser("bind", rawBrowser);
+  const tab = nonEmpty(parsed, "tab");
+  const query = nonEmpty(parsed, "query") ?? positional(parsed, 0);
+  const url = nonEmpty(parsed, "url");
+  const title = nonEmpty(parsed, "title");
+  const params: BindOptions = {
+    ...(tab === undefined ? {} : { tab }),
+    ...(query === undefined || query === "" ? {} : { query }),
+    ...(url === undefined ? {} : { url }),
+    ...(title === undefined ? {} : { title }),
+    ...(browser === undefined ? {} : { browser }),
+    ...(parsed.booleans.has("active") ? { active: true } : {}),
+    ...(parsed.booleans.has("use") ? { use: true } : {}),
+  };
+  return { method: "bind", params };
 }
 
 function buildClose(parsed: Parsed): Request {
@@ -203,7 +231,6 @@ function buildGoto(parsed: Parsed): Request {
 function buildScreenshot(parsed: Parsed): Request {
   const params: { context?: string; out?: string; fullPage?: boolean } = contextFlag(parsed);
   const out = nonEmpty(parsed, "out");
-  // The daemon runs in another working directory, so relative paths resolve here, against the caller's cwd.
   if (out !== undefined) params.out = resolve(out);
   if (parsed.booleans.has("full-page")) params.fullPage = true;
   return { method: "screenshot", params };
@@ -232,6 +259,12 @@ const PAGE: readonly FlagName[] = ["context"];
 
 const COMMANDS: Readonly<Record<string, CommandSpec>> = {
   open: { positionals: ["browser"], flags: ["profile", "headless", "use"], build: buildOpen },
+  tabs: { positionals: ["query?"], flags: ["browser", "query", "active"], build: buildTabs },
+  bind: {
+    positionals: ["query?"],
+    flags: ["query", "url", "title", "browser", "tab", "active", "use"],
+    build: buildBind,
+  },
   list: { positionals: [], flags: [], build: () => ({ method: "list", params: {} }) },
   use: {
     positionals: ["ctx"],
@@ -255,17 +288,14 @@ const COMMANDS: Readonly<Record<string, CommandSpec>> = {
   },
   type: { positionals: [], flags: [...PAGE, ...TARGET_FLAGS, "value"], build: buildFill("type") },
   select: { positionals: [], flags: [...PAGE, ...TARGET_FLAGS, "value"], build: buildFill("select") },
+  doctor: { positionals: [], flags: [], build: () => ({ method: "doctor", params: {} }) },
+  setup: { positionals: [], flags: [], build: () => ({ setup: true }) },
   shutdown: { positionals: [], flags: [], build: () => ({ method: "shutdown", params: {} }) },
 };
 
 export const COMMAND_NAMES: readonly string[] = [...Object.keys(COMMANDS), "help"];
 
-// ---------------------------------------------------------------------------
-// Tokenizer
-// ---------------------------------------------------------------------------
-
 const HELP_TOKENS = new Set(["--help", "-h"]);
-
 class HelpSignal {}
 
 interface FlagToken {
@@ -296,7 +326,15 @@ function splitFlag(command: string, token: string, allowed: readonly FlagName[])
 
 function takeValue(command: string, token: FlagToken, next: string | undefined): string {
   if (token.inline !== undefined) return token.inline;
-  if (next === undefined || next.startsWith("--") || next === "-c" || HELP_TOKENS.has(next)) {
+  if (
+    next === undefined ||
+    next.startsWith("--") ||
+    next === "-c" ||
+    next === "-q" ||
+    next === "-b" ||
+    next === "-a" ||
+    HELP_TOKENS.has(next)
+  ) {
     invalid(`${command}: ${token.spelling} requires a value (use ${token.spelling}=VALUE for values starting with "--")`);
   }
   return next;
@@ -341,11 +379,6 @@ function checkPositionalCount(parsed: Parsed, spec: CommandSpec): void {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Entry point
-// ---------------------------------------------------------------------------
-
-/** Parse `process.argv.slice(2)` into a daemon request, or a help marker. */
 export function parseArgs(argv: readonly string[]): ParseResult {
   const [command, ...rest] = argv;
   if (command === undefined || command === "help" || HELP_TOKENS.has(command)) {
@@ -353,7 +386,7 @@ export function parseArgs(argv: readonly string[]): ParseResult {
     return { help: true };
   }
   const spec = Object.hasOwn(COMMANDS, command) ? COMMANDS[command] : undefined;
-  if (spec === undefined) invalid(`unknown command "${command}"; run "tabctx help" for usage`);
+  if (spec === undefined) invalid(`unknown command "${command}"; run "abt help" for usage`);
   try {
     const parsed = tokenize(command, rest, spec);
     checkPositionalCount(parsed, spec);
@@ -365,7 +398,9 @@ export function parseArgs(argv: readonly string[]): ParseResult {
 }
 
 export const USAGE: readonly string[] = [
-  "tabctx open <browser> [--profile P] [--headless] [--use]   browser: chromium | chrome | safari | firefox",
+  "abt bind [query] [--query Q] [--url U] [--title T] [--browser B] [--tab ID] [--active] [--use]   bind to an already-open tab",
+  "abt tabs [--browser B] [--query Q]   list all open tabs across Chrome, Safari, Firefox, Brave, Edge, and Extension",
+  "tabctx open <browser> [--profile P] [--headless] [--use]   browser: chromium | chrome | brave | edge | firefox | safari | webkit | extension",
   "tabctx list",
   "tabctx use <ctx>",
   "tabctx current",
@@ -379,6 +414,8 @@ export const USAGE: readonly string[] = [
   "tabctx click <target> [--context C]",
   "tabctx type <target> --value V [--context C]",
   "tabctx select <target> --value V [--context C]",
+  "abt setup   install the agentic-browser-tab skill for Claude Code, Codex, and Antigravity",
+  "abt doctor   check browser executables, live tabs, extension bridge, and daemon status",
   "tabctx shutdown   stop the background daemon",
   "tabctx help",
   "target: exactly one of --role R [--name N] | --label L | --text T | --placeholder P | --testid ID | --selector CSS, plus optional --nth N (0-based)",

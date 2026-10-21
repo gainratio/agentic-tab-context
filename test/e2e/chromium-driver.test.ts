@@ -288,29 +288,23 @@ describe("ChromiumDriver (e2e, headless)", () => {
 });
 
 describe("createDriver", () => {
-  it("returns a Chromium driver for chromium and chrome", () => {
+  it("returns drivers for chromium, chrome, brave, edge, firefox, safari, webkit, and extension", () => {
     expect(createDriver("chromium", { profilesDir: tmpdir() }).name).toBe("chromium");
     expect(createDriver("chrome", { profilesDir: tmpdir() }).name).toBe("chrome");
+    expect(createDriver("brave", { profilesDir: tmpdir() }).name).toBe("brave");
+    expect(createDriver("edge", { profilesDir: tmpdir() }).name).toBe("edge");
+    expect(createDriver("firefox", { profilesDir: tmpdir() }).name).toBe("firefox");
+    expect(createDriver("safari", { profilesDir: tmpdir() }).name).toBe("safari");
+    expect(createDriver("webkit", { profilesDir: tmpdir() }).name).toBe("webkit");
+    expect(createDriver("extension", { profilesDir: tmpdir() }).name).toBe("extension");
   });
 
-  it("rejects safari with UNSUPPORTED_BROWSER and explains the lockout", () => {
-    expect(() => createDriver("safari", { profilesDir: tmpdir() })).toThrowError(TabCtxError);
+  it("rejects unknown browser names with UNSUPPORTED_BROWSER", () => {
+    expect(() => createDriver("opera" as never, { profilesDir: tmpdir() })).toThrowError(TabCtxError);
     try {
-      createDriver("safari", { profilesDir: tmpdir() });
+      createDriver("opera" as never, { profilesDir: tmpdir() });
     } catch (error) {
       expect((error as TabCtxError).code).toBe("UNSUPPORTED_BROWSER");
-      expect((error as TabCtxError).message).toMatch(/planned/);
-      expect((error as TabCtxError).message).toMatch(/automation window/);
-    }
-  });
-
-  it("rejects firefox with UNSUPPORTED_BROWSER", () => {
-    try {
-      createDriver("firefox", { profilesDir: tmpdir() });
-      expect.unreachable();
-    } catch (error) {
-      expect((error as TabCtxError).code).toBe("UNSUPPORTED_BROWSER");
-      expect((error as TabCtxError).message).toMatch(/planned/);
     }
   });
 });

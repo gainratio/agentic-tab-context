@@ -124,8 +124,23 @@ describe("tabctx end to end", () => {
     expect(statSync(path).size).toBeGreaterThan(0);
   });
 
-  it("rejects unsupported browsers and bad arguments with typed errors", async () => {
-    expect((await tabctx("open", "safari")).json).toMatchObject({ ok: false, error: "UNSUPPORTED_BROWSER" });
+  it("discovers open tabs via `tabs` and binds to a live tab via `bind`", async () => {
+    const listed = await tabctx("tabs");
+    expect(listed.code).toBe(0);
+    const tabs = listed.json.tabs as Json[];
+    expect(tabs.some((t) => String(t.url).endsWith("/app.html"))).toBe(true);
+
+    const bound = await tabctx("bind", "--query", "Fixture App");
+    expect(bound.code).toBe(0);
+    expect(bound.json).toMatchObject({ ok: true, context: ctx, browser: "chromium", title: "Fixture App" });
+
+    const doc = await tabctx("doctor");
+    expect(doc.code).toBe(0);
+    expect(doc.json).toMatchObject({ ok: true });
+  });
+
+  it("rejects unknown browsers and bad arguments with typed errors", async () => {
+    expect((await tabctx("open", "opera")).json).toMatchObject({ ok: false, error: "INVALID_ARGUMENT" });
     expect((await tabctx("click")).json).toMatchObject({ ok: false, error: "INVALID_ARGUMENT" });
   });
 

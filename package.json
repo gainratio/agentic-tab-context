@@ -1,11 +1,13 @@
 {
-  "name": "tabcontext",
-  "version": "0.1.0",
-  "description": "tabctx: a persistent, sticky browser context for coding assistants, with deterministic JSON output.",
+  "name": "agentic-browser-tab",
+  "version": "0.2.0",
+  "description": "agentic-browser-tab (abt): discover and bind to the browser tab you already have open across Chrome, Safari, Firefox, Brave, and Edge — deterministic JSON CLI + browser extension + coding assistant skill.",
   "license": "MIT",
   "private": true,
   "type": "module",
   "bin": {
+    "abt": "bin/abt.js",
+    "agentic-browser-tab": "bin/abt.js",
     "tabctx": "bin/tabctx.js"
   },
   "engines": {
@@ -17,7 +19,8 @@
     "test": "vitest run",
     "test:unit": "vitest run test/unit",
     "test:e2e": "vitest run test/e2e",
-    "check": "npm run typecheck && npm test"
+    "check": "npm run typecheck && npm test",
+    "setup": "npm run build && node bin/abt.js setup"
   },
   "dependencies": {
     "playwright-core": "^1.56.0"
@@ -25,6 +28,6 @@
   "devDependencies": {
     "@types/node": "^22.10.0",
     "typescript": "^5.7.0",
-    "vitest": "^3.2.0"
+    "vitest": "^4.1.11"
   }
 }

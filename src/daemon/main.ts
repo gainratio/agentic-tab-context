@@ -1,14 +1,14 @@
 /**
  * Daemon entrypoint: `node dist/daemon/main.js`.
- *
- * Logs are one JSON object per line in `paths.daemonLog` and only ever carry
- * metadata (method, outcome, timing); never page content or typed values.
  */
 import { appendFileSync, mkdirSync } from "node:fs";
 import { resolvePaths } from "../contracts/paths.js";
 import type { Paths } from "../contracts/protocol.js";
 import type { BrowserName } from "../contracts/types.js";
-import { createDriver } from "../drivers/index.js";
+import { DEFAULT_BRIDGE_PORT, ExtensionBridge } from "../drivers/extension/bridge.js";
+import { ExtensionDriver } from "../drivers/extension/driver.js";
+import { createDriver, type DriverOptions } from "../drivers/index.js";
+import { MacosTabDriver } from "../drivers/macos/driver.js";
 import { ContextRegistry } from "./registry.js";
 import { type RunningServer, startServer } from "./server.js";
 import { DaemonService } from "./service.js";
@@ -26,11 +26,18 @@ function createLogger(paths: Paths): LogFn {
   };
 }
 
-function driverOptions(paths: Paths): { profilesDir: string; executablePath?: string } {
-  const executablePath = process.env.TABCTX_CHROMIUM_PATH;
+function driverOptions(paths: Paths, extensionBridge: ExtensionBridge): DriverOptions {
+  const executablePath = process.env.ABT_BROWSER_PATH ?? process.env.TABCTX_CHROMIUM_PATH;
   return executablePath === undefined || executablePath === ""
-    ? { profilesDir: paths.profiles }
-    : { profilesDir: paths.profiles, executablePath };
+    ? { profilesDir: paths.profiles, extensionBridge }
+    : { profilesDir: paths.profiles, executablePath, extensionBridge };
+}
+
+function bridgePortFromEnv(): number {
+  const raw = process.env.ABT_BRIDGE_PORT ?? process.env.TABCTX_BRIDGE_PORT;
+  if (raw === undefined || raw === "") return DEFAULT_BRIDGE_PORT;
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) && parsed >= 0 && parsed <= 65535 ? parsed : DEFAULT_BRIDGE_PORT;
 }
 
 function errorMessage(err: unknown): string {
@@ -42,19 +49,35 @@ export async function runDaemon(): Promise<void> {
   mkdirSync(paths.home, { recursive: true, mode: 0o700 });
   const log = createLogger(paths);
   const registry = new ContextRegistry({ statePath: paths.state });
-  const options = driverOptions(paths);
+  const extensionBridge = new ExtensionBridge();
+  await extensionBridge.start(bridgePortFromEnv());
+  const extensionDriver = new ExtensionDriver(extensionBridge);
+  const macosDriver = new MacosTabDriver();
+  const options = driverOptions(paths, extensionBridge);
   const driverFactory = (browser: BrowserName) => createDriver(browser, options);
-  const service = new DaemonService({ registry, driverFactory, paths });
+  const service = new DaemonService({
+    registry,
+    driverFactory,
+    paths,
+    extensionBridge,
+    extensionDriver,
+    macosDriver,
+  });
+  extensionBridge.onPinTab(async (tabId) => {
+    const res = await service.handle({ method: "bind", params: { tab: tabId, use: true } });
+    return res.ok && typeof res.context === "string" ? res.context : "";
+  });
 
   let server: RunningServer;
   try {
     server = await startServer(service, paths, { onRequest: (entry) => log("request", { ...entry }) });
   } catch (err) {
+    await extensionBridge.close();
     log("start_failed", { message: errorMessage(err) });
     process.exitCode = 1;
     return;
   }
-  log("started", { socket: paths.socket });
+  log("started", { socket: paths.socket, bridgePort: extensionBridge.port });
 
   let stopping = false;
   const stop = async (reason: string): Promise<void> => {
@@ -62,6 +85,7 @@ export async function runDaemon(): Promise<void> {
     stopping = true;
     log("stopping", { reason });
     await service.closeAll();
+    await extensionBridge.close();
     await server.close();
     log("stopped", { reason });
     process.exit(0);

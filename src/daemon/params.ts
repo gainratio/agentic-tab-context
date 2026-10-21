@@ -5,7 +5,7 @@
  */
 import { TabCtxError } from "../contracts/errors.js";
 import { PROFILE_PATTERN } from "../contracts/patterns.js";
-import { BROWSERS, type BrowserName, type Target } from "../contracts/types.js";
+import { BROWSERS, type BindOptions, type BrowserName, type Target } from "../contracts/types.js";
 
 export type Params = Record<string, unknown>;
 
@@ -48,12 +48,38 @@ export function optionalNonNegativeInteger(params: Params, key: string): number 
   return value;
 }
 
-export function requireBrowser(params: Params): BrowserName {
+export function optionalBrowser(params: Params): BrowserName | undefined {
   const value = params.browser;
+  if (value === undefined) return undefined;
   if (typeof value !== "string" || !(BROWSERS as readonly string[]).includes(value)) {
     throw invalid(`browser must be one of: ${BROWSERS.join(", ")}`);
   }
   return value as BrowserName;
+}
+
+export function requireBrowser(params: Params): BrowserName {
+  const browser = optionalBrowser(params);
+  if (browser === undefined) throw invalid(`browser must be one of: ${BROWSERS.join(", ")}`);
+  return browser;
+}
+
+export function parseBindOptions(params: Params): BindOptions {
+  const tab = optionalString(params, "tab");
+  const query = optionalString(params, "query");
+  const url = optionalString(params, "url");
+  const title = optionalString(params, "title");
+  const browser = optionalBrowser(params);
+  const active = optionalBoolean(params, "active");
+  const use = optionalBoolean(params, "use");
+  return {
+    ...(tab === undefined ? {} : { tab }),
+    ...(query === undefined ? {} : { query }),
+    ...(url === undefined ? {} : { url }),
+    ...(title === undefined ? {} : { title }),
+    ...(browser === undefined ? {} : { browser }),
+    ...(active === undefined ? {} : { active }),
+    ...(use === undefined ? {} : { use }),
+  };
 }
 
 export function profileParam(params: Params): string {
@@ -67,13 +93,9 @@ export function profileParam(params: Params): string {
 export function requireTarget(params: Params): Target {
   const raw = params.target;
   if (!isRecord(raw)) throw invalid("target is required");
-  const nth = targetNth(raw);
+  const nth = optionalNonNegativeInteger(raw, "nth");
   const target = targetByKind(raw);
   return nth === undefined ? target : { ...target, nth };
-}
-
-function targetNth(raw: Params): number | undefined {
-  return optionalNonNegativeInteger(raw, "nth");
 }
 
 function targetByKind(raw: Params): Target {

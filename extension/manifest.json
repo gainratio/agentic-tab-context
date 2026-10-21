@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "Agentic Browser Tab (abt)",
+  "version": "0.1.0",
+  "description": "Bind your already-open browser tabs to coding assistants (Claude Code, Codex, Antigravity) without opening new windows or tabs.",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "Agentic Browser Tab",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "background": {
+    "service_worker": "service-worker.js",
+    "type": "module"
+  },
+  "permissions": [
+    "tabs",
+    "scripting",
+    "storage",
+    "alarms"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ]
+}
