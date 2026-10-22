@@ -70,38 +70,6 @@ export function chromiumPrelude(appName: string, tabId: string): string {
     if (tab === null) throw new Error("ATC_TAB_GONE");`;
 }
 
-export interface SafariPosition {
-  window: number;
-  tab: number;
-  url: string;
-}
-
-/**
- * Safari has no tab id. Trust the remembered position only if it still shows the
- * remembered URL (or we just navigated it); otherwise follow that URL if exactly
- * one tab shows it, else fail closed.
- */
-export function safariLocateScript(position: SafariPosition, justNavigated: boolean): string {
-  return `
-    const app = Application("Safari");
-    const want = ${JSON.stringify(position.url)};
-    let hit = null;
-    try { const t = app.windows[${position.window - 1}].tabs[${position.tab - 1}]; if (${justNavigated} || t.url() === want) hit = [${position.window}, ${position.tab}, t.url()]; } catch (e) {}
-    if (hit === null) {
-      const hits = [];
-      app.windows().forEach((w, wi) => w.tabs().forEach((t, ti) => { if (t.url() === want) hits.push([wi + 1, ti + 1, want]); }));
-      if (hits.length !== 1) throw new Error(hits.length === 0 ? "ATC_TAB_MOVED" : "ATC_TAB_AMBIGUOUS");
-      hit = hits[0];
-    }
-    JSON.stringify({ window: hit[0], tab: hit[1], url: hit[2] || "" });`;
-}
-
-export function safariPrelude(position: SafariPosition): string {
-  return `
-    const app = Application("Safari");
-    const tab = app.windows[${position.window - 1}].tabs[${position.tab - 1}];`;
-}
-
 const FAILURES: ReadonlyArray<readonly [RegExp, (appName: string) => AtcError]> = [
   [/ATC_TAB_GONE/, () => new AtcError("CONTEXT_CLOSED", "the bound tab was closed")],
   [/ATC_TAB_MOVED/, () => new AtcError("TAB_MOVED", "the bound Safari tab moved or navigated away; run `atc bind` again")],

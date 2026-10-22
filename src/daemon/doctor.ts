@@ -22,8 +22,9 @@ function nextSteps(input: DoctorInput, extensionConnected: boolean): string[] {
   if (!extensionConnected) {
     steps.push(`Install the browser extension: run \`atc setup\`, then load ${EXTENSION_DIR} via chrome://extensions > Developer mode > Load unpacked.`);
   }
-  if (!extensionConnected && (input.platform ?? process.platform) === "darwin") {
-    steps.push("Without the extension, macOS tabs can be listed and bound, but reading or clicking needs View > Developer > Allow JavaScript from Apple Events.");
+  if ((input.platform ?? process.platform) === "darwin") {
+    if (!extensionConnected) steps.push("Without the extension, Chrome, Brave, Edge and Chromium page access needs View > Developer > Allow JavaScript from Apple Events.");
+    steps.push("Safari supports discovery only; its tab positions cannot safely identify a page for binding or actions.");
   }
   if (input.tabs.length === 0) steps.push("No open tabs found. Open the page you want help with, then run `atc tabs`.");
   return steps;

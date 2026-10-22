@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rm, stat, symlink } from "node:fs/promises";
 import { createServer, type AddressInfo } from "node:net";
 import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
+import { type BrowserContext } from "playwright-core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AtcError, type ErrorCode } from "../../src/contracts/errors.js";
 import type { BrowserDriver, BrowserSession, Target } from "../../src/contracts/types.js";
@@ -51,6 +52,14 @@ async function closedPort(): Promise<number> {
 
 const save: Target = { kind: "role", role: "button", name: "Save" };
 const deleteButton: Target = { kind: "role", role: "button", name: "Delete" };
+
+/** Fixture-only access for creating sibling tabs; assertions use the driver API. */
+function ownedContext(driver: BrowserDriver, session: BrowserSession): BrowserContext {
+  const states = Reflect.get(driver, "sessions") as Map<string, { context: BrowserContext }>;
+  const state = states.get(session.sessionId);
+  if (state === undefined) throw new Error("test browser session is missing");
+  return state.context;
+}
 
 describe("ChromiumDriver (e2e, headless)", () => {
   let server: FixtureServer;
@@ -281,6 +290,76 @@ describe("ChromiumDriver (e2e, headless)", () => {
   it("treats unknown sessions as CONTEXT_CLOSED", async () => {
     await expectAtcError(driver.inspect({ sessionId: "nope" }), "CONTEXT_CLOSED");
   });
+
+  it("keeps managed page bindings immutable when another tab is bound", async () => {
+    const original = await openSession("immutable-tabs");
+    await driver.navigate(original, `${server.baseUrl}/app.html`);
+    const page = await ownedContext(driver, original).newPage();
+    await page.goto(`${server.baseUrl}/pricing.html`);
+    const listed = await driver.listTabs?.() ?? [];
+    const tab = listed.find((item) => item.url === page.url() && item.tabId.includes(original.sessionId));
+    expect(tab).toBeDefined();
+    const bound = await driver.bindTab!(tab!.tabId);
+    opened.push(bound);
+    expect(bound.sessionId).not.toBe(original.sessionId);
+    expect((await driver.location(original)).title).toBe("Fixture App");
+    expect((await driver.location(bound)).title).toBe("Pricing");
+    expect(original.tabId).toBe(listed.find((item) => item.url.endsWith("/app.html") && item.tabId.includes(original.sessionId))?.tabId);
+    let disconnected = 0;
+    driver.onDisconnect!(original, () => disconnected++);
+    driver.onDisconnect!(bound, () => disconnected++);
+    await ownedContext(driver, original).close();
+    expect(disconnected).toBe(2);
+    await expectAtcError(driver.location(original), "CONTEXT_CLOSED");
+    await expectAtcError(driver.location(bound), "CONTEXT_CLOSED");
+  });
+
+  it("redacts managed password values before and after a reveal toggle", async () => {
+    const protectedSession = await openSession("password-inspection");
+    const page = ownedContext(driver, protectedSession).pages()[0]!;
+    await page.setContent('<label>Password<input type="password" value="MANAGED_PREFILLED_SECRET"></label><label>Revealed<input type="text" autocomplete="current-password" value="MANAGED_REVEALED_SECRET"></label>');
+    expect((await driver.inspect(protectedSession)).aria).not.toMatch(/MANAGED_PREFILLED_SECRET|MANAGED_REVEALED_SECRET/);
+    await page.getByLabel("Password", { exact: true }).fill("MANAGED_EDITED_SECRET");
+    expect((await driver.inspect(protectedSession)).aria).not.toContain("MANAGED_EDITED_SECRET");
+    await page.getByLabel("Password", { exact: true }).evaluate((element) => { (element as HTMLInputElement).type = "text"; });
+    expect((await driver.inspect(protectedSession)).aria).not.toContain("MANAGED_EDITED_SECRET");
+  });
+
+  it("never reuses a managed tab id after an earlier sibling closes", async () => {
+    const original = await openSession("stable-tab-ids");
+    const context = ownedContext(driver, original);
+    const earlier = await context.newPage();
+    const target = await context.newPage();
+    await target.goto(`${server.baseUrl}/pricing.html`);
+    const later = await context.newPage();
+    await later.goto(`${server.baseUrl}/app.html`);
+    const tabId = (await driver.listTabs!()).find((item) => item.url === target.url() && item.tabId.includes(original.sessionId))!.tabId;
+    await earlier.close();
+    const bound = await driver.bindTab!(tabId);
+    opened.push(bound);
+    expect((await driver.location(bound)).title).toBe("Pricing");
+    await target.close();
+    await expectAtcError(driver.bindTab!(tabId), "TARGET_NOT_FOUND");
+    await expectAtcError(driver.location(bound), "CONTEXT_CLOSED");
+    expect((await driver.location(original)).url).toBe("about:blank");
+  });
+
+  it("keeps sibling managed bindings alive until their last binding closes", async () => {
+    const original = await openSession("shared-tab-lifecycle");
+    await driver.navigate(original, `${server.baseUrl}/app.html`);
+    const sibling = await ownedContext(driver, original).newPage();
+    await sibling.goto(`${server.baseUrl}/pricing.html`);
+    const tabId = (await driver.listTabs!()).find((item) => item.url === sibling.url() && item.tabId.includes(original.sessionId))!.tabId;
+    const bound = await driver.bindTab!(tabId);
+    opened.push(bound);
+    let disconnected = 0;
+    driver.onDisconnect!(bound, () => disconnected++);
+    await driver.close(original);
+    expect((await driver.location(bound)).title).toBe("Pricing");
+    await driver.close(bound);
+    expect(disconnected).toBe(1);
+    await expectAtcError(driver.location(bound), "CONTEXT_CLOSED");
+  });
 });
 
 describe("createDriver", () => {
@@ -291,7 +370,7 @@ describe("createDriver", () => {
   });
 
   it("refuses safari with guidance instead of silently opening WebKit", () => {
-    expect(() => createDriver("safari", { profilesDir: tmpdir() })).toThrowError(/atc bind --browser safari/);
+    expect(() => createDriver("safari", { profilesDir: tmpdir() })).toThrowError(/Safari.*discovery only/);
   });
 
   it("returns the shared extension driver, and refuses when there is none", () => {

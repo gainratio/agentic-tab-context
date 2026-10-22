@@ -1,8 +1,8 @@
 /**
  * MacosTabDriver: binds to tabs already open in Chrome, Brave, Edge, Chromium
- * or Safari on macOS, through Apple Events. Chromium-family tabs are tracked
- * by their stable browser id; Safari tabs by position plus URL check, so a
- * reordered or reused tab fails closed instead of being silently retargeted.
+ * on macOS through Apple Events. Chromium-family tabs have stable browser ids.
+ * Safari discovery is supported, but binding is refused because Safari exposes
+ * only positions and URLs, neither of which identifies a tab safely.
  */
 import { randomUUID } from "node:crypto";
 import { AtcError } from "../../contracts/errors.js";
@@ -20,16 +20,14 @@ import type {
   Target,
 } from "../../contracts/types.js";
 import { type ActAction, type PageOp, actOp, pageExpression, toActionResult, toEntries, toPageState } from "../page-agent.js";
-import { APP_BY_BROWSER, type JxaRunner, LIST_SCRIPT, type SafariPosition, chromiumPrelude, defaultJxaRunner, safariLocateScript, safariPrelude, toJxaError } from "./jxa.js";
+import { APP_BY_BROWSER, type JxaRunner, LIST_SCRIPT, chromiumPrelude, defaultJxaRunner, toJxaError } from "./jxa.js";
 
 const TAB_ID_PATTERN = /^macos:([a-z]+):(.+)$/;
 const SAFARI_POSITION = /^(\d+):(\d+)$/;
 
 interface MacosSession {
   appName: string;
-  chromiumTabId?: string;
-  safari?: SafariPosition;
-  justNavigated: boolean;
+  chromiumTabId: string;
   disconnectCallbacks: Array<() => void>;
 }
 
@@ -54,16 +52,17 @@ export class MacosTabDriver implements BrowserDriver {
     }
   }
 
-  async bindTab(tabId: string, knownUrl?: string): Promise<BrowserSession> {
+  async bindTab(tabId: string, _knownUrl?: string): Promise<BrowserSession> {
     const session = { sessionId: randomUUID() };
-    this.sessions.set(session.sessionId, await this.newSession(tabId, knownUrl));
+    this.sessions.set(session.sessionId, this.newSession(tabId));
     await this.page(session, { op: "watch" }).catch(() => undefined);
     return session;
   }
 
-  close(session: BrowserSession): Promise<void> {
+  async close(session: BrowserSession): Promise<void> {
+    if (!this.sessions.has(session.sessionId)) return;
+    await this.page(session, { op: "unwatch" }).catch(() => undefined);
     this.end(session.sessionId);
-    return Promise.resolve();
   }
 
   onDisconnect(session: BrowserSession, callback: () => void): void {
@@ -74,7 +73,6 @@ export class MacosTabDriver implements BrowserDriver {
 
   async navigate(session: BrowserSession, url: string): Promise<void> {
     await this.run(session, `tab.url = ${JSON.stringify(url)}; "ok";`);
-    this.live(session).justNavigated = true;
   }
 
   back(session: BrowserSession): Promise<void> {
@@ -90,8 +88,7 @@ export class MacosTabDriver implements BrowserDriver {
   }
 
   async location(session: BrowserSession): Promise<{ url: string; title: string }> {
-    const title = this.live(session).appName === "Safari" ? "tab.name()" : "tab.title()";
-    const json = await this.run(session, `JSON.stringify({ url: tab.url() || "", title: ${title} || "" });`);
+    const json = await this.run(session, `JSON.stringify({ url: tab.url() || "", title: tab.title() || "" });`);
     return JSON.parse(json) as { url: string; title: string };
   }
 
@@ -124,21 +121,21 @@ export class MacosTabDriver implements BrowserDriver {
     return toEntries<NetworkEntry>(await this.page(session, { op: "logs", kind: "network", since: sinceSeq }));
   }
 
-  private async newSession(tabId: string, knownUrl: string | undefined): Promise<MacosSession> {
+  private newSession(tabId: string): MacosSession {
     const match = TAB_ID_PATTERN.exec(tabId);
     const appName = match === null ? undefined : APP_BY_BROWSER[match[1] as BrowserName];
     if (match === null || appName === undefined) throw new AtcError("INVALID_ARGUMENT", `not a macOS tab id: ${tabId}`);
-    const base = { appName, justNavigated: false, disconnectCallbacks: [] };
-    if (appName !== "Safari") return { ...base, chromiumTabId: match[2] ?? "" };
-    const position = SAFARI_POSITION.exec(match[2] ?? "");
-    if (position === null) throw new AtcError("INVALID_ARGUMENT", `not a Safari tab id: ${tabId}`);
-    const url = knownUrl ?? (await this.listTabs()).find((t) => t.tabId === tabId)?.url ?? "";
-    return { ...base, safari: { window: Number(position[1]), tab: Number(position[2]), url } };
+    if (appName === "Safari") return this.rejectSafari(tabId, match[2] ?? "");
+    return { appName, chromiumTabId: match[2] ?? "", disconnectCallbacks: [] };
+  }
+
+  private rejectSafari(tabId: string, position: string): never {
+    if (!SAFARI_POSITION.test(position)) throw new AtcError("INVALID_ARGUMENT", `not a Safari tab id: ${tabId}`);
+    throw new AtcError("UNSUPPORTED_ACTION", "Safari live tabs support discovery only: stable tab identity is unavailable, so page access is refused. Use a supported browser extension or an atc-managed browser.");
   }
 
   private async history(session: BrowserSession, expression: string): Promise<void> {
     await this.evalInPage(session, `${expression}; "ok"`);
-    this.live(session).justNavigated = true;
   }
 
   private async act(session: BrowserSession, action: ActAction, target: Target, value?: string): Promise<ActionResult> {
@@ -150,29 +147,19 @@ export class MacosTabDriver implements BrowserDriver {
   }
 
   private evalInPage(session: BrowserSession, expression: string): Promise<string> {
-    const safari = this.live(session).appName === "Safari";
-    const call = safari ? "app.doJavaScript(js, { in: tab })" : "app.execute(tab, { javascript: js })";
-    return this.run(session, `const js = ${JSON.stringify(expression)}; String(${call});`);
+    return this.run(session, `const js = ${JSON.stringify(expression)}; String(app.execute(tab, { javascript: js }));`);
   }
 
   /** Run `body` with `app` and `tab` bound to this session's tab, re-verifying its identity first. */
   private async run(session: BrowserSession, body: string): Promise<string> {
     const state = this.live(session);
     try {
-      return await this.runJxa(`${await this.prelude(state)}\n${body}`);
+      return await this.runJxa(`${chromiumPrelude(state.appName, state.chromiumTabId)}\n${body}`);
     } catch (error) {
       const failure = error instanceof AtcError ? error : toJxaError(error, state.appName);
       if (failure.code === "CONTEXT_CLOSED") this.end(session.sessionId);
       throw failure;
     }
-  }
-
-  private async prelude(state: MacosSession): Promise<string> {
-    if (state.safari === undefined) return chromiumPrelude(state.appName, state.chromiumTabId ?? "");
-    const located = JSON.parse(await this.runJxa(safariLocateScript(state.safari, state.justNavigated))) as SafariPosition;
-    state.safari = located;
-    state.justNavigated = false;
-    return safariPrelude(located);
   }
 
   private live(session: BrowserSession): MacosSession {

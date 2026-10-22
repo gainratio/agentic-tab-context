@@ -22,9 +22,11 @@ const INSTALL_HINTS: Readonly<Record<ManagedBrowser, string>> = {
 
 export interface SessionState extends DisconnectableState {
   readonly id: string;
+  readonly ownerId: string;
+  readonly tabId: string;
   readonly profileDir: string;
   readonly context: BrowserContext;
-  page: Page;
+  readonly page: Page;
   readonly consoleLog: SeqLog<ConsoleEntry>;
   readonly networkLog: SeqLog<NetworkEntry>;
 }
@@ -44,13 +46,12 @@ export async function launchContext(
 }
 
 /** Wrap a fresh context: reuse its first page (or open one) and start recording logs. */
-export async function newSession(context: BrowserContext, profileDir: string): Promise<SessionState> {
+export async function newSession(context: BrowserContext, profileDir: string, browser: ManagedBrowser): Promise<SessionState> {
   const page = await firstPage(context);
+  const id = randomUUID();
   const state: SessionState = {
-    id: randomUUID(),
-    profileDir,
-    context,
-    page,
+    id, ownerId: id, tabId: `managed:${browser}:${id}:0`,
+    profileDir, context, page,
     consoleLog: new SeqLog<ConsoleEntry>(),
     networkLog: new SeqLog<NetworkEntry>(),
     disconnectCallbacks: [],

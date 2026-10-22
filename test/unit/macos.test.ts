@@ -4,11 +4,14 @@
  */
 import { describe, expect, it } from "vitest";
 import { AtcError } from "../../src/contracts/errors.js";
+import { resolvePaths } from "../../src/contracts/paths.js";
+import { doctorReport } from "../../src/daemon/doctor.js";
+import { createDriver } from "../../src/drivers/index.js";
 import { MacosTabDriver } from "../../src/drivers/macos/driver.js";
 import { LIST_SCRIPT, osascriptFailure, toJxaError } from "../../src/drivers/macos/jxa.js";
 
-const CHROME_TAB = { tabId: "macos:chrome:1234", browser: "chrome", source: "macos", url: "http://localhost:5182/screen", title: "AML", active: true };
-const SAFARI_TAB = { tabId: "macos:safari:1:2", browser: "safari", source: "macos", url: "https://example.com/a", title: "A", active: false };
+const CHROME_TAB = { tabId: "macos:chrome:1234", browser: "chrome", source: "macos", url: "http://localhost:5182/screen", title: "AML", active: true } as const;
+const SAFARI_TAB = { tabId: "macos:safari:1:2", browser: "safari", source: "macos", url: "https://example.com/a", title: "A", active: false } as const;
 
 /** Records every script and answers from a queue (or throws, like osascript). */
 function fakeJxa(answers: Array<string | Error>): { run: (script: string) => Promise<string>; scripts: string[] } {
@@ -47,13 +50,14 @@ describe("MacosTabDriver", () => {
     await expect(driver.location(session)).rejects.toMatchObject({ code: "CONTEXT_CLOSED" });
   });
 
-  it("fails closed with TAB_MOVED when a Safari tab no longer shows the bound page", async () => {
-    const jxa = fakeJxa([JSON.stringify({ window: 1, tab: 2, url: SAFARI_TAB.url }), "{}", new Error("Error: ATC_TAB_MOVED")]);
-    const driver = new MacosTabDriver(jxa.run);
-    const session = await driver.bindTab(SAFARI_TAB.tabId, SAFARI_TAB.url);
-    await expect(driver.location(session)).rejects.toMatchObject({ code: "TAB_MOVED" });
-    const locate = jxa.scripts.find((s) => s.includes('const want = "https://example.com/a"')) ?? "";
-    expect(locate).toContain("hits.length !== 1");
+  it("refuses to open Safari when it is the only available tab", async () => {
+    const scripts: string[] = [];
+    const driver = new MacosTabDriver(async (script) => {
+      scripts.push(script);
+      return JSON.stringify([{ ...SAFARI_TAB, active: true }]);
+    });
+    await expect(driver.open({ profile: "live", headless: false })).rejects.toMatchObject({ code: "UNSUPPORTED_ACTION" });
+    expect(scripts).toEqual([LIST_SCRIPT]);
   });
 
   it("explains how to enable page access when the browser blocks Apple Events JavaScript", async () => {
@@ -78,6 +82,26 @@ describe("MacosTabDriver", () => {
     await expect(driver.bindTab("macos:netscape:1")).rejects.toMatchObject({ code: "INVALID_ARGUMENT" });
     await expect(driver.bindTab("macos:safari:not-a-position")).rejects.toMatchObject({ code: "INVALID_ARGUMENT" });
   });
+
+  it("keeps Safari discovery-only instead of trusting a position or matching URL", async () => {
+    const jxa = fakeJxa([]);
+    const driver = new MacosTabDriver(jxa.run);
+    expect((await driver.listTabs()).find((tab) => tab.browser === "safari")).toEqual(SAFARI_TAB);
+    await expect(driver.bindTab(SAFARI_TAB.tabId, SAFARI_TAB.url)).rejects.toMatchObject({ code: "UNSUPPORTED_ACTION" });
+    expect(jxa.scripts).toEqual([LIST_SCRIPT]);
+  });
+
+  it("stops page capture before detaching a stable macOS binding", async () => {
+    const jxa = fakeJxa(["{}", "{}"]);
+    const driver = new MacosTabDriver(jxa.run);
+    const session = await driver.bindTab(CHROME_TAB.tabId);
+    await driver.close(session);
+    expect(jxa.scripts.at(-1)).toContain(String.raw`\"op\":\"unwatch\"`);
+    const count = jxa.scripts.length;
+    await driver.close(session);
+    expect(jxa.scripts).toHaveLength(count);
+    await expect(driver.inspect(session)).rejects.toMatchObject({ code: "CONTEXT_CLOSED" });
+  });
 });
 
 describe("osascriptFailure", () => {
@@ -96,5 +120,21 @@ describe("osascriptFailure", () => {
   it("does not echo the script even when osascript printed nothing", () => {
     const failure = osascriptFailure(Object.assign(new Error("Command failed: osascript ... ATC_TAB_GONE"), { stderr: "", code: 1 }));
     expect(failure.message).toBe("osascript failed (exit 1)");
+  });
+});
+
+describe("Safari capability guidance", () => {
+  it("refuses managed Safari with discovery-only guidance", () => {
+    expect(() => createDriver("safari", { profilesDir: "/unused" })).toThrowError(/Safari.*discovery only/);
+    expect(() => createDriver("safari", { profilesDir: "/unused" })).not.toThrowError(/atc bind --browser safari/);
+  });
+
+  it("doctor distinguishes stable Chromium page access from Safari discovery", () => {
+    const report = doctorReport({
+      paths: resolvePaths({ ATC_HOME: "/tmp/atc-doctor-guidance-unit" }), env: {},
+      tabs: [SAFARI_TAB], openContexts: 0, current: null, platform: "darwin",
+    });
+    expect(report.nextSteps).toContainEqual(expect.stringMatching(/Safari.*discovery only/));
+    expect(report.nextSteps).not.toContainEqual(expect.stringContaining("macOS tabs can be listed and bound"));
   });
 });

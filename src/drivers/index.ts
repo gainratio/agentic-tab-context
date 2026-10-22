@@ -17,8 +17,8 @@ export interface DriverOptions {
 }
 
 const SAFARI_GUIDANCE =
-  "Safari cannot be automated with your own profile. Use `atc bind --browser safari` to work in a Safari tab " +
-  "you already have open, or `atc open webkit` for a separate WebKit window.";
+  "Safari supports discovery only: use `atc tabs --browser safari` to list its open tabs. " +
+  "Use a supported browser extension for existing-tab actions, or `atc open webkit` for a separate WebKit window.";
 
 function isManaged(browser: BrowserName): browser is ManagedBrowser {
   return (MANAGED_BROWSERS as readonly string[]).includes(browser);
