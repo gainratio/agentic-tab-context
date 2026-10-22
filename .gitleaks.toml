@@ -1,0 +1,17 @@
+# gitleaks configuration: the default rules, plus exactly one narrow exception.
+#
+# extension/manifest.json "key" is the browser extension's RSA *public* key.
+# Chrome derives the extension's stable id from it, and it is meant to be
+# published. It trips the generic-api-key heuristic, so this exception applies
+# only to that one rule, and only to an RSA-2048 SubjectPublicKeyInfo value.
+# Every other rule (tokens, private keys, cloud credentials) still scans every
+# file, including the manifest.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "RSA public keys are not secrets (Chrome extension manifest key)"
+targetRules = ["generic-api-key"]
+regexTarget = "secret"
+regexes = ['''^MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA[A-Za-z0-9+/=]+$''']
