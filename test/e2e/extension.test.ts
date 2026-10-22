@@ -3,7 +3,7 @@
  * messaging to the daemon, and separate `atc` processes binding to and driving
  * a tab that was already open. No browser is opened by atc.
  */
-import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type BrowserContext, type Page, chromium } from "playwright-core";
@@ -96,12 +96,92 @@ describe("browser extension end to end", () => {
     expect((await atc("click", "--role", "button", "--name", "Delete")).json).toMatchObject({ ok: false, error: "AMBIGUOUS_TARGET", matched: 2 });
   });
 
+  it("does not disclose existing or edited password values through CLI inspect", async () => {
+    await page.evaluate(() => {
+      const label = document.createElement("label");
+      label.id = "password-fixture";
+      label.textContent = "Password";
+      const input = document.createElement("input");
+      input.type = "password";
+      input.value = "EXTENSION_PREFILLED_PASSWORD";
+      label.append(input);
+      document.body.append(label);
+    });
+    expect(String((await atc("inspect")).json.aria)).not.toContain("EXTENSION_PREFILLED_PASSWORD");
+    await page.getByLabel("Password", { exact: true }).fill("EXTENSION_EDITED_PASSWORD");
+    expect(String((await atc("inspect")).json.aria)).not.toContain("EXTENSION_EDITED_PASSWORD");
+    await page.getByLabel("Password", { exact: true }).evaluate((element) => { (element as HTMLInputElement).type = "text"; });
+    expect(String((await atc("inspect")).json.aria)).not.toContain("EXTENSION_EDITED_PASSWORD");
+    await page.locator("#password-fixture").evaluate((element) => element.remove());
+  });
+
+  it("rejects unsupported full-page capture explicitly", async () => {
+    expect((await atc("screenshot", "--full-page")).json).toMatchObject({ ok: false, error: "UNSUPPORTED_ACTION" });
+  });
+
+  it("keeps an exact extension binding separate from a managed tab at the same URL", async () => {
+    const opened = await atc("open", "chromium", "--headless", "--profile", "identity-regression");
+    const managed = String(opened.json.context);
+    try {
+      expect(opened.json).toMatchObject({ ok: true, browser: "chromium" });
+      expect((await atc("goto", page.url(), "--context", managed)).json).toMatchObject({ ok: true });
+      expect((await atc("type", "--context", managed, "--label", "Product Name", "--value", "MANAGED_IDENTITY_SENTINEL")).json).toMatchObject({ ok: true });
+      const tabs = tabsOf(await fixtureTabs());
+      const extensionTab = tabs.find((tab) => tab.source === "extension");
+      expect(extensionTab).toBeDefined();
+      expect((await atc("bind", "--tab", String(extensionTab?.tabId))).json).toMatchObject({ ok: true, context: ctx, source: "extension", reused: true });
+      expect((await atc("type", "--label", "Product Name", "--value", "EXTENSION_IDENTITY_SENTINEL")).json).toMatchObject({ ok: true });
+      expect(await page.getByLabel("Product Name", { exact: true }).inputValue()).toBe("EXTENSION_IDENTITY_SENTINEL");
+      expect(String((await atc("inspect")).json.aria)).toContain("EXTENSION_IDENTITY_SENTINEL");
+      const managedAria = String((await atc("inspect", "--context", managed)).json.aria);
+      expect(managedAria).toContain("MANAGED_IDENTITY_SENTINEL");
+      expect(managedAria).not.toContain("EXTENSION_IDENTITY_SENTINEL");
+    } finally {
+      await atc("close", "--context", managed);
+      await atc("use", ctx);
+    }
+  });
+
+  it("removes a rejected legacy binding from capture membership before reload", async () => {
+    const legacy = await context.newPage();
+    try {
+      await legacy.goto(`${fixtures.baseUrl}/app.html?legacy-upgrade`);
+      await legacy.evaluate('globalThis.__atcAgent = { version: 1, store: { watching: true, console: [], network: [] }, record() {} };');
+      const listed = await eventually(fixtureTabs, (r) => tabsOf(r).some((tab) => String(tab.url).includes("legacy-upgrade")));
+      const legacyId = String(tabsOf(listed).find((tab) => String(tab.url).includes("legacy-upgrade"))?.tabId);
+      const bound = await atc("bind", "--tab", legacyId);
+      expect(bound.json).toMatchObject({ ok: false });
+      expect(String(bound.json.message)).toContain("ATC_RELOAD_REQUIRED");
+      const worker = context.serviceWorkers()[0]!;
+      const watched = await worker.evaluate('chrome.storage.session.get("atcWatched").then((value) => value.atcWatched || [])');
+      expect(watched).not.toContain(Number(legacyId.split(":").at(-1)));
+      await legacy.reload();
+      expect(await legacy.evaluate('typeof globalThis.__atcAgent')).toBe("undefined");
+    } finally {
+      await legacy.close();
+      await atc("use", ctx);
+    }
+  });
+
   it("reports console messages and failed requests", async () => {
     await atc("click", "--role", "button", "--name", "Break");
     const logs = await eventually(() => atc("console"), (r) => JSON.stringify(r.json.entries).includes("boom"));
     expect(JSON.stringify(logs.json.entries)).toContain("boom");
     const network = await atc("network");
     expect((network.json.entries as Json[]).find((e) => String(e.url).endsWith("/missing.json"))).toMatchObject({ status: 404 });
+  });
+
+  it("stops capture on close and starts a fresh capture after rebinding", async () => {
+    expect((await atc("close", "--context", ctx)).json).toMatchObject({ ok: true });
+    await page.evaluate('console.log("while-unbound");');
+    expect(await page.evaluate('({ watching: __atcAgent.store.watching, console: __atcAgent.store.console.length, network: __atcAgent.store.network.length })')).toEqual({ watching: false, console: 0, network: 0 });
+    const bound = await atc("bind", "Fixture App", "--browser", "chromium");
+    expect(bound.json).toMatchObject({ ok: true, reused: false });
+    ctx = String(bound.json.context);
+    await page.evaluate('console.log("after-rebind");');
+    const text = JSON.stringify((await atc("console")).json.entries);
+    expect(text).toContain("after-rebind");
+    expect(text).not.toMatch(/while-unbound|boom/);
   });
 
   it("navigates, goes back, and takes a screenshot of the tab", async () => {
@@ -115,6 +195,67 @@ describe("browser extension end to end", () => {
   it("reports the extension as connected in doctor", async () => {
     const report = await atc("doctor");
     expect((report.json.extension as { connected: Json[] }).connected).toEqual([expect.objectContaining({ browser: "chromium" })]);
+  });
+
+  it("keeps concurrent screenshots attached to their own bound tabs", async () => {
+    const first = await context.newPage();
+    const second = await context.newPage();
+    const colors = [[18, 52, 86], [86, 52, 18]];
+    const ids: string[] = [];
+    try {
+      for (const [index, tab] of [first, second].entries()) {
+        await tab.goto(`${fixtures.baseUrl}/app.html?capture=${index}`);
+        await tab.evaluate(({ index, color }) => {
+          document.title = `Capture ${index}`;
+          document.body.innerHTML = "";
+          document.body.style.background = `rgb(${color.join(",")})`;
+          document.documentElement.style.background = `rgb(${color.join(",")})`;
+        }, { index, color: colors[index]! });
+      }
+      const listed = await eventually(() => atc("tabs", "--query", "Capture", "--browser", "chromium"), (r) => tabsOf(r).length === 2);
+      for (const index of [0, 1]) ids.push(String((await atc("bind", "--tab", String(tabsOf(listed).find((t) => t.title === `Capture ${index}`)?.tabId))).json.context));
+      const shots = await Promise.all(ids.map((id) => atc("screenshot", "--context", id)));
+      expect(shots.map((shot) => shot.json.ok)).toEqual([true, true]);
+      for (const [index, shot] of shots.entries()) {
+        const data = `data:image/png;base64,${readFileSync(String(shot.json.path)).toString("base64")}`;
+        const pixel = await page.evaluate(async (url) => {
+          const image = new Image();
+          image.src = url;
+          await image.decode();
+          const canvas = document.createElement("canvas");
+          canvas.width = image.width; canvas.height = image.height;
+          const drawing = canvas.getContext("2d")!;
+          drawing.drawImage(image, 0, 0);
+          return [...drawing.getImageData(Math.floor(image.width / 2), Math.floor(image.height / 2), 1, 1).data].slice(0, 3);
+        }, data);
+        expect(pixel).toEqual(colors[index]);
+      }
+    } finally {
+      for (const id of ids) await atc("close", "--context", id);
+      await first.close(); await second.close();
+      await atc("use", ctx);
+    }
+  });
+
+  it("stops capture after daemon death and starts fresh after reconnecting", async () => {
+    const report = await atc("doctor");
+    const daemon = report.json.daemon as { pid: number; home: string };
+    expect(daemon.home).toBe(home);
+    expect(Number.isSafeInteger(daemon.pid) && daemon.pid > 0 && daemon.pid !== process.pid).toBe(true);
+    process.kill(daemon.pid, "SIGKILL");
+    const stopped = await eventually(() => page.evaluate<{ watching: boolean; console: number; network: number }>('({ watching: __atcAgent.store.watching, console: __atcAgent.store.console.length, network: __atcAgent.store.network.length })'), (state) => !state.watching);
+    expect(stopped).toEqual({ watching: false, console: 0, network: 0 });
+    const worker = context.serviceWorkers()[0]!;
+    expect(await worker.evaluate('chrome.storage.session.get("atcWatched").then((value) => value.atcWatched || [])')).toEqual([]);
+    await page.reload();
+    expect(await page.evaluate('typeof globalThis.__atcAgent')).toBe("undefined");
+    const listed = await eventually(fixtureTabs, (r) => tabsOf(r).some((tab) => tab.source === "extension"));
+    const tab = tabsOf(listed).find((entry) => entry.source === "extension");
+    const rebound = await atc("bind", "--tab", String(tab?.tabId));
+    expect(rebound.json).toMatchObject({ ok: true, source: "extension", reused: false });
+    ctx = String(rebound.json.context);
+    await page.evaluate('console.log("after-daemon-reconnect")');
+    expect(JSON.stringify((await atc("console")).json.entries)).toContain("after-daemon-reconnect");
   });
 
   it("closes the context when the user closes the tab", async () => {

@@ -31,6 +31,7 @@ interface ExtSession {
 export class ExtensionDriver implements BrowserDriver {
   readonly name = "extension" as const;
   private readonly sessions = new Map<string, ExtSession>();
+  private readonly tabTails = new Map<string, Promise<void>>();
 
   constructor(private readonly bridge: ExtensionBridge) {
     bridge.onTabsChanged((key, tabs) => this.closeVanished(key, tabs));
@@ -54,16 +55,39 @@ export class ExtensionDriver implements BrowserDriver {
       throw new AtcError("TARGET_NOT_FOUND", `tab ${tabId} is not open in any connected browser`);
     }
     const sessionId = randomUUID();
-    this.sessions.set(sessionId, { tabId, disconnectCallbacks: [] });
-    await this.bridge.dispatch(tabId, "watch").catch(() => undefined);
+    await this.serialize(tabId, () => this.startSession(tabId, sessionId));
     return { sessionId };
+  }
+
+  private async startSession(tabId: string, sessionId: string): Promise<void> {
+    this.sessions.set(sessionId, { tabId, disconnectCallbacks: [] });
+    try {
+      await this.bridge.dispatch(tabId, "watch");
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("ATC_RELOAD_REQUIRED")) {
+        this.end(sessionId);
+        await this.bridge.dispatch(tabId, "unwatch").catch(() => undefined);
+        throw error;
+      }
+    }
   }
 
   close(session: BrowserSession): Promise<void> {
     const state = this.sessions.get(session.sessionId);
-    if (state !== undefined) void this.bridge.dispatch(state.tabId, "unwatch").catch(() => undefined);
     this.end(session.sessionId);
-    return Promise.resolve();
+    if (state === undefined) return Promise.resolve();
+    return this.serialize(state.tabId, async () => {
+      if ([...this.sessions.values()].some((other) => other.tabId === state.tabId)) return;
+      await this.bridge.dispatch(state.tabId, "unwatch").catch(() => undefined);
+    });
+  }
+
+  private serialize<T>(tabId: string, work: () => Promise<T>): Promise<T> {
+    const result = (this.tabTails.get(tabId) ?? Promise.resolve()).then(work);
+    const tail = result.then(() => undefined, () => undefined);
+    this.tabTails.set(tabId, tail);
+    void tail.then(() => { if (this.tabTails.get(tabId) === tail) this.tabTails.delete(tabId); });
+    return result;
   }
 
   onDisconnect(session: BrowserSession, callback: () => void): void {
@@ -109,7 +133,8 @@ export class ExtensionDriver implements BrowserDriver {
     return this.act(session, "select", target, value);
   }
 
-  async screenshot(session: BrowserSession, path: string, _fullPage: boolean): Promise<ScreenshotResult> {
+  async screenshot(session: BrowserSession, path: string, fullPage: boolean): Promise<ScreenshotResult> {
+    if (fullPage) throw new AtcError("UNSUPPORTED_ACTION", "full-page screenshots are not supported for live extension tabs");
     const dataUrl = String(await this.send(session, "screenshot"));
     const absolute = resolve(path);
     await mkdir(dirname(absolute), { recursive: true });

@@ -4,11 +4,12 @@
  * chrome.scripting; the macOS driver evaluates it through Apple Events.
  * It defines `globalThis.__atcAgent` and is safe to inject repeatedly.
  */
+globalThis.__atcWatch.checkUpgrade(globalThis.__atcAgent);
 globalThis.__atcAgent =
-  globalThis.__atcAgent && globalThis.__atcAgent.version === 1
+  globalThis.__atcAgent && globalThis.__atcAgent.version === 2
     ? globalThis.__atcAgent
     : {
-        version: 1,
+        version: 2,
         store: { console: [], network: [], seq: 0, watching: false },
         cap: 500,
 
@@ -16,6 +17,7 @@ globalThis.__atcAgent =
           if (op.op === "inspect") return this.inspect();
           if (op.op === "act") return this.act(op);
           if (op.op === "watch") return this.watch();
+          if (op.op === "unwatch") return this.unwatch();
           if (op.op === "logs") return this.logs(op.kind, op.since);
           return { ok: false, error: "INVALID_ARGUMENT", message: "unknown page operation" };
         },
@@ -44,7 +46,7 @@ globalThis.__atcAgent =
         label(el) {
           const aria = el.getAttribute("aria-label");
           if (aria) return aria.trim();
-          const byFor = el.id ? document.querySelector(`label[for="${CSS.escape(el.id)}"]`) : null;
+          const byFor = el.id ? el.getRootNode().querySelector(`label[for="${CSS.escape(el.id)}"]`) : null;
           if (byFor) return (byFor.textContent || "").trim();
           const wrapping = el.closest("label");
           if (!wrapping) return "";
@@ -67,6 +69,7 @@ globalThis.__atcAgent =
         describe(el) {
           const role = this.role(el);
           const name = JSON.stringify(this.name(el));
+          if (this.password(el)) return [`- textbox ${name} [redacted]`];
           if (role === "textbox") return [`- textbox ${name}${el.value ? `: ${JSON.stringify(el.value)}` : ""}`];
           if (role === "combobox" && el instanceof HTMLSelectElement) {
             const options = [...el.options].map((o) => `  - option ${JSON.stringify(o.label || o.value)}${o.selected ? " [selected]" : ""}`);
@@ -77,14 +80,21 @@ globalThis.__atcAgent =
         },
 
         inspect() {
-          const elements = document.body ? [...document.body.querySelectorAll("*")] : [];
-          const lines = elements.filter((el) => this.visible(el)).flatMap((el) => this.describe(el));
+          const lines = this.elements(document.body).filter((el) => this.visible(el)).flatMap((el) => this.describe(el));
           return { url: location.href, title: document.title, aria: lines.join("\n") };
         },
 
+        elements(root = document) {
+          const elements = root ? [...root.querySelectorAll("*")] : [];
+          for (const el of [...elements]) {
+            if (el.shadowRoot) elements.push(...this.elements(el.shadowRoot));
+          }
+          return elements;
+        },
+
         candidates(target) {
-          if (target.kind === "selector") return [...document.querySelectorAll(target.selector)];
-          const all = [...document.querySelectorAll("*")];
+          const all = this.elements();
+          if (target.kind === "selector") return all.filter((el) => el.matches(target.selector));
           if (target.kind === "role") {
             return all.filter((el) => this.role(el) === target.role && (target.name === undefined || this.name(el) === target.name));
           }
@@ -134,53 +144,23 @@ globalThis.__atcAgent =
           return { ok: true, matched: 1 };
         },
 
-        record(kind, entry) {
-          const list = this.store[kind];
-          this.store.seq += 1;
-          list.push({ seq: this.store.seq, ...entry, at: new Date().toISOString() });
-          if (list.length > this.cap) list.shift();
+        password(el) {
+          if (!(el instanceof HTMLInputElement)) return false;
+          const tokens = (el.getAttribute("autocomplete") || "").toLowerCase().split(/\s+/);
+          this.passwords ??= new WeakSet();
+          if (el.type === "password" || tokens.some((value) => ["current-password", "new-password"].includes(value))) this.passwords.add(el);
+          return this.passwords.has(el);
         },
 
         watch() {
-          if (this.store.watching) return { ok: true };
-          this.store.watching = true;
-          this.hookConsole();
-          this.hookFetch();
-          addEventListener("error", (e) => this.record("console", { type: "pageerror", text: e.message || "error", url: location.href }));
-          return { ok: true };
+          return globalThis.__atcWatch.start(this);
         },
 
-        hookConsole() {
-          const agent = this;
-          for (const level of ["log", "info", "warn", "error"]) {
-            const original = console[level];
-            console[level] = function (...args) {
-              agent.record("console", { type: level === "warn" ? "warning" : level, text: args.map(String).join(" "), url: location.href });
-              return original.apply(this, args);
-            };
-          }
-        },
-
-        hookFetch() {
-          if (typeof fetch !== "function") return;
-          const agent = this;
-          const original = fetch;
-          globalThis.fetch = async function (input, init) {
-            const url = new URL(typeof input === "string" ? input : (input && input.url) || location.href, location.href).href;
-            const method = (init && init.method) || "GET";
-            try {
-              const response = await original.apply(this, [input, init]);
-              agent.record("network", { method, url, resourceType: "fetch", status: response.status });
-              return response;
-            } catch (error) {
-              agent.record("network", { method, url, resourceType: "fetch", failure: String(error) });
-              throw error;
-            }
-          };
+        unwatch() {
+          return globalThis.__atcWatch.stop(this);
         },
 
         logs(kind, since) {
-          this.watch();
           return this.store[kind === "network" ? "network" : "console"].filter((entry) => entry.seq > since);
         },
       };

@@ -2,6 +2,7 @@
  * Executes one daemon command against one tab and reports the result.
  */
 import { send } from "./native.js";
+import { captureTab } from "./capture.js";
 import { runPageOp, setWatched } from "./page.js";
 
 const HANDLERS = {
@@ -19,7 +20,10 @@ const HANDLERS = {
     await setWatched(tabId, true);
     return runPageOp(tabId, { op: "watch" });
   },
-  unwatch: (tabId) => setWatched(tabId, false),
+  unwatch: async (tabId) => {
+    await setWatched(tabId, false);
+    return runPageOp(tabId, { op: "unwatch" });
+  },
 };
 
 export async function runCommand(command) {
@@ -57,16 +61,4 @@ function navigateAndWait(tabId, timeoutMs, start) {
     chrome.tabs.onUpdated.addListener(listener);
     start().catch(finish);
   });
-}
-
-/** captureVisibleTab only sees the selected tab, so select it briefly and then restore the user's tab. */
-async function captureTab(tabId) {
-  const tab = await chrome.tabs.get(tabId);
-  const [previous] = await chrome.tabs.query({ active: true, windowId: tab.windowId });
-  if (!tab.active) await chrome.tabs.update(tabId, { active: true });
-  try {
-    return await chrome.tabs.captureVisibleTab(tab.windowId, { format: "png" });
-  } finally {
-    if (previous && previous.id !== tabId) await chrome.tabs.update(previous.id, { active: true });
-  }
 }

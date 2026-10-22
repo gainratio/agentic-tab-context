@@ -25,6 +25,7 @@ export async function connect() {
     const error = chrome.runtime.lastError ? chrome.runtime.lastError.message : "";
     port = null;
     void chrome.storage.session.set({ atcHost: error ? `missing: ${error}` : "disconnected", atcDaemon: false });
+    void onMessage({ type: "daemon", connected: false });
   });
   await chrome.storage.session.set({ atcHost: "connected" });
   send({ type: "hello", browser: browserName(), instance: await instanceId() });

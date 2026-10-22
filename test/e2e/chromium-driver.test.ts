@@ -325,6 +325,26 @@ describe("ChromiumDriver (e2e, headless)", () => {
     expect((await driver.inspect(protectedSession)).aria).not.toContain("MANAGED_EDITED_SECRET");
   });
 
+  it("inspects and operates controls inside nested open shadow roots", async () => {
+    const shadowSession = await openSession("shadow-inspection");
+    const page = ownedContext(driver, shadowSession).pages()[0]!;
+    await page.setContent('<main><div id="host"></div></main>');
+    await page.evaluate(() => {
+      const outer = document.querySelector("#host")!.attachShadow({ mode: "open" });
+      const nested = document.createElement("div");
+      outer.append(nested);
+      const inner = nested.attachShadow({ mode: "open" });
+      inner.innerHTML = '<button>Shadow Save</button><label for="secret">Shadow Password</label><input id="secret" type="password" value="SHADOW_SECRET">';
+      inner.querySelector("button")!.addEventListener("click", () => document.body.setAttribute("data-saved", "true"));
+    });
+    const inspected = (await driver.inspect(shadowSession)).aria;
+    expect(inspected).toContain('button "Shadow Save"');
+    expect(inspected).toContain('textbox "Shadow Password" [redacted]');
+    expect(inspected).not.toContain("SHADOW_SECRET");
+    await driver.click(shadowSession, { kind: "role", role: "button", name: "Shadow Save" });
+    expect(await page.getAttribute("body", "data-saved")).toBe("true");
+  });
+
   it("never reuses a managed tab id after an earlier sibling closes", async () => {
     const original = await openSession("stable-tab-ids");
     const context = ownedContext(driver, original);

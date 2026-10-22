@@ -3,7 +3,7 @@
  * daemon over native messaging, reports open tabs, and runs commands the
  * daemon sends for tabs the user bound.
  */
-import { runCommand } from "./sw/commands.js";
+import { runConnectedCommand, setCaptureConnection } from "./sw/lifecycle.js";
 import { connect, isConnected, send, setMessageHandler } from "./sw/native.js";
 import { runPageOp, watchedTabs } from "./sw/page.js";
 import { pushTabs } from "./sw/tabs.js";
@@ -14,13 +14,15 @@ const pendingPins = new Map();
 let nextPinId = 1;
 
 setMessageHandler(async (message) => {
-  if (message.type === "command") await runCommand(message);
+  if (message.type === "command") await runConnectedCommand(message);
   else if (message.type === "pinned") pendingPins.get(message.id)?.(message);
   else if (message.type === "daemon") await onDaemon(message.connected);
 });
 
 async function onDaemon(connected) {
+  const cleanup = setCaptureConnection(connected);
   await chrome.storage.session.set({ atcDaemon: connected });
+  await cleanup;
   if (connected) await pushTabs();
 }
 

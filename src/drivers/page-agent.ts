@@ -17,6 +17,7 @@ export type ActAction = "click" | "type" | "select";
 export type PageOp =
   | { op: "inspect" }
   | { op: "watch" }
+  | { op: "unwatch" }
   | { op: "logs"; kind: "console" | "network"; since: number }
   | { op: "act"; action: ActAction; target: Target; label: string; value?: string };
 
@@ -24,7 +25,7 @@ let cachedSource: string | undefined;
 
 /** A self-contained script expression that runs `op` and evaluates to its JSON result. */
 export function pageExpression(op: PageOp): string {
-  cachedSource ??= readFileSync(PAGE_AGENT_PATH, "utf8");
+  cachedSource ??= ["page-agent-watch.js", "page-agent.js"].map((file) => readFileSync(join(PACKAGE_ROOT, "extension", file), "utf8")).join("\n");
   return `${cachedSource}\n;JSON.stringify(globalThis.__atcAgent.run(${JSON.stringify(op)}))`;
 }
 
