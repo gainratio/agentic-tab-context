@@ -15,6 +15,7 @@ quality = [
     { name = "mypy" },
     { name = "poethepoet" },
     { name = "pytest" },
+    { name = "pyyaml" },
     { name = "ruff" },
     { name = "xenon" },
 ]
@@ -25,6 +26,7 @@ requires-dist = [
     { name = "mypy", marker = "extra == 'quality'" },
     { name = "poethepoet", marker = "extra == 'quality'" },
     { name = "pytest", marker = "extra == 'quality'" },
+    { name = "pyyaml", marker = "extra == 'quality'" },
     { name = "ruff", marker = "extra == 'quality'" },
     { name = "xenon", marker = "extra == 'quality'" },
 ]

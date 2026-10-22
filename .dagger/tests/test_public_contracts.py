@@ -5,11 +5,13 @@ from __future__ import annotations
 import asyncio
 import inspect
 import json
+import tomllib
 from pathlib import Path
 from typing import cast
 
 import dagger
 import pytest
+import yaml
 
 import agentic_tab_context.main as main_module
 from agentic_tab_context.main import AgenticTabContext
@@ -25,6 +27,44 @@ FOREIGN_REPOSITORIES = (
     "",
 )
 VALID_SHA = "a" * 40
+ROOT = Path(__file__).parents[2]
+PYTHON_GATE = "uv run --frozen --extra quality poe gate"
+
+
+def _required_ci_step(steps: list[dict[str, object]], **selector: object) -> int:
+    matches = [index for index, step in enumerate(steps) if selector.items() <= step.items()]
+    assert len(matches) == 1
+    step = steps[matches[0]]
+    assert "if" not in step
+    assert not step.get("continue-on-error", False)
+    return matches[0]
+
+
+def test_should_require_the_frozen_python_module_gate_in_ci() -> None:
+    workflow = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())
+    job = workflow["jobs"]["check"]
+    assert "if" not in job
+    assert not job.get("continue-on-error", False)
+    steps = job["steps"]
+    generate = _required_ci_step(steps, run="dagger develop")
+    gate = _required_ci_step(steps, run=PYTHON_GATE)
+    assert steps[gate]["working-directory"] == ".dagger"
+    assert generate < gate
+    dagger_install = _required_ci_step(
+        steps, uses="dagger/dagger-for-github@27b130bf0f79a7f6fbbbe0fbca6760dc9bb40a77"
+    )
+    uv_install = _required_ci_step(
+        steps, uses="astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9"
+    )
+    assert max(dagger_install, uv_install) < generate
+    assert steps[dagger_install]["with"]["version"] == "0.21.8"
+    assert steps[uv_install]["with"] == {"version": "0.13.5", "python-version": "3.13.14"}
+
+
+def test_should_keep_every_python_module_quality_check_in_the_gate() -> None:
+    project = tomllib.loads((ROOT / ".dagger/pyproject.toml").read_text())
+
+    assert project["tool"]["poe"]["tasks"]["gate"] == ["lint", "typecheck", "complexity", "test"]
 
 
 class RecordingWorkspace:
