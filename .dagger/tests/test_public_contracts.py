@@ -1,4 +1,4 @@
-"""Behavioral contracts for Agentic Browser Tab's typed Dagger quality and security graph."""
+"""Behavioral contracts for Agentic Tab Context's typed Dagger quality and security graph."""
 
 from __future__ import annotations
 
@@ -11,21 +11,17 @@ from typing import cast
 import dagger
 import pytest
 
-import agentic_browser_tab.main as main_module
-from agentic_browser_tab.main import AgenticBrowserTab
+import agentic_tab_context.main as main_module
+from agentic_tab_context.main import AgenticTabContext
 
 CENTRAL_SHA = "8420264d5560b0817579d9c5323ae3a69ce4558d"
-REPOSITORY = "gainratio/agentic-browser-tab"
-ALLOWED = (
-    "gainratio/agentic-browser-tab",
-    "hseshadr/agentic-browser-tab",
-    "gainratio/tabcontext",
-    "hseshadr/tabcontext",
-)
+REPOSITORY = "gainratio/agentic-tab-context"
+ALLOWED = ("gainratio/agentic-tab-context",)
 FOREIGN_REPOSITORIES = (
-    "attacker/agentic-browser-tab",
+    "attacker/agentic-tab-context",
     "gainratio/other-repo",
-    "hseshadr/tabcontext-evil",
+    "gainratio-evil/agentic-tab-context",
+    "other-owner/agentic-tab-context",
     "",
 )
 VALID_SHA = "a" * 40
@@ -94,7 +90,7 @@ class RecordingDag:
 def test_should_select_an_explicit_typed_workspace_root() -> None:
     workspace = RecordingWorkspace()
 
-    AgenticBrowserTab.create(cast(dagger.Workspace, workspace))
+    AgenticTabContext.create(cast(dagger.Workspace, workspace))
 
     assert workspace.path == "/"
     assert ".git" in workspace.excludes
@@ -104,7 +100,7 @@ def test_should_select_an_explicit_typed_workspace_root() -> None:
 def test_should_exclude_generated_python_gate_state_from_source_binding() -> None:
     workspace = RecordingWorkspace()
 
-    AgenticBrowserTab.create(cast(dagger.Workspace, workspace))
+    AgenticTabContext.create(cast(dagger.Workspace, workspace))
 
     assert {
         ".dagger/.mypy_cache",
@@ -114,7 +110,7 @@ def test_should_exclude_generated_python_gate_state_from_source_binding() -> Non
 
 
 def test_should_require_typed_workspace_when_constructing_graph() -> None:
-    signature = inspect.signature(AgenticBrowserTab.create, eval_str=True)
+    signature = inspect.signature(AgenticTabContext.create, eval_str=True)
 
     workspace = signature.parameters.get("workspace")
 
@@ -132,13 +128,13 @@ def test_should_expose_canonical_gate_boundaries() -> None:
         "workflow_security",
     }
 
-    available = {name for name in expected if hasattr(AgenticBrowserTab, name)}
+    available = {name for name in expected if hasattr(AgenticTabContext, name)}
 
     assert available == expected
 
 
 def test_should_pin_node_and_security_images_by_sha256() -> None:
-    module = inspect.getmodule(AgenticBrowserTab)
+    module = inspect.getmodule(AgenticTabContext)
 
     assert module is not None
     assert "node:24.16.0-bookworm-slim@sha256:" in module.NODE_IMAGE
@@ -147,8 +143,8 @@ def test_should_pin_node_and_security_images_by_sha256() -> None:
 
 
 def test_should_scan_snapshot_history_and_both_workflow_extensions() -> None:
-    secret_scan = inspect.getsource(AgenticBrowserTab._secret_scan)
-    workflow_security = inspect.getsource(AgenticBrowserTab._workflow_security)
+    secret_scan = inspect.getsource(AgenticTabContext._secret_scan)
+    workflow_security = inspect.getsource(AgenticTabContext._workflow_security)
 
     assert "GITLEAKS_SNAPSHOT" in secret_scan
     assert "GITLEAKS_HISTORY" in secret_scan
@@ -157,8 +153,8 @@ def test_should_scan_snapshot_history_and_both_workflow_extensions() -> None:
 
 
 def test_should_install_frozen_dependencies_with_ignore_scripts() -> None:
-    implementation = inspect.getsource(AgenticBrowserTab)
-    module = inspect.getmodule(AgenticBrowserTab)
+    implementation = inspect.getsource(AgenticTabContext)
+    module = inspect.getmodule(AgenticTabContext)
 
     assert module is not None
     assert module.INSTALL_COMMAND == ["npm", "ci", "--ignore-scripts"]
@@ -180,7 +176,7 @@ def test_should_pin_foundation_to_the_exact_central_commit() -> None:
 
 
 def test_should_require_an_explicit_commit_for_the_canonical_check() -> None:
-    signature = inspect.signature(AgenticBrowserTab.ci)
+    signature = inspect.signature(AgenticTabContext.ci)
 
     assert signature.parameters["commit_sha"].default is inspect.Signature.empty
 
@@ -190,19 +186,19 @@ def test_should_bind_guard_then_run_products_on_the_bound_source(
 ) -> None:
     events: list[str] = []
     foundation = RecordingFoundation(events)
-    abt = AgenticBrowserTab.__new__(AgenticBrowserTab)
-    abt.source = cast(dagger.Directory, "caller-source")
+    atc = AgenticTabContext.__new__(AgenticTabContext)
+    atc.source = cast(dagger.Directory, "caller-source")
 
     async def run_products(source: dagger.Directory, *_identity: object) -> None:
         assert source == foundation.bound
         events.append("product")
 
     monkeypatch.setattr(main_module, "dag", RecordingDag(foundation))
-    monkeypatch.setattr(abt, "_run_ci", run_products)
+    monkeypatch.setattr(atc, "_run_ci", run_products)
 
-    result = asyncio.run(abt.ci(VALID_SHA, REPOSITORY))
+    result = asyncio.run(atc.ci(VALID_SHA, REPOSITORY))
 
-    assert result == "Agentic Browser Tab canonical Dagger gate passed"
+    assert result == "Agentic Tab Context canonical Dagger gate passed"
     assert events == ["source", "guard", "product"]
 
 
@@ -211,17 +207,17 @@ def test_should_stop_before_products_when_foundation_rejects(
 ) -> None:
     events: list[str] = []
     foundation = RecordingFoundation(events, ValueError("guard rejected"))
-    abt = AgenticBrowserTab.__new__(AgenticBrowserTab)
-    abt.source = cast(dagger.Directory, "caller-source")
+    atc = AgenticTabContext.__new__(AgenticTabContext)
+    atc.source = cast(dagger.Directory, "caller-source")
 
     async def run_products(*_arguments: object) -> None:
         events.append("product")
 
     monkeypatch.setattr(main_module, "dag", RecordingDag(foundation))
-    monkeypatch.setattr(abt, "_run_ci", run_products)
+    monkeypatch.setattr(atc, "_run_ci", run_products)
 
     with pytest.raises(ValueError, match="guard rejected"):
-        asyncio.run(abt.ci(VALID_SHA, REPOSITORY))
+        asyncio.run(atc.ci(VALID_SHA, REPOSITORY))
     assert events == ["source"]
 
 
@@ -231,16 +227,16 @@ def test_should_bind_and_guard_the_runs_own_allowed_repository(
 ) -> None:
     events: list[str] = []
     foundation = RecordingFoundation(events, repository=repository)
-    abt = AgenticBrowserTab.__new__(AgenticBrowserTab)
-    abt.source = cast(dagger.Directory, "caller-source")
+    atc = AgenticTabContext.__new__(AgenticTabContext)
+    atc.source = cast(dagger.Directory, "caller-source")
 
     async def run_products(*_arguments: object) -> None:
         events.append("product")
 
     monkeypatch.setattr(main_module, "dag", RecordingDag(foundation))
-    monkeypatch.setattr(abt, "_run_ci", run_products)
+    monkeypatch.setattr(atc, "_run_ci", run_products)
 
-    asyncio.run(abt.ci(VALID_SHA, repository))
+    asyncio.run(atc.ci(VALID_SHA, repository))
 
     assert events == ["source", "guard", "product"]
 
@@ -251,11 +247,11 @@ def test_should_refuse_a_foreign_repository_before_foundation_runs(
 ) -> None:
     events: list[str] = []
     foundation = RecordingFoundation(events)
-    abt = AgenticBrowserTab.__new__(AgenticBrowserTab)
-    abt.source = cast(dagger.Directory, "caller-source")
+    atc = AgenticTabContext.__new__(AgenticTabContext)
+    atc.source = cast(dagger.Directory, "caller-source")
 
     monkeypatch.setattr(main_module, "dag", RecordingDag(foundation))
 
     with pytest.raises(ValueError, match="repository"):
-        asyncio.run(abt.ci(VALID_SHA, repository))
+        asyncio.run(atc.ci(VALID_SHA, repository))
     assert events == []

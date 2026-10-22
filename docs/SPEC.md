@@ -1,13 +1,13 @@
-# Agentic Browser Tab (`abt` / `tabctx`) — Specification
+# Agentic Tab Context (`atc` / `abt` / `tabctx`) — Specification
 
-Agentic Browser Tab (`abt`, aliased as `agentic-browser-tab` and `tabctx`) is a deterministic, browser-agnostic CLI, local daemon, and Manifest V3 WebExtension that gives coding assistants a **persistent, sticky browser tab** — binding directly to the tab the user already has open rather than launching redundant browser windows.
+Agentic Tab Context (`atc`, aliased as `agentic-tab-context`, `abt`, and `tabctx`) is a deterministic, browser-agnostic CLI, local daemon, and Manifest V3 WebExtension that gives coding assistants a **persistent, sticky browser tab** — binding directly to the tab the user already has open rather than launching redundant browser windows.
 
 ## Core Principles
-- **Bind first, never open a redundant browser.** `abt bind` discovers open tabs across the WebExtension bridge (`127.0.0.1:43919`), macOS native browsers (`osascript` JXA), and managed Playwright contexts, binding to the matching tab in place.
-- **Sticky context.** A context (`ctx_<hex>`) lives in the background daemon until `abt close` or until its tab/browser closes.
+- **Bind first, never open a redundant browser.** `atc bind` discovers open tabs across the WebExtension bridge (`127.0.0.1:43919`), macOS native browsers (`osascript` JXA), and managed Playwright contexts, binding to the matching tab in place.
+- **Sticky context.** A context (`ctx_<hex>`) lives in the background daemon until `atc close` or until its tab/browser closes.
 - **Deterministic, never guess.** Ambiguous tab queries or DOM locators fail closed with `AMBIGUOUS_TARGET` and the match count/candidates; missing targets fail with `TARGET_NOT_FOUND`. `--tab <tabId>` (for `bind`) and `--nth N` (for DOM actions) are explicit escape hatches.
 - **JSON only.** Every command prints **exactly one line** of compact JSON on `stdout`; exit code is `0` iff `"ok": true`.
-- **Zero credentials.** Humans authenticate in their own browser window; `abt` never stores or echoes credentials and redacts typed values from error responses.
+- **Zero credentials.** Humans authenticate in their own browser window; `atc` never stores or echoes credentials and redacts typed values from error responses.
 
 ## Architecture
 1. **CLI (`src/cli/`)**: Strict, zero-dependency argument parser (`args.ts`), one-step skill/extension installer (`setup.ts`), and auto-starting Unix socket client (`client.ts`).

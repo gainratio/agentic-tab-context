@@ -1,8 +1,7 @@
-"""Agentic Browser Tab's complete quality, browser E2E, and security graph."""
+"""Agentic Tab Context's complete quality, browser E2E, and security graph."""
 
 from __future__ import annotations
 
-import re
 from typing import Final, Self
 
 import dagger
@@ -20,16 +19,10 @@ GITLEAKS_IMAGE: Final = (
     "ghcr.io/gitleaks/gitleaks:v8.29.1@sha256:"
     "aa036a2f4bdfe3cc3c55fa4326308efabb4a6be498c883c864fd1d0d5585438a"
 )
-ALLOWED_REPOSITORIES: Final = (
-    "gainratio/agentic-browser-tab",
-    "hseshadr/agentic-browser-tab",
-    "gainratio/tabcontext",
-    "hseshadr/tabcontext",
-)
-REPOSITORY: Final = "gainratio/agentic-browser-tab"
+ALLOWED_REPOSITORIES: Final = ("gainratio/agentic-tab-context",)
+REPOSITORY: Final = "gainratio/agentic-tab-context"
 REPOSITORY_URL: Final = f"https://github.com/{REPOSITORY}.git"
 SHA_LENGTH: Final = 40
-RELEASE_TAG: Final = re.compile(r"v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)")
 SOURCE_EXCLUDES: Final = [
     ".git",
     ".dagger/.mypy_cache",
@@ -76,8 +69,8 @@ GITLEAKS_HISTORY: Final = [
 
 
 @object_type
-class AgenticBrowserTab:
-    """Run the same typed Agentic Browser Tab gate locally and on GitHub."""
+class AgenticTabContext:
+    """Run the same typed Agentic Tab Context gate locally and on GitHub."""
 
     source: dagger.Directory = field()
 
@@ -152,7 +145,7 @@ class AgenticBrowserTab:
         self._require_repository(repository)
         source = await self._verified_source(self.source, commit_sha, repository)
         await self._run_ci(source, commit_sha)
-        return "Agentic Browser Tab canonical Dagger gate passed"
+        return "Agentic Tab Context canonical Dagger gate passed"
 
     async def _verified_source(
         self, source: dagger.Directory, commit_sha: str, repository: str
@@ -191,7 +184,7 @@ class AgenticBrowserTab:
         base = base.with_env_variable("PLAYWRIGHT_BROWSERS_PATH", "/opt/pw-browsers")
         base = base.with_env_variable("npm_config_cache", "/opt/npm-cache")
         base = base.with_mounted_cache(
-            "/opt/npm-cache", dag.cache_volume("abt-npm-cache"), owner="65532:65532"
+            "/opt/npm-cache", dag.cache_volume("atc-npm-cache"), owner="65532:65532"
         )
         base = base.with_exec(["mkdir", "-p", "/opt/home", "/opt/pw-browsers"])
         base = base.with_exec(["chown", "-R", "65532:65532", "/opt/home", "/opt/pw-browsers"])
@@ -199,7 +192,7 @@ class AgenticBrowserTab:
 
     @staticmethod
     def _history(commit_sha: str) -> dagger.Directory:
-        AgenticBrowserTab._require_sha(commit_sha)
+        AgenticTabContext._require_sha(commit_sha)
         return dag.git(REPOSITORY_URL).commit(commit_sha).tree(depth=0, include_tags=True)
 
     @staticmethod

@@ -1,6 +1,6 @@
 /**
- * `abt setup`: installs the agentic-browser-tab skill into Claude Code, Codex,
- * Antigravity, and Universal Agent Skills directories, and reports browser/extension readiness.
+ * `atc setup` / `abt setup`: installs the agentic-tab-context skill into Claude Code,
+ * Codex, Antigravity, and Universal Agent Skills directories, and reports browser/extension readiness.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -16,15 +16,15 @@ export function extensionDirPath(): string {
 }
 
 export function skillSourcePath(): string {
-  return join(PACKAGE_ROOT, "skills", "agentic-browser-tab", "SKILL.md");
+  return join(PACKAGE_ROOT, "skills", "agentic-tab-context", "SKILL.md");
 }
 
 export function skillTargetPaths(userHome: string): string[] {
   return [
-    join(userHome, ".claude", "skills", "agentic-browser-tab", "SKILL.md"),
-    join(userHome, ".codex", "skills", "agentic-browser-tab", "SKILL.md"),
-    join(userHome, ".gemini", "antigravity", "skills", "agentic-browser-tab", "SKILL.md"),
-    join(userHome, ".agents", "skills", "agentic-browser-tab", "SKILL.md"),
+    join(userHome, ".claude", "skills", "agentic-tab-context", "SKILL.md"),
+    join(userHome, ".codex", "skills", "agentic-tab-context", "SKILL.md"),
+    join(userHome, ".gemini", "antigravity", "skills", "agentic-tab-context", "SKILL.md"),
+    join(userHome, ".agents", "skills", "agentic-tab-context", "SKILL.md"),
   ];
 }
 
@@ -39,10 +39,12 @@ export function runSetup(env: NodeJS.ProcessEnv = process.env): OkResponse {
   }
   return {
     ok: true,
-    cli: "abt",
+    cli: "atc",
     installedSkills,
     extensionPath: extensionDirPath(),
-    browsers: detectInstalledBrowsers(env.ABT_BROWSER_PATH ?? env.TABCTX_CHROMIUM_PATH),
+    browsers: detectInstalledBrowsers(
+      env.ATC_BROWSER_PATH ?? env.ABT_BROWSER_PATH ?? env.TABCTX_CHROMIUM_PATH,
+    ),
   };
 }
 
@@ -53,7 +55,7 @@ function readSkillContent(): string {
 }
 
 const DEFAULT_SKILL_MARKDOWN = `---
-name: agentic-browser-tab
+name: agentic-tab-context
 description: >
   Discover and bind to the user's already-open browser tab across Chrome, Safari,
   Firefox, Brave, and Edge without opening a redundant browser window or tab.
@@ -61,34 +63,34 @@ description: >
   "inspect my localhost tab", or asks to test/interact with a page in their browser.
 ---
 
-# Agentic Browser Tab (\`abt\` / \`tabctx\`)
+# Agentic Tab Context (\`atc\` / \`abt\` / \`tabctx\`)
 
-Use \`abt\` (or \`tabctx\`) to inspect and interact with the browser tab the user **already has open**, or to keep one sticky browser context across commands.
+Use \`atc\` (or \`abt\` / \`tabctx\`) to inspect and interact with the browser tab the user **already has open**, or to keep one sticky browser context across commands.
 
 ## Golden Rule: Never Open a Redundant Browser or Tab First
 
 When the user says **"look at my browser"** (or names a site/tab like \`localhost\`, \`aml-filter\`, \`pricing\`):
 1. **Find and bind to the existing tab first**:
    \`\`\`sh
-   abt bind --query "localhost"   # or: abt bind --active
+   atc bind --query "localhost"   # or: atc bind --active
    \`\`\`
    To see all open tabs across Chrome, Safari, Firefox, Brave, and Edge before binding:
    \`\`\`sh
-   abt tabs
-   abt bind --tab <tabId>
+   atc tabs
+   atc bind --tab <tabId>
    \`\`\`
 2. **Inspect and act on the bound tab**:
    \`\`\`sh
-   abt inspect
-   abt click --role button --name "Save"
-   abt type --label "Product Name" --value "Acme"
-   abt select --label "Environment" --value "Stage"
-   abt console --since 0
-   abt network --since 0
-   abt screenshot
+   atc inspect
+   atc click --role button --name "Save"
+   atc type --label "Product Name" --value "Acme"
+   atc select --label "Environment" --value "Stage"
+   atc console --since 0
+   atc network --since 0
+   atc screenshot
    \`\`\`
 3. **Only open a new browser context if no matching tab is open**:
    \`\`\`sh
-   abt open chrome --use          # or: chromium | firefox | safari | brave | edge
+   atc open chrome --use          # or: chromium | firefox | safari | brave | edge
    \`\`\`
 `;

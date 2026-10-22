@@ -1,5 +1,5 @@
 [project]
-name = "agentic-browser-tab"
+name = "agentic-tab-context"
 version = "0.2.0"
 requires-python = ">=3.13,<3.15"
 dependencies = ["dagger-io"]
