@@ -3,6 +3,11 @@
 # register the browser extension's native host, and print a health check.
 set -euo pipefail
 
+case "$(uname -s)" in
+  Darwin|Linux) ;;
+  *) echo "atc supports macOS and Linux only." >&2; exit 1 ;;
+esac
+
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO_DIR"
 

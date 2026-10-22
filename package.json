@@ -16,10 +16,12 @@
   "bin": {
     "atc": "bin/atc.js"
   },
+  "files": ["bin/", "dist/", "extension/", "skills/", "README.md", "PRIVACY.md", "LICENSE"],
   "engines": {
     "node": ">=22"
   },
   "scripts": {
+    "prepack": "npm run build",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
     "test": "vitest run",

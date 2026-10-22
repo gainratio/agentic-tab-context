@@ -6,6 +6,7 @@ import { createHash } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { NATIVE_HOST_NAME } from "../contracts/extension.js";
+import { AtcError } from "../contracts/errors.js";
 import type { Paths } from "../contracts/protocol.js";
 import { PACKAGE_ROOT } from "../drivers/page-agent.js";
 
@@ -41,6 +42,9 @@ function chromium(browser: string, profileRoot: string): BrowserHostDir {
 }
 
 export function browserHostDirs(home: string, platform: NodeJS.Platform): BrowserHostDir[] {
+  if (platform !== "darwin" && platform !== "linux") {
+    throw new AtcError("UNSUPPORTED_ACTION", "Native messaging installation supports macOS and Linux only");
+  }
   return platform === "darwin" ? macHostDirs(home) : linuxHostDirs(home);
 }
 
@@ -98,11 +102,12 @@ export interface HostInstallOptions {
 
 /** Write the launcher and register it with every browser whose profile folder exists. Returns the manifests written. */
 export function installNativeHost(options: HostInstallOptions): string[] {
+  const browsers = browserHostDirs(options.home, options.platform).filter((d) => existsSync(d.profileRoot));
   writeLauncher(options.paths);
   const { key, geckoId } = extensionManifest();
   const ids = [extensionIdFromKey(key), ...options.extraExtensionIds];
   const installed: string[] = [];
-  for (const dir of browserHostDirs(options.home, options.platform).filter((d) => existsSync(d.profileRoot))) {
+  for (const dir of browsers) {
     const target = join(dir.hostDir, `${NATIVE_HOST_NAME}.json`);
     mkdirSync(dirname(target), { recursive: true });
     writeFileSync(target, `${JSON.stringify(hostManifest(options.paths.nativeHost, dir.firefox, ids, geckoId), null, 2)}\n`);
