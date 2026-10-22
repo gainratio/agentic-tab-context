@@ -14,7 +14,7 @@ Say **"look at my browser"**, and the assistant finds the tab you mean. It can t
 
 ## Quick start (about 2 minutes)
 
-You need [Node.js](https://nodejs.org) 22 or newer and Chrome (or another Chromium browser).
+You need macOS or Linux, [Node.js](https://nodejs.org) 22 or newer, and Chrome (or another Chromium browser). Windows installation is unsupported and stops before writing files.
 
 **1. Install**
 
@@ -60,17 +60,17 @@ You can also click the extension's toolbar icon and press **Let my assistant use
 | Chrome, Chromium | Yes, with the extension | Tested automatically on every change |
 | Brave, Edge | Yes, with the extension | Same engine as Chrome; not tested yet |
 | Firefox | Extension is written to support it | Not tested yet |
-| Safari (Mac) | Can find and pick tabs. Reading and clicking needs one Safari setting (below). No screenshots. | Tested with simulated Safari responses only |
-| Chrome, Brave, Edge on a Mac **without** the extension | Same as Safari | Tested with simulated responses only |
+| Safari (Mac) | Discovery only: can list tabs; binding and actions are unsupported because Safari exposes no stable tab identity | Discovery tested with simulated responses; physical Safari unverified |
+| Chrome, Brave, Edge on a Mac **without** the extension | Can bind by stable browser tab id; page access needs the Apple Events setting below. No screenshots. | Tested with simulated responses only |
 
-The Safari setting is **Develop > Allow JavaScript from Apple Events**. In Chrome, Brave and Edge it is **View > Developer > Allow JavaScript from Apple Events**. You only need it if you don't install the extension.
+In Chrome, Brave and Edge on macOS, the setting is **View > Developer > Allow JavaScript from Apple Events**. You only need it if you don't install the extension. Enabling Safari automation does not enable Safari binding in atc.
 
 Need a separate, clean browser window instead? `atc open chromium` (or `firefox`, `webkit`) opens one that remembers its own logins.
 
 ## Is it safe?
 
-- **Nothing leaves your computer.** atc opens no network port. The extension talks to atc through the browser's built-in "native messaging" channel, and the browser only lets this one extension use it.
-- **atc never sees your passwords.** You log in yourself, as usual. Anything typed through atc is removed from its error messages.
+- **The bridge is local.** atc opens no network listening port. The extension talks to atc through native messaging. Your assistant's handling of returned content follows its own settings and terms; normal website requests still occur.
+- **Password controls are redacted from inspection.** Log in yourself, as usual. Values supplied through `atc type` are passed to the page and removed from error messages. Ordinary page text, console messages and network addresses can still contain sensitive information.
 - **Your assistant can read whatever is on the tab you give it.** Only let it use tabs you're happy to share. Web pages can contain text aimed at AI assistants, so treat what a page says as information, not instructions.
 
 ## Commands
@@ -91,7 +91,9 @@ You rarely need these yourself; your assistant runs them. Every command prints o
 | `atc doctor` | Check that everything is connected |
 | `atc setup` | Reinstall the assistant skill and browser connection |
 
-atc never guesses. If two buttons are both called "Delete", or two tabs both match "localhost", it stops and lists the choices instead of picking one.
+Element actions require one exact match. Tab binding prefers a unique exact URL/title match, then a unique active tab; otherwise it lists the choices. Use `--tab <id>` when you need one specific tab.
+
+Live extension screenshots capture the viewport. `--full-page` is supported for managed windows and explicitly rejected for live tabs.
 
 The full reference (every flag, the output format, error codes) is in [docs/SPEC.md](docs/SPEC.md).
 
@@ -115,7 +117,24 @@ The first `atc` command starts a small background service. It remembers which ta
 | `atc doctor` shows no connected extension | Run `atc setup`, then reload the extension at `chrome://extensions` |
 | "blocks page access from other apps" | Install the extension, or turn on the Apple Events setting above |
 | `AMBIGUOUS_TARGET` | Several things matched. Use `atc tabs` and `atc bind --tab <id>`, or add `--nth 1` for elements |
-| `TAB_MOVED` (Safari) | The tab was moved or changed page. Run `atc bind` again |
+| Safari binding is unsupported | Use tab discovery only, or choose a supported Chromium browser |
+| A reload is required after an update | Reload the affected page, then bind it again to replace the old page agent |
+
+## Update or remove
+
+To update your clone, stop atc, pull the reviewed changes, and rebuild:
+
+```sh
+atc shutdown
+git pull --ff-only
+./install.sh
+```
+
+Reload the extension in your browser and reload previously bound pages after updating, then run `atc doctor`.
+
+To remove it, run `atc shutdown` and `npm unlink --global agentic-tab-context`, then remove the browser extension. Remove the `nativeHostManifests` and `installedSkills` files listed in your original setup output. The native manifests are named `com.gainratio.atc.json` in the browser's native-host folder. Keep `~/.atc` (or your `ATC_HOME`) if you want to retain managed-browser logins and saved screenshots; delete it only when you intend to remove those too. The clone can then be removed.
+
+The npm package is private. Local archives include the compiled CLI and extension assets; publishing an npm package or Chrome Web Store build is a separate release action.
 
 ## Contributing
 

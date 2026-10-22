@@ -1,8 +1,8 @@
 ---
 name: agentic-tab-context
 description: >
-  Use the browser tab the user already has open (Chrome, Brave, Edge, Firefox,
-  Safari) instead of opening a new browser. Use whenever the user says "look at
+  Use the browser tab the user already has open in Chrome, Brave, Edge or Firefox
+  instead of opening a new browser. Safari supports discovery only. Use whenever the user says "look at
   my browser", "check the open tab", "the page I have open", or asks to inspect,
   test, debug, fill in, click through, or screenshot a page they are viewing.
 ---
@@ -36,7 +36,9 @@ atc click  --role button --name "Save"
 atc type   --label "Email" --value "test@example.com"
 atc select --label "Plan" --value "Pro"
 atc goto   /settings          # relative to the current page
-atc back | forward | reload
+atc back
+atc forward
+atc reload
 ```
 
 Locators (exactly one per action): `--role R [--name N]`, `--label`, `--text`, `--placeholder`, `--testid`, `--selector`. Matching is exact and only counts visible elements. If several match (`AMBIGUOUS_TARGET`), add `--nth N` (0-based) after re-inspecting.
@@ -54,8 +56,8 @@ atc screenshot            # prints the PNG path; open it to see the page
 | Error | What to do |
 |---|---|
 | `CONTEXT_CLOSED` | The user closed the tab. Bind again. |
-| `TAB_MOVED` | (Safari) The tab moved or changed page. Run `atc bind` again. |
-| `UNSUPPORTED_ACTION` | E.g. screenshot of a Safari tab. Tell the user, and suggest the extension (`atc doctor`). |
+| `TAB_MOVED` | Tab identity is uncertain. Inspect the tab list and bind the intended stable id again. |
+| `UNSUPPORTED_ACTION` | Safari is discovery-only; live extension screenshots are viewport-only. Report the limitation and use a supported operation. |
 | `ACTION_FAILED` mentioning "Apple Events" | The browser blocks page access. Tell the user to install the atc extension (`atc doctor` shows how) or enable the setting named in the message. |
 | `DAEMON_UNAVAILABLE` | Run `atc doctor` and report its `nextSteps`. |
 

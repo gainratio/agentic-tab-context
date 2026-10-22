@@ -17,8 +17,9 @@ Agentic Tab Context ("the extension") connects your browser to the `atc` program
 
 ## What is stored
 
-- A random identifier for this browser profile, and the list of tabs currently being watched, kept in the extension's local storage.
-- No page content is stored by the extension.
+- A random identifier for this browser profile is kept in local extension storage. Watched tab identifiers use session storage and do not survive a browser restart.
+- No page content is persisted to extension storage. While bound, the page keeps bounded in-memory console and network buffers (up to 500 entries per kind). Unwatch, closing the atc context, or navigation clears these buffers and stops that capture session.
+- Password control values are omitted from inspection. Other returned page content and logs can contain sensitive information. The local atc program may retain requested screenshots and managed-browser profiles under `ATC_HOME`; removing the extension does not delete those files.
 
 ## Your control
 

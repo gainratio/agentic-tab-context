@@ -28,7 +28,7 @@ How to use it
 3. Ask your assistant to "look at my browser", or click the toolbar icon and choose "Let my assistant use this tab"
 
 Privacy
-Everything stays on your computer. The extension only talks to the atc program on the same machine through the browser's native messaging. It makes no network requests, and nothing is sent to us or anyone else.
+The extension's own communication is local native messaging to atc; it makes no network requests of its own. Your assistant's use of returned information follows that assistant's settings and terms. Normal website requests still occur. Password controls are redacted from inspection.
 
 **Category**
 Developer Tools
@@ -53,7 +53,7 @@ English
 | `tabs` | permissions | Reads the title and address of open tabs so the user (or their assistant) can pick which tab to connect. |
 | `scripting` | permissions | Reads the visible content of the connected tab and performs the clicks and form entries the user's assistant requests in that tab. |
 | `nativeMessaging` | permissions | The only channel to the local atc program on the same computer. No network connection is used. |
-| `storage` | permissions | Keeps a random per-profile identifier and the list of connected tabs across browser restarts. |
+| `storage` | permissions | Keeps a random per-profile identifier locally and watched-tab identifiers for the current browser session. Watched tabs do not persist across browser restarts. |
 | `alarms` | permissions | Retries the connection to the local atc program every 30 seconds if it isn't installed or running yet. |
 | `<all_urls>` | host_permissions | Developers work on local servers (localhost), staging and production sites on any domain; the user chooses which tab to connect. |
 
