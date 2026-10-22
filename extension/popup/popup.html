@@ -14,6 +14,19 @@
       </header>
       <p class="badge" id="status-text" role="status" aria-live="polite">Checking…</p>
 
+      <section class="setup-guide" id="standalone-help" aria-labelledby="help-title" hidden>
+        <h2 id="help-title">Open this from your browser toolbar</h2>
+        <p>This is the extension’s popup. Opening this HTML file directly cannot connect to your browser tabs.</p>
+        <ol>
+          <li>In Chrome or Chromium, open the website you want help with.</li>
+          <li>Open the browser’s Extensions menu and select <strong>Agentic Tab Context</strong>.</li>
+          <li>Click <strong>Let my assistant use this tab</strong>, then return to your assistant and ask what you want it to do.</li>
+        </ol>
+        <h3>Extension not loaded yet?</h3>
+        <p>Open <code>chrome://extensions</code> in Chrome or Chromium. Turn on <strong>Developer mode</strong>, choose <strong>Load unpacked</strong>, and select the <code>extension</code> folder inside your Agentic Tab Context checkout.</p>
+        <p>For a connection problem, run <code>atc doctor</code> in your terminal to see its status and next steps.</p>
+      </section>
+
       <section class="tab-box">
         <div class="label">This tab</div>
         <div class="tab-title" id="tab-title">—</div>
@@ -27,6 +40,7 @@
       <div class="feedback" id="feedback" role="status" aria-live="polite" aria-atomic="true" hidden></div>
 
       <footer class="footer">
+        After connecting, return to your assistant’s chat.<br />
         Or just ask your assistant to <em>"look at my browser"</em>.
       </footer>
     </main>

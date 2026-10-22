@@ -32,6 +32,24 @@ async function popup(rejectPin = false): Promise<Page> {
   return page;
 }
 
+it("explains toolbar usage when opened as a file without extension APIs", async () => {
+  const page = await browser.newPage({ viewport: { width: 1100, height: 760 } });
+  pages.push(page);
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto(pathToFileURL(join(ROOT, "extension/popup/popup.html")).href);
+  expect(await page.getByRole("heading", { name: "Open this from your browser toolbar" }).isVisible()).toBe(true);
+  expect(await page.locator("#status-text").innerText()).toBe("Opened outside the browser extension");
+  expect(await page.locator("#standalone-help").innerText()).toContain("chrome://extensions");
+  expect(await page.locator("#standalone-help").innerText()).toContain("return to your assistant");
+  expect(await page.locator("#bind-btn").isVisible()).toBe(false);
+  expect(await page.locator(".tab-box").isVisible()).toBe(false);
+  expect(errors).toEqual([]);
+  const card = await page.locator(".card").boundingBox();
+  expect(card!.width).toBeGreaterThan(400);
+  expect(Math.abs(card!.x + card!.width / 2 - 550)).toBeLessThan(2);
+});
+
 it("announces status and binding feedback, and works from the keyboard", async () => {
   const page = await popup();
   expect(await page.locator("#status-text").getAttribute("role")).toBe("status");
