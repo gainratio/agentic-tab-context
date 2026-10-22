@@ -66,15 +66,26 @@ class RecordingFoundation:
         self.bound = cast(dagger.Directory, "bound-source")
 
     def source(
-        self, source: dagger.Directory, repository: str, commit_sha: str
+        self,
+        source: dagger.Directory,
+        repository: str,
+        commit_sha: str,
+        http_auth_header: dagger.Secret | None = None,
     ) -> dagger.Directory:
         assert (source, repository, commit_sha) == ("caller-source", self.repository, VALID_SHA)
-        self.events.append("source")
+        self.events.append("source" if http_auth_header is None else "source+auth")
         return self.bound
 
-    def guard(self, source: dagger.Directory, repository: str, commit_sha: str) -> dagger.Container:
+    def guard(
+        self,
+        source: dagger.Directory,
+        repository: str,
+        commit_sha: str,
+        http_auth_header: dagger.Secret | None = None,
+    ) -> dagger.Container:
         assert (source, repository, commit_sha) == (self.bound, self.repository, VALID_SHA)
-        return cast(dagger.Container, RecordingSync("guard", self.events, self.error))
+        name = "guard" if http_auth_header is None else "guard+auth"
+        return cast(dagger.Container, RecordingSync(name, self.events, self.error))
 
 
 class RecordingDag:
@@ -122,7 +133,6 @@ def test_should_expose_canonical_gate_boundaries() -> None:
     expected = {
         "ci",
         "quality",
-        "e2e",
         "dependency_audit",
         "secret_scan",
         "workflow_security",
@@ -158,7 +168,8 @@ def test_should_install_frozen_dependencies_with_ignore_scripts() -> None:
 
     assert module is not None
     assert module.INSTALL_COMMAND == ["npm", "ci", "--ignore-scripts"]
-    assert '["npm", "run", "gate"]' in implementation
+    assert module.GATE_COMMAND == ["npm", "run", "gate"]
+    assert "GATE_COMMAND" in implementation
 
 
 def test_should_pin_foundation_to_the_exact_central_commit() -> None:
@@ -255,3 +266,34 @@ def test_should_refuse_a_foreign_repository_before_foundation_runs(
     with pytest.raises(ValueError, match="repository"):
         asyncio.run(atc.ci(VALID_SHA, repository))
     assert events == []
+
+
+def test_should_forward_the_git_auth_header_for_a_private_repository(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[str] = []
+    foundation = RecordingFoundation(events)
+    atc = AgenticTabContext.__new__(AgenticTabContext)
+    atc.source = cast(dagger.Directory, "caller-source")
+    seen: list[object] = []
+
+    async def run_products(_source: dagger.Directory, _sha: str, header: object) -> None:
+        seen.append(header)
+
+    monkeypatch.setattr(main_module, "dag", RecordingDag(foundation))
+    monkeypatch.setattr(atc, "_run_ci", run_products)
+    header = cast(dagger.Secret, object())
+
+    asyncio.run(atc.ci(VALID_SHA, REPOSITORY, header))
+
+    assert events == ["source+auth", "guard+auth"]
+    assert seen == [header]
+
+
+def test_should_require_explicit_auth_rather_than_embedding_credentials() -> None:
+    signature = inspect.signature(AgenticTabContext.ci, eval_str=True)
+
+    header = signature.parameters["git_auth_header"]
+
+    assert header.default is None
+    assert "dagger.Secret" in str(header.annotation)

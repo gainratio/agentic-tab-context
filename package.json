@@ -1,7 +1,7 @@
 {
   "name": "agentic-tab-context",
-  "version": "0.2.0",
-  "description": "agentic-tab-context (atc / abt): discover and bind to the browser tab you already have open across Chrome, Safari, Firefox, Brave, and Edge — deterministic JSON CLI + browser extension + coding assistant skill.",
+  "version": "0.3.0",
+  "description": "Let your coding assistant use the browser tab you already have open, instead of opening a new one.",
   "license": "MIT",
   "private": true,
   "type": "module",
@@ -14,11 +14,7 @@
     "url": "https://github.com/gainratio/agentic-tab-context/issues"
   },
   "bin": {
-    "atc": "bin/atc.js",
-    "agentic-tab-context": "bin/atc.js",
-    "abt": "bin/abt.js",
-    "agentic-browser-tab": "bin/abt.js",
-    "tabctx": "bin/tabctx.js"
+    "atc": "bin/atc.js"
   },
   "engines": {
     "node": ">=22"
@@ -29,9 +25,7 @@
     "test": "vitest run",
     "test:unit": "vitest run test/unit",
     "test:e2e": "vitest run test/e2e",
-    "check": "npm run typecheck && npm test",
-    "gate": "npm run build && npm run typecheck && npm test",
-    "setup": "npm run build && node bin/atc.js setup"
+    "gate": "npm run build && npm run typecheck && npm test"
   },
   "dependencies": {
     "playwright-core": "^1.56.0"

@@ -34,16 +34,10 @@ body {
 .header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
   gap: 8px;
 }
 
-.brand h1 {
+.header h1 {
   font-size: 14px;
   font-weight: 600;
 }

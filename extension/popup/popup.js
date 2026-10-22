@@ -1,47 +1,46 @@
-document.addEventListener("DOMContentLoaded", async () => {
-  const statusDot = document.getElementById("status-dot");
-  const statusBadge = document.getElementById("status-badge");
-  const tabTitle = document.getElementById("tab-title");
-  const tabUrl = document.getElementById("tab-url");
-  const bindBtn = document.getElementById("bind-btn");
-  const feedback = document.getElementById("feedback");
+const statusDot = document.getElementById("status-dot");
+const statusText = document.getElementById("status-text");
+const tabTitle = document.getElementById("tab-title");
+const tabUrl = document.getElementById("tab-url");
+const bindButton = document.getElementById("bind-btn");
+const feedback = document.getElementById("feedback");
 
-  async function refreshStatus() {
-    try {
-      const response = await chrome.runtime.sendMessage({ type: "abt:status" });
-      if (response && response.connected) {
-        statusDot.classList.add("connected");
-        statusBadge.textContent = `Daemon Ready (${response.count} tabs)`;
-      } else {
-        statusDot.classList.remove("connected");
-        statusBadge.textContent = "Run `abt tabs` to start daemon";
-      }
-      if (response && response.activeTab) {
-        tabTitle.textContent = response.activeTab.title || "Untitled";
-        tabUrl.textContent = response.activeTab.url || "";
-      }
-    } catch {
-      statusBadge.textContent = "Offline";
-    }
-  }
+function describeStatus(status) {
+  if (status.atcDaemon) return { ready: true, text: "Connected to atc" };
+  if (String(status.atcHost || "").startsWith("missing")) return { ready: false, text: "Run `atc setup` in a terminal, then reopen this popup" };
+  return { ready: false, text: "Waiting for atc. Run any `atc` command (e.g. `atc tabs`)" };
+}
 
-  bindBtn.addEventListener("click", async () => {
-    bindBtn.disabled = true;
-    try {
-      const res = await chrome.runtime.sendMessage({ type: "abt:bind-active" });
-      feedback.hidden = false;
-      if (res && res.ok) {
-        feedback.textContent = res.context
-          ? `Bound active tab as context ${res.context} (${res.tabId})`
-          : `Synced ${res.tabId} — run 'abt bind --active'`;
-      } else {
-        feedback.textContent = (res && res.error) || "Run `abt bind --active` in your terminal to start the daemon.";
-      }
-      await refreshStatus();
-    } finally {
-      bindBtn.disabled = false;
-    }
-  });
+async function showStatus() {
+  const status = (await chrome.runtime.sendMessage({ type: "atc:status" })) || {};
+  const { ready, text } = describeStatus(status);
+  statusDot.classList.toggle("connected", ready);
+  statusText.textContent = text;
+  bindButton.disabled = !ready;
+}
 
-  await refreshStatus();
-});
+async function activeTab() {
+  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  return tab;
+}
+
+async function showTab() {
+  const tab = await activeTab();
+  tabTitle.textContent = (tab && tab.title) || "No tab";
+  tabUrl.textContent = (tab && tab.url) || "";
+}
+
+async function bindActiveTab() {
+  bindButton.disabled = true;
+  const tab = await activeTab();
+  const reply = await chrome.runtime.sendMessage({ type: "atc:pin", tabId: tab.id });
+  feedback.hidden = false;
+  feedback.textContent = reply && reply.ok
+    ? `Bound. Your assistant can now use this tab (context ${reply.context}).`
+    : `Could not bind: ${(reply && reply.message) || "atc is not running"}`;
+  bindButton.disabled = false;
+}
+
+bindButton.addEventListener("click", () => void bindActiveTab());
+void showStatus();
+void showTab();

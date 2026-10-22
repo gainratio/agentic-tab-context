@@ -1,7 +1,7 @@
 /**
  * Live tab discovery, filtering, and deterministic selection for `tabs` and `bind`.
  */
-import { TabCtxError } from "../contracts/errors.js";
+import { AtcError } from "../contracts/errors.js";
 import type { BindOptions, BrowserDriver, BrowserName, LiveTab } from "../contracts/types.js";
 import type { ContextRegistry } from "./registry.js";
 
@@ -26,30 +26,23 @@ async function collectManagedTabs(
   registry: ContextRegistry,
   drivers: ReadonlyMap<BrowserName, BrowserDriver>,
 ): Promise<LiveTab[]> {
-  const out: LiveTab[] = [];
-  const seenDrivers = new Set<BrowserDriver>();
-  for (const driver of drivers.values()) {
-    if (seenDrivers.has(driver)) continue;
-    seenDrivers.add(driver);
-    if (driver.listTabs !== undefined) {
-      out.push(...(await driver.listTabs().catch(() => [])));
-    }
-  }
-  if (out.length === 0) {
-    for (const ctx of registry.list()) {
-      if (ctx.status !== "open" || ctx.source === "extension" || ctx.source === "macos") continue;
-      out.push({
-        tabId: ctx.tabId ?? `managed:${ctx.browser}:${ctx.id}:0`,
-        browser: ctx.browser,
-        source: "managed",
-        url: ctx.url ?? "about:blank",
-        title: ctx.title ?? "",
-        active: registry.current === ctx.id,
-        context: ctx.id,
-      });
-    }
-  }
-  return out;
+  const unique = [...new Set(drivers.values())].filter((driver) => driver.listTabs !== undefined);
+  const listed = (await Promise.all(unique.map((driver) => driver.listTabs?.().catch(() => []) ?? []))).flat();
+  return listed.length > 0 ? listed : registryManagedTabs(registry);
+}
+
+/** Fallback when no managed driver can list pages: describe open managed contexts from the registry. */
+function registryManagedTabs(registry: ContextRegistry): LiveTab[] {
+  const managed = registry.list().filter((ctx) => ctx.status === "open" && ctx.source !== "extension" && ctx.source !== "macos");
+  return managed.map((ctx) => ({
+    tabId: ctx.tabId ?? `managed:${ctx.browser}:${ctx.id}:0`,
+    browser: ctx.browser,
+    source: "managed",
+    url: ctx.url ?? "about:blank",
+    title: ctx.title ?? "",
+    active: registry.current === ctx.id,
+    context: ctx.id,
+  }));
 }
 
 function attachContextIds(registry: ContextRegistry, tabs: LiveTab[]): LiveTab[] {
@@ -92,19 +85,13 @@ function includesIgnoreCase(haystack: string, needle: string): boolean {
 export function selectTabToBind(tabs: readonly LiveTab[], filter: BindOptions): LiveTab {
   const candidates = filterTabs(tabs, filter);
   if (candidates.length === 0) {
-    throw new TabCtxError("TARGET_NOT_FOUND", "No open browser tab matches the requested filter", { matched: 0 });
+    throw new AtcError("TARGET_NOT_FOUND", "No open browser tab matches the requested filter", { matched: 0 });
   }
-  if (candidates.length === 1 && candidates[0] !== undefined) return candidates[0];
-
-  const exact = pickUniqueExactMatch(candidates, filter);
-  if (exact !== undefined) return exact;
-
-  const active = pickUniqueActiveMatch(candidates);
-  if (active !== undefined) return active;
-
-  throw new TabCtxError(
+  const chosen = candidates.length === 1 ? candidates[0] : (pickUniqueExactMatch(candidates, filter) ?? pickUniqueActiveMatch(candidates));
+  if (chosen !== undefined) return chosen;
+  throw new AtcError(
     "AMBIGUOUS_TARGET",
-    `${candidates.length} open browser tabs match; pass --tab <tabId> (from 'abt tabs') to pick one`,
+    `${candidates.length} open browser tabs match; pass --tab <tabId> (from 'atc tabs') to pick one`,
     { matched: candidates.length, candidates },
   );
 }

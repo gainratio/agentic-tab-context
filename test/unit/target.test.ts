@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { TabCtxError } from "../../src/contracts/errors.js";
+import { AtcError } from "../../src/contracts/errors.js";
 import type { Target } from "../../src/contracts/types.js";
 import { chooseIndex, describeTarget, isValidNth, pickOption } from "../../src/drivers/target.js";
 
-function caught(fn: () => unknown): TabCtxError {
+function caught(fn: () => unknown): AtcError {
   try {
     fn();
   } catch (error) {
-    if (error instanceof TabCtxError) return error;
+    if (error instanceof AtcError) return error;
     throw error;
   }
-  throw new Error("expected a TabCtxError");
+  throw new Error("expected a AtcError");
 }
 
 describe("describeTarget", () => {

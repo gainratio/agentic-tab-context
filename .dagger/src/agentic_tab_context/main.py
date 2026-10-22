@@ -2,70 +2,25 @@
 
 from __future__ import annotations
 
-from typing import Final, Self
+from typing import Self
 
 import dagger
 from dagger import check, dag, field, function, object_type
 
-NODE_IMAGE: Final = (
-    "node:24.16.0-bookworm-slim@sha256:"
-    "2c87ef9bd3c6a3bd4b472b4bec2ce9d16354b0c574f736c476489d09f560a203"
+from .constants import (
+    ACTIONLINT_IMAGE,
+    ALLOWED_REPOSITORIES,
+    GATE_COMMAND,
+    GITLEAKS_HISTORY,
+    GITLEAKS_IMAGE,
+    GITLEAKS_SNAPSHOT,
+    INSTALL_COMMAND,
+    NODE_IMAGE,
+    PLAYWRIGHT_INSTALL,
+    REPOSITORY_URL,
+    SHA_LENGTH,
+    SOURCE_EXCLUDES,
 )
-ACTIONLINT_IMAGE: Final = (
-    "rhysd/actionlint:1.7.10@sha256:"
-    "ef8299f97635c4c30e2298f48f30763ab782a4ad2c95b744649439a039421e36"
-)
-GITLEAKS_IMAGE: Final = (
-    "ghcr.io/gitleaks/gitleaks:v8.29.1@sha256:"
-    "aa036a2f4bdfe3cc3c55fa4326308efabb4a6be498c883c864fd1d0d5585438a"
-)
-ALLOWED_REPOSITORIES: Final = ("gainratio/agentic-tab-context",)
-REPOSITORY: Final = "gainratio/agentic-tab-context"
-REPOSITORY_URL: Final = f"https://github.com/{REPOSITORY}.git"
-SHA_LENGTH: Final = 40
-SOURCE_EXCLUDES: Final = [
-    ".git",
-    ".dagger/.mypy_cache",
-    ".dagger/.pytest_cache",
-    ".dagger/.ruff_cache",
-    ".dagger/.venv",
-    ".dagger/sdk",
-    ".mypy_cache",
-    ".pytest_cache",
-    ".ruff_cache",
-    "**/__pycache__",
-    "node_modules",
-    "**/node_modules",
-    "coverage",
-    "dist",
-    ".tabctx",
-]
-INSTALL_COMMAND: Final = ["npm", "ci", "--ignore-scripts"]
-PLAYWRIGHT_INSTALL: Final = [
-    "npx",
-    "playwright-core",
-    "install",
-    "--with-deps",
-    "chromium",
-]
-GITLEAKS_SNAPSHOT: Final = [
-    "gitleaks",
-    "detect",
-    "--source",
-    "/snapshot",
-    "--no-git",
-    "--redact",
-    "--no-banner",
-]
-GITLEAKS_HISTORY: Final = [
-    "gitleaks",
-    "detect",
-    "--source",
-    "/repo",
-    "--log-opts=--all",
-    "--redact",
-    "--no-banner",
-]
 
 
 @object_type
@@ -83,20 +38,11 @@ class AgenticTabContext:
 
     @function
     def quality(self) -> dagger.Container:
-        """Run build, strict TypeScript typecheck, unit tests, and Chromium E2E tests."""
+        """Run build, strict typecheck, unit tests, and real-Chromium E2E (incl. extension)."""
         return self._quality(self.source)
 
     def _quality(self, source: dagger.Directory) -> dagger.Container:
-        return self._playwright(source).with_exec(["npm", "run", "gate"])
-
-    @function
-    def e2e(self) -> dagger.Container:
-        """Run the real headless Chromium CLI and driver end-to-end suite."""
-        return (
-            self._playwright(self.source)
-            .with_exec(["npm", "run", "build"])
-            .with_exec(["npm", "run", "test:e2e"])
-        )
+        return self._playwright(source).with_exec(GATE_COMMAND)
 
     @function
     def dependency_audit(self) -> dagger.Container:
@@ -108,18 +54,22 @@ class AgenticTabContext:
         return self._dependencies(source).with_exec(command)
 
     @function
-    def secret_scan(self, commit_sha: str = "") -> dagger.Container:
-        """Scan the typed snapshot and complete canonical history."""
-        return self._secret_scan(self.source, commit_sha)
+    def secret_scan(
+        self, commit_sha: str = "", git_auth_header: dagger.Secret | None = None
+    ) -> dagger.Container:
+        """Scan the typed snapshot and, given a commit, its complete history."""
+        return self._secret_scan(self.source, commit_sha, git_auth_header)
 
-    def _secret_scan(self, source: dagger.Directory, commit_sha: str = "") -> dagger.Container:
+    def _secret_scan(
+        self, source: dagger.Directory, commit_sha: str, header: dagger.Secret | None
+    ) -> dagger.Container:
         scan = self._gitleaks().with_directory("/snapshot", source)
-        scan = scan.with_exec(["sh", "-ceu", self._nonempty_snapshot()])
+        scan = scan.with_exec(["sh", "-ceu", 'test -n "$(find /snapshot -type f -print -quit)"'])
         scan = scan.with_exec(GITLEAKS_SNAPSHOT)
-        if commit_sha:
-            history = self._history(commit_sha)
-            return scan.with_directory("/repo", history).with_exec(GITLEAKS_HISTORY)
-        return scan
+        if not commit_sha:
+            return scan
+        history = self._history(commit_sha, header)
+        return scan.with_directory("/repo", history).with_exec(GITLEAKS_HISTORY)
 
     @function
     def workflow_security(self) -> dagger.Container:
@@ -140,60 +90,60 @@ class AgenticTabContext:
 
     @function
     @check
-    async def ci(self, commit_sha: str, repository: str) -> str:
-        """Guard the exact caller source before the canonical product gate."""
+    async def ci(
+        self,
+        commit_sha: str,
+        repository: str,
+        git_auth_header: dagger.Secret | None = None,
+    ) -> str:
+        """Guard the exact caller source, then run the full gate. Private repos pass a header."""
         self._require_repository(repository)
-        source = await self._verified_source(self.source, commit_sha, repository)
-        await self._run_ci(source, commit_sha)
+        source = await self._verified_source(commit_sha, repository, git_auth_header)
+        await self._run_ci(source, commit_sha, git_auth_header)
         return "Agentic Tab Context canonical Dagger gate passed"
 
     async def _verified_source(
-        self, source: dagger.Directory, commit_sha: str, repository: str
+        self, commit_sha: str, repository: str, header: dagger.Secret | None
     ) -> dagger.Directory:
         """Bind and guard one exact caller snapshot before product evaluation."""
         self._require_sha(commit_sha)
         foundation = dag.foundation()
-        bound = foundation.source(source, repository, commit_sha)
-        await foundation.guard(bound, repository, commit_sha).sync()
+        bound = foundation.source(self.source, repository, commit_sha, http_auth_header=header)
+        await foundation.guard(bound, repository, commit_sha, http_auth_header=header).sync()
         return bound
 
-    async def _run_ci(self, source: dagger.Directory, commit_sha: str = "") -> None:
+    async def _run_ci(
+        self, source: dagger.Directory, commit_sha: str, header: dagger.Secret | None
+    ) -> None:
         await self._quality(source).sync()
         await self._dependency_audit(source).sync()
-        await self._secret_scan(source, commit_sha).sync()
+        await self._secret_scan(source, commit_sha, header).sync()
         await self._workflow_security(source).sync()
 
     def _playwright(self, source: dagger.Directory) -> dagger.Container:
-        installed = self._dependencies(source).with_user("0:0")
-        installed = installed.with_exec(PLAYWRIGHT_INSTALL)
-        return installed.with_exec(["chown", "-R", "65532:65532", "/opt/pw-browsers"]).with_user(
-            "65532:65532"
-        )
+        installed = self._dependencies(source).with_user("0:0").with_exec(PLAYWRIGHT_INSTALL)
+        installed = installed.with_exec(["chown", "-R", "65532:65532", "/opt/pw-browsers"])
+        return installed.with_user("65532:65532")
 
     def _dependencies(self, source: dagger.Directory) -> dagger.Container:
         return self._node(source).with_exec(INSTALL_COMMAND)
 
     def _node(self, source: dagger.Directory) -> dagger.Container:
-        base = (
-            dag.container()
-            .from_(NODE_IMAGE)
-            .with_directory("/src", source, owner="65532:65532")
-            .with_workdir("/src")
-        )
-        base = base.with_env_variable("HOME", "/opt/home")
+        base = dag.container().from_(NODE_IMAGE).with_directory("/src", source, owner="65532:65532")
+        base = base.with_workdir("/src").with_env_variable("HOME", "/opt/home")
         base = base.with_env_variable("PLAYWRIGHT_BROWSERS_PATH", "/opt/pw-browsers")
         base = base.with_env_variable("npm_config_cache", "/opt/npm-cache")
-        base = base.with_mounted_cache(
-            "/opt/npm-cache", dag.cache_volume("atc-npm-cache"), owner="65532:65532"
-        )
+        cache = dag.cache_volume("atc-npm-cache")
+        base = base.with_mounted_cache("/opt/npm-cache", cache, owner="65532:65532")
         base = base.with_exec(["mkdir", "-p", "/opt/home", "/opt/pw-browsers"])
         base = base.with_exec(["chown", "-R", "65532:65532", "/opt/home", "/opt/pw-browsers"])
         return base.with_user("65532:65532")
 
     @staticmethod
-    def _history(commit_sha: str) -> dagger.Directory:
+    def _history(commit_sha: str, header: dagger.Secret | None) -> dagger.Directory:
         AgenticTabContext._require_sha(commit_sha)
-        return dag.git(REPOSITORY_URL).commit(commit_sha).tree(depth=0, include_tags=True)
+        repo = dag.git(REPOSITORY_URL, http_auth_header=header)
+        return repo.commit(commit_sha).tree(depth=0, include_tags=True)
 
     @staticmethod
     def _actionlint() -> dagger.Container:
@@ -202,10 +152,6 @@ class AgenticTabContext:
     @staticmethod
     def _gitleaks() -> dagger.Container:
         return dag.container().from_(GITLEAKS_IMAGE).with_entrypoint([])
-
-    @staticmethod
-    def _nonempty_snapshot() -> str:
-        return 'test -n "$(find /snapshot -type f -print -quit)"'
 
     @staticmethod
     def _require_repository(repository: str) -> None:

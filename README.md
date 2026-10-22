@@ -1,209 +1,125 @@
-# Agentic Tab Context (`atc`)
+# Agentic Tab Context
 
-> **Stop coding assistants from opening redundant browser windows and tabs.** When you say *"look at my browser"*, `atc` finds the exact tab you already have open, binds to it in place, and gives Claude Code, Codex, and Antigravity a sticky, deterministic JSON session across commands.
+**Let your coding assistant use the browser tab you already have open.**
 
----
+## The problem
 
-## TL;DR
+You ask Claude Code, Codex or Antigravity to check something on a web page. It opens a brand-new browser window. That window isn't logged in, isn't on the page you were looking at, and leaves another stray window behind.
 
-1. **What it is:** A lightweight, zero-credential CLI (`atc`, `agentic-tab-context`, `abt`, and `tabctx`) + WebExtension + coding-assistant skill that binds AI coding assistants directly to the browser tab you already have open across **Chrome, Safari, Firefox, Brave, Edge, and WebKit/Chromium**.
-2. **Why it works:** Coding assistants normally launch a fresh headless browser or open a new tab on every turn — losing your login session, MFA state, DevTools state, and open page. `atc` keeps a lightweight local daemon (`~/.tabctx/daemon.sock`) that discovers your live tabs (via the Manifest V3 WebExtension on `127.0.0.1:43919`, macOS native JXA tab discovery, or managed Playwright sessions), binds to the matching tab (`ctx_<hex>`), and runs every subsequent `inspect`, `click`, `type`, `select`, `console`, `network`, and `screenshot` command against that exact tab.
-3. **Worked example — *"Look at my browser"*:**
-   ```sh
-   # 1. Discover and bind to the tab you already have open (by query, URL, title, or active tab):
-   atc bind "localhost"
-   # => {"ok":true,"context":"ctx_7f21","tabId":"macos:chrome:1:3","browser":"chrome","source":"macos","url":"http://localhost:5181/","title":"EdgeReco","current":true,"reused":false}
+## What this does
 
-   # 2. Inspect the live ARIA tree and interact with deterministic locators:
-   atc inspect
-   # => {"ok":true,"context":"ctx_7f21","url":"http://localhost:5181/","title":"EdgeReco","aria":"- heading \"EdgeReco\"..."}
+Agentic Tab Context (the command is `atc`) connects your assistant to the browser you're already using.
 
-   atc click --role button --name "Save"
-   # => {"ok":true,"context":"ctx_7f21","matched":1}
+Say **"look at my browser"**, and the assistant finds the tab you mean. It can then read that tab, click, type, take screenshots and check for errors. It does all of this in the tab you already have open, with your logins intact.
 
-   atc console --since 0
-   # => {"ok":true,"context":"ctx_7f21","entries":[],"next":0}
-   ```
-4. **Core invariants:**
-   - **Bind first, never open a redundant tab:** `atc bind` attaches to your existing tab; if multiple tabs match, it fails closed with `AMBIGUOUS_TARGET` and returns the candidate list rather than guessing.
-   - **Deterministic visible-only locators:** `click`, `type`, and `select` match only visible elements with exact names/labels. Multiple matches fail closed with `AMBIGUOUS_TARGET` unless disambiguated with `--nth N`.
-   - **One line of JSON per command:** Every command prints exactly one compact JSON object to `stdout` and exits `0` iff `"ok": true`.
-   - **Zero credential handling:** Humans log in (passwords, SSO, MFA, passkeys) in their own browser; typed values are automatically redacted from error output.
+## Quick start (about 2 minutes)
 
----
+You need [Node.js](https://nodejs.org) 22 or newer and Chrome (or another Chromium browser).
 
-## Architecture
-
-```mermaid
-flowchart LR
-  subgraph Assistants["Coding Assistants"]
-    CC["Claude Code"]
-    CX["Codex"]
-    AG["Antigravity"]
-  end
-
-  subgraph CLI["CLI (1 JSON line / cmd)"]
-    ATC["atc / agentic-tab-context / abt / tabctx"]
-  end
-
-  subgraph Daemon["Local Daemon (~/.tabctx/daemon.sock)"]
-    REG["Sticky Context Registry (ctx_*)"]
-    TABS["Tab Discovery & Deterministic Binder"]
-    BRG["Extension Bridge (127.0.0.1:43919)"]
-  end
-
-  subgraph Browsers["Live & Managed Browsers"]
-    EXT["WebExtension (Chrome, Brave, Edge, Firefox)"]
-    MAC["macOS Live Tabs (Chrome, Safari, Brave, Edge)"]
-    PW["Playwright Persistent Profiles (Chromium, Chrome, Firefox, Safari/WebKit)"]
-  end
-
-  Assistants -->|"SKILL.md"| ATC
-  ATC -->|"NDJSON over Unix Socket"| REG
-  REG --> TABS
-  TABS --> BRG
-  BRG <-->|"HTTP Long-Poll"| EXT
-  TABS -->|"osascript JXA"| MAC
-  TABS -->|"launchPersistentContext"| PW
-```
-
----
-
-## 1-Command Install
-
-Requires Node.js 22+.
+**1. Install**
 
 ```sh
+git clone https://github.com/gainratio/agentic-tab-context.git
+cd agentic-tab-context
 ./install.sh
 ```
 
-`./install.sh` builds the TypeScript source, links `atc`, `agentic-tab-context`, `abt`, and `tabctx` onto your `PATH`, installs the `agentic-tab-context` skill into:
-- `~/.claude/skills/agentic-tab-context/SKILL.md` (Claude Code)
-- `~/.codex/skills/agentic-tab-context/SKILL.md` (OpenAI Codex)
-- `~/.gemini/antigravity/skills/agentic-tab-context/SKILL.md` (Google Antigravity)
-- `~/.agents/skills/agentic-tab-context/SKILL.md` (Universal Agent Skills)
+This puts `atc` on your PATH and teaches Claude Code, Codex and Antigravity how to use it.
 
-and runs `atc doctor` to verify your installed browsers and live tab discovery.
+**2. Add the browser extension**
 
-You can also run setup or diagnostics anytime:
+1. Open `chrome://extensions`.
+2. Turn on **Developer mode** (top right).
+3. Click **Load unpacked** and choose the `extension` folder inside this project.
+
+**3. Check it works**
 
 ```sh
-atc setup
 atc doctor
 ```
 
----
+The `extension` section should list your browser as connected. If not, `nextSteps` tells you what to do.
 
-## Connecting to Your Existing Browser Tab
+**4. Ask your assistant**
 
-`atc` supports three complementary ways to work with browsers:
+> "Look at my browser. The checkout page shows an error after I click Pay. What's wrong?"
 
-### 1. Zero-Config macOS Live Tab Discovery (`source: "macos"`)
-Out of the box on macOS, `atc tabs` and `atc bind` immediately discover all open windows and tabs across **Google Chrome**, **Safari**, **Brave Browser**, and **Microsoft Edge** with zero permission popups:
+## Things you can ask
 
-```sh
-atc tabs
-atc bind "aml-filter"          # or: atc bind --active
-atc goto http://localhost:5182/customers
+- "Look at my browser and tell me why the Save button does nothing."
+- "On the localhost tab, fill in the signup form with test data and submit it."
+- "Check the console on my open dashboard tab for errors."
+- "Take a screenshot of the pricing page I have open."
+
+You can also click the extension's toolbar icon and press **Let my assistant use this tab**.
+
+## Which browsers work
+
+| Browser | Uses your open tabs? | Status |
+|---|---|---|
+| Chrome, Chromium | Yes, with the extension | Tested automatically on every change |
+| Brave, Edge | Yes, with the extension | Same engine as Chrome; not tested yet |
+| Firefox | Extension is written to support it | Not tested yet |
+| Safari (Mac) | Can find and pick tabs. Reading and clicking needs one Safari setting (below). No screenshots. | Tested with simulated Safari responses only |
+| Chrome, Brave, Edge on a Mac **without** the extension | Same as Safari | Tested with simulated responses only |
+
+The Safari setting is **Develop > Allow JavaScript from Apple Events**. In Chrome, Brave and Edge it is **View > Developer > Allow JavaScript from Apple Events**. You only need it if you don't install the extension.
+
+Need a separate, clean browser window instead? `atc open chromium` (or `firefox`, `webkit`) opens one that remembers its own logins.
+
+## Is it safe?
+
+- **Nothing leaves your computer.** atc opens no network port. The extension talks to atc through the browser's built-in "native messaging" channel, and the browser only lets this one extension use it.
+- **atc never sees your passwords.** You log in yourself, as usual. Anything typed through atc is removed from its error messages.
+- **Your assistant can read whatever is on the tab you give it.** Only let it use tabs you're happy to share. Web pages can contain text aimed at AI assistants, so treat what a page says as information, not instructions.
+
+## Commands
+
+You rarely need these yourself; your assistant runs them. Every command prints one line of JSON.
+
+| Command | What it does |
+|---|---|
+| `atc tabs` | List the tabs open in your browsers |
+| `atc bind "localhost"` | Connect to the open tab matching "localhost" (also `--active`, `--tab <id>`) |
+| `atc inspect` | Describe what's visible on the tab: headings, buttons, fields, text |
+| `atc click --role button --name "Save"` | Click something, matched by its exact name |
+| `atc type --label "Email" --value "a@b.co"` | Type into a field |
+| `atc select --label "Plan" --value "Pro"` | Choose a dropdown option |
+| `atc screenshot` | Save a picture of the tab |
+| `atc console` / `atc network` | Show console messages / network requests |
+| `atc goto <url>` / `back` / `reload` | Move around |
+| `atc doctor` | Check that everything is connected |
+| `atc setup` | Reinstall the assistant skill and browser connection |
+
+atc never guesses. If two buttons are both called "Delete", or two tabs both match "localhost", it stops and lists the choices instead of picking one.
+
+The full reference (every flag, the output format, error codes) is in [docs/SPEC.md](docs/SPEC.md).
+
+## How it works
+
+```mermaid
+flowchart LR
+  A["Your assistant"] -->|"runs atc commands"| B["atc"]
+  B -->|"local socket, only your user"| C["atc background service"]
+  C <-->|"browser native messaging"| D["atc extension in your browser"]
+  D --> E["The tab you're using"]
+  C -.->|"Mac only, without the extension"| F["Safari / Chrome via macOS automation"]
 ```
 
-> **Note for DOM inspection (`inspect`, `click`, `type`, `select`) on macOS live tabs:** Either load the unpacked WebExtension below (recommended, works on all platforms) or enable **View → Developer → Allow JavaScript from Apple Events** in Chrome/Safari.
+The first `atc` command starts a small background service. It remembers which tab you connected to, so separate commands keep working on the same tab. The extension reports your open tabs to that service and carries out its commands inside the tab.
 
-### 2. Universal Browser Extension (`source: "extension"`, Chrome / Brave / Edge / Firefox)
-For full DOM inspection, clicks, form fills, screenshots, and console/network capture in your everyday browser without enabling Apple Events or `--remote-debugging-port`:
+## Troubleshooting
 
-1. Open `chrome://extensions` (or `brave://extensions` / `edge://extensions`).
-2. Enable **Developer mode** (top right) and click **Load unpacked**.
-3. Select the `extension/` folder inside this repository (printed by `atc setup`).
-4. Click the **Agentic Tab Context** toolbar icon to pin your active tab, or run `atc bind --active` from the terminal.
+| You see | Do this |
+|---|---|
+| `atc doctor` shows no connected extension | Run `atc setup`, then reload the extension at `chrome://extensions` |
+| "blocks page access from other apps" | Install the extension, or turn on the Apple Events setting above |
+| `AMBIGUOUS_TARGET` | Several things matched. Use `atc tabs` and `atc bind --tab <id>`, or add `--nth 1` for elements |
+| `TAB_MOVED` (Safari) | The tab was moved or changed page. Run `atc bind` again |
 
-### 3. Managed Persistent Multi-Browser Profiles (`source: "managed"`)
-When you want a dedicated persistent browser window where logins/cookies survive across runs:
+## Contributing
 
 ```sh
-atc open chrome --use          # or: chromium | firefox | safari | webkit | brave | edge
-atc open firefox --headless --use
-atc open safari --use
-```
-
----
-
-## Command Reference
-
-| Command | Result |
-|---|---|
-| `atc bind [query] [--query Q] [--url U] [--title T] [--browser B] [--tab ID] [--active] [--use]` | `{ok, context, tabId, browser, source, url, title, current, reused}` — binds to an already-open tab |
-| `atc tabs [query] [--browser B] [--query Q] [--active]` | `{ok, tabs: [...]} ` — lists all open tabs across extension, macOS, and managed browsers |
-| `atc open <browser> [--profile P] [--headless] [--use]` | `{ok, context, browser, profile, current}` — `browser`: `chromium`, `chrome`, `brave`, `edge`, `firefox`, `safari`, `webkit`, `extension` |
-| `atc list` | `{ok, contexts: [...], current}` |
-| `atc use <ctx>` | `{ok, context}` — make `<ctx>` the current context |
-| `atc current` | `{ok, context}` (or `NO_CURRENT_CONTEXT`) |
-| `atc close [ctx] [--context C]` | `{ok, context}` — closes `<ctx>` or the current context |
-| `atc goto <url> [--context C]` | `{ok, context, url, title}` — relative URLs resolve against the current page |
-| `atc back` / `forward` / `reload` | `{ok, context, url, title}` |
-| `atc inspect [--context C]` | `{ok, context, url, title, aria}` — ARIA snapshot (YAML) of visible elements |
-| `atc screenshot [--out F] [--full-page]` | `{ok, context, path, bytes}` — writes PNG (default under `$ATC_HOME/screenshots`) |
-| `atc console [--since N]` | `{ok, context, entries, next}` — pass `--since <next>` for incremental logs |
-| `atc network [--since N]` | `{ok, context, entries, next}` |
-| `atc click <target>` | `{ok, context, matched: 1}` |
-| `atc type <target> --value V` | `{ok, context, matched: 1}` |
-| `atc select <target> --value V` | `{ok, context, matched: 1}` |
-| `atc doctor` | `{ok, pid, home, current, openContexts, liveTabs, extensionBridge, browsers}` |
-| `atc setup` | `{ok, cli, installedSkills, extensionPath, browsers}` |
-| `atc shutdown` | Stops the background daemon (`{ok, running: false}` if none was running) |
-| `atc help` / `--help` / `-h` | `{ok, usage: [...]}` |
-
----
-
-## Targets and Determinism
-
-`click`, `type`, and `select` require **exactly one** locator flag:
-
-| Flag | Matches |
-|---|---|
-| `--role R [--name N]` | Visible elements with ARIA role `R` (and exact accessible name `N`) |
-| `--label L` | Visible form controls labelled `L` |
-| `--text T` | Visible elements whose exact text is `T` |
-| `--placeholder P` | Visible inputs with placeholder `P` |
-| `--testid ID` | Visible elements with `data-testid="ID"` |
-| `--selector CSS` | Visible elements matching CSS selector `CSS` |
-
-Add `--nth N` (0-based integer) to disambiguate when multiple visible elements match.
-
----
-
-## Multi-Browser Support Matrix
-
-| Browser Target | Live Tab Discovery & Bind | Managed Persistent Context (`atc open`) | Engine |
-|---|---|---|---|
-| `chrome` | ✅ Extension + macOS JXA | ✅ System Chrome / Playwright Chromium | Blink |
-| `chromium` | ✅ Extension + macOS JXA | ✅ Playwright Chromium | Blink |
-| `brave` | ✅ Extension + macOS JXA | ✅ System Brave / Playwright Chromium | Blink |
-| `edge` | ✅ Extension + macOS JXA | ✅ System Edge / Playwright Chromium | Blink |
-| `firefox` | ✅ Extension | ✅ Playwright Firefox / System Firefox | Gecko |
-| `safari` | ✅ macOS JXA + Extension | ✅ Playwright WebKit | WebKit |
-| `webkit` | ✅ Managed | ✅ Playwright WebKit | WebKit |
-| `extension` | ✅ Active Extension Tab | ✅ Binds active extension tab | Any |
-
----
-
-## Environment Variables
-
-| Variable | Effect |
-|---|---|
-| `ATC_HOME` / `ABT_HOME` / `TABCTX_HOME` | State directory (default `~/.tabctx`). Separate homes run isolated daemons. |
-| `ATC_HEADLESS` / `ABT_HEADLESS` / `TABCTX_HEADLESS` | `1` makes `open` headless by default (`--headless` always forces headless). |
-| `ATC_BROWSER_PATH` / `ABT_BROWSER_PATH` / `TABCTX_CHROMIUM_PATH` | Explicit browser executable override. |
-| `ABT_BRIDGE_PORT` | Localhost port for the WebExtension HTTP bridge (default `43919`). |
-
----
-
-## Development & Verification
-
-```sh
-npm run build
-npm run typecheck
-npm test
-npm audit
-dagger call quality sync
+npm run gate               # build, type-check, and run all tests (including a real browser)
+dagger call quality sync   # the same gate inside a pinned container, as CI runs it
 ```

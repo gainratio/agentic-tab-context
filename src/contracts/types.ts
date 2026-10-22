@@ -1,5 +1,5 @@
 /**
- * Shared contracts for agentic-browser-tab (abt / tabctx). Every module (cli,
+ * Shared contracts for agentic-tab-context (atc). Every module (cli,
  * daemon, drivers) imports from here and never from each other's internals.
  */
 
@@ -51,6 +51,14 @@ export interface BindOptions {
   browser?: BrowserName;
   active?: boolean;
   use?: boolean;
+}
+
+/** Locator kinds whose value lives in a field named after the kind (label.label, text.text, ...). */
+export const SIMPLE_LOCATOR_KINDS = ["label", "text", "placeholder", "testid", "selector"] as const;
+export type SimpleLocatorKind = (typeof SIMPLE_LOCATOR_KINDS)[number];
+
+export function simpleTarget(kind: SimpleLocatorKind, value: string): Target {
+  return { kind, [kind]: value } as unknown as Target;
 }
 
 /** How a command picks exactly one element. Exactly one locator kind is set. */

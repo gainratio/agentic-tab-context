@@ -1,16 +1,17 @@
 /**
- * Daemon entrypoint: `node dist/daemon/main.js`.
+ * Daemon entrypoint: `node dist/daemon/main.js`. Started on demand by the CLI.
  */
 import { appendFileSync, mkdirSync } from "node:fs";
 import { resolvePaths } from "../contracts/paths.js";
 import type { Paths } from "../contracts/protocol.js";
 import type { BrowserName } from "../contracts/types.js";
-import { DEFAULT_BRIDGE_PORT, ExtensionBridge } from "../drivers/extension/bridge.js";
+import { ExtensionBridge } from "../drivers/extension/bridge.js";
 import { ExtensionDriver } from "../drivers/extension/driver.js";
-import { createDriver, type DriverOptions } from "../drivers/index.js";
+import { createDriver } from "../drivers/index.js";
 import { MacosTabDriver } from "../drivers/macos/driver.js";
+import type { RunningServer } from "../transport/unix-server.js";
 import { ContextRegistry } from "./registry.js";
-import { type RunningServer, startServer } from "./server.js";
+import { startServer } from "./server.js";
 import { DaemonService } from "./service.js";
 
 type LogFn = (event: string, fields?: Record<string, unknown>) => void;
@@ -26,81 +27,77 @@ function createLogger(paths: Paths): LogFn {
   };
 }
 
-function driverOptions(paths: Paths, extensionBridge: ExtensionBridge): DriverOptions {
-  const executablePath = process.env.ABT_BROWSER_PATH ?? process.env.TABCTX_CHROMIUM_PATH;
-  return executablePath === undefined || executablePath === ""
-    ? { profilesDir: paths.profiles, extensionBridge }
-    : { profilesDir: paths.profiles, executablePath, extensionBridge };
-}
-
-function bridgePortFromEnv(): number {
-  const raw = process.env.ABT_BRIDGE_PORT ?? process.env.TABCTX_BRIDGE_PORT;
-  if (raw === undefined || raw === "") return DEFAULT_BRIDGE_PORT;
-  const parsed = Number(raw);
-  return Number.isInteger(parsed) && parsed >= 0 && parsed <= 65535 ? parsed : DEFAULT_BRIDGE_PORT;
-}
-
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-export async function runDaemon(): Promise<void> {
-  const paths = resolvePaths();
-  mkdirSync(paths.home, { recursive: true, mode: 0o700 });
-  const log = createLogger(paths);
-  const registry = new ContextRegistry({ statePath: paths.state });
-  const extensionBridge = new ExtensionBridge();
-  await extensionBridge.start(bridgePortFromEnv());
-  const extensionDriver = new ExtensionDriver(extensionBridge);
-  const macosDriver = new MacosTabDriver();
-  const options = driverOptions(paths, extensionBridge);
-  const driverFactory = (browser: BrowserName) => createDriver(browser, options);
+function buildService(paths: Paths, bridge: ExtensionBridge): DaemonService {
+  const extensionDriver = new ExtensionDriver(bridge);
+  const executablePath = process.env.ATC_CHROMIUM_PATH;
+  const options = { profilesDir: paths.profiles, extensionDriver, ...(executablePath ? { executablePath } : {}) };
   const service = new DaemonService({
-    registry,
-    driverFactory,
+    registry: new ContextRegistry({ statePath: paths.state }),
+    driverFactory: (browser: BrowserName) => createDriver(browser, options),
     paths,
-    extensionBridge,
+    extensionBridge: bridge,
     extensionDriver,
-    macosDriver,
+    macosDriver: new MacosTabDriver(),
   });
-  extensionBridge.onPinTab(async (tabId) => {
-    const res = await service.handle({ method: "bind", params: { tab: tabId, use: true } });
-    return res.ok && typeof res.context === "string" ? res.context : "";
-  });
+  bridge.onPinTab((tabId) => bindFromPopup(service, tabId));
+  return service;
+}
 
-  let server: RunningServer;
-  try {
-    server = await startServer(service, paths, { onRequest: (entry) => log("request", { ...entry }) });
-  } catch (err) {
-    await extensionBridge.close();
-    log("start_failed", { message: errorMessage(err) });
-    process.exitCode = 1;
-    return;
-  }
-  log("started", { socket: paths.socket, bridgePort: extensionBridge.port });
+/** The extension popup's "use this tab" button binds that tab and makes it current. */
+async function bindFromPopup(service: DaemonService, tabId: string): Promise<string> {
+  const res = await service.handle({ method: "bind", params: { tab: tabId, use: true } });
+  if (!res.ok) throw new Error(res.message);
+  return String(res.context);
+}
 
-  let stopping = false;
-  const stop = async (reason: string): Promise<void> => {
-    if (stopping) return;
-    stopping = true;
-    log("stopping", { reason });
-    await service.closeAll();
-    await extensionBridge.close();
-    await server.close();
-    log("stopped", { reason });
-    process.exit(0);
-  };
-
-  service.onShutdown(() => void stop("shutdown"));
+function handleSignals(stop: (reason: string) => Promise<void>, log: LogFn): void {
   process.once("SIGTERM", () => void stop("SIGTERM"));
   process.once("SIGINT", () => void stop("SIGINT"));
   process.on("uncaughtException", (err) => {
     log("uncaught_exception", { message: errorMessage(err) });
     void stop("uncaught_exception");
   });
-  process.on("unhandledRejection", (reason) => {
-    log("unhandled_rejection", { message: errorMessage(reason) });
-  });
+  process.on("unhandledRejection", (reason) => log("unhandled_rejection", { message: errorMessage(reason) }));
+}
+
+function stopper(service: DaemonService, bridge: ExtensionBridge, server: RunningServer, log: LogFn): (reason: string) => Promise<void> {
+  let stopping = false;
+  return async (reason) => {
+    if (stopping) return;
+    stopping = true;
+    log("stopping", { reason });
+    await service.closeAll();
+    await Promise.all([bridge.close(), server.close()]);
+    log("stopped", { reason });
+    process.exit(0);
+  };
+}
+
+async function serve(paths: Paths, service: DaemonService, bridge: ExtensionBridge, log: LogFn): Promise<void> {
+  await bridge.start(paths.extensionSocket);
+  const server = await startServer(service, paths, { onRequest: (entry) => log("request", { ...entry }) });
+  const stop = stopper(service, bridge, server, log);
+  service.onShutdown(() => void stop("shutdown"));
+  handleSignals(stop, log);
+  log("started", { socket: paths.socket, extensionSocket: paths.extensionSocket });
+}
+
+export async function runDaemon(): Promise<void> {
+  const paths = resolvePaths();
+  mkdirSync(paths.home, { recursive: true, mode: 0o700 });
+  const log = createLogger(paths);
+  const bridge = new ExtensionBridge();
+  try {
+    await serve(paths, buildService(paths, bridge), bridge, log);
+  } catch (err) {
+    await bridge.close();
+    log("start_failed", { message: errorMessage(err) });
+    process.exitCode = 1;
+  }
 }
 
 await runDaemon();

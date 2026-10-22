@@ -1,18 +1,21 @@
 #!/usr/bin/env bash
+# One-step install: build atc, put it on your PATH, install the assistant skill,
+# register the browser extension's native host, and print a health check.
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO_DIR"
 
-echo "==> 1/4 Installing dependencies..."
+echo "==> 1/4 Installing dependencies"
 npm install --no-fund --no-audit
 
-echo "==> 2/4 Building agentic-tab-context (atc)..."
+echo "==> 2/4 Building"
 npm run build
 
-echo "==> 3/4 Linking 'atc', 'agentic-tab-context', 'abt', and 'tabctx' CLIs globally..."
-npm link --force
+echo "==> 3/4 Putting 'atc' on your PATH"
+npm unlink --global agentic-tab-context >/dev/null 2>&1 || true
+npm link
 
-echo "==> 4/4 Installing coding assistant skills (Claude Code, Codex, Antigravity, Agents) & running doctor..."
+echo "==> 4/4 Installing the assistant skill and browser bridge"
 node "$REPO_DIR/bin/atc.js" setup
 node "$REPO_DIR/bin/atc.js" doctor

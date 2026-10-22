@@ -8,7 +8,7 @@
  * - Anything else (`/pricing`, `./a`, `pricing.html`, `docs/intro`, `?q=1`) is
  *   relative and resolves against the context's current http(s) URL.
  */
-import { TabCtxError } from "../contracts/errors.js";
+import { AtcError } from "../contracts/errors.js";
 
 const HOST_WITH_PORT = /^[^/?#:@]+:\d+(?:[/?#]|$)/;
 const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
@@ -31,7 +31,7 @@ export function isRelativeUrl(raw: string): boolean {
 
 export function resolveGotoUrl(raw: string, base: string | undefined): string {
   const input = raw.trim();
-  if (input === "") throw new TabCtxError("INVALID_ARGUMENT", "url must not be empty");
+  if (input === "") throw new AtcError("INVALID_ARGUMENT", "url must not be empty");
   if (hasScheme(input)) return parseAbsolute(input);
   const host = bareHostOf(input);
   if (host !== undefined) {
@@ -39,7 +39,7 @@ export function resolveGotoUrl(raw: string, base: string | undefined): string {
     return parseAbsolute(`${scheme}://${input}`);
   }
   if (base === undefined || !isHttpUrl(base)) {
-    throw new TabCtxError(
+    throw new AtcError(
       "INVALID_ARGUMENT",
       "relative url needs a context that is already on an http(s) page; pass an absolute url",
     );
@@ -82,6 +82,6 @@ function parseAbsolute(value: string): string {
   try {
     return new URL(value).href;
   } catch {
-    throw new TabCtxError("INVALID_ARGUMENT", "url is not a valid absolute URL");
+    throw new AtcError("INVALID_ARGUMENT", "url is not a valid absolute URL");
   }
 }

@@ -1,35 +1,31 @@
-import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, rm, stat, symlink } from "node:fs/promises";
 import { createServer, type AddressInfo } from "node:net";
 import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { TabCtxError, type ErrorCode } from "../../src/contracts/errors.js";
+import { AtcError, type ErrorCode } from "../../src/contracts/errors.js";
 import type { BrowserDriver, BrowserSession, Target } from "../../src/contracts/types.js";
 import { createDriver } from "../../src/drivers/index.js";
+import { resolveExecutable } from "../../src/drivers/playwright/executables.js";
 import { startFixtureServer, type FixtureServer } from "../helpers/fixture-server.js";
 
-const DEFAULT_CHROMIUM = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
-
 function chromiumPath(): string | undefined {
-  const fromEnv = process.env.TABCTX_CHROMIUM_PATH;
-  if (fromEnv !== undefined && fromEnv !== "") return fromEnv;
-  return existsSync(DEFAULT_CHROMIUM) ? DEFAULT_CHROMIUM : undefined;
+  return resolveExecutable("chromium", process.env.ATC_CHROMIUM_PATH);
 }
 
-async function expectTabCtxError(
+async function expectAtcError(
   promise: Promise<unknown>,
   code: ErrorCode,
   details?: Record<string, unknown>,
-): Promise<TabCtxError> {
+): Promise<AtcError> {
   const error = await promise.then(
     () => {
       throw new Error(`expected ${code}, but the call succeeded`);
     },
     (reason: unknown) => reason,
   );
-  expect(error).toBeInstanceOf(TabCtxError);
-  const typed = error as TabCtxError;
+  expect(error).toBeInstanceOf(AtcError);
+  const typed = error as AtcError;
   expect(typed.code).toBe(code);
   if (details !== undefined) expect(typed.details).toEqual(details);
   return typed;
@@ -71,7 +67,7 @@ describe("ChromiumDriver (e2e, headless)", () => {
 
   beforeAll(async () => {
     server = await startFixtureServer();
-    workDir = await mkdtemp(join(tmpdir(), "tabctx-driver-"));
+    workDir = await mkdtemp(join(tmpdir(), "atc-driver-"));
     const executablePath = chromiumPath();
     driver = createDriver("chromium", {
       profilesDir: join(workDir, "profiles"),
@@ -103,7 +99,7 @@ describe("ChromiumDriver (e2e, headless)", () => {
   });
 
   it("refuses an ambiguous target and reports the match count", async () => {
-    const error = await expectTabCtxError(driver.click(session, deleteButton), "AMBIGUOUS_TARGET", { matched: 2 });
+    const error = await expectAtcError(driver.click(session, deleteButton), "AMBIGUOUS_TARGET", { matched: 2 });
     expect(error.message).toContain("Delete");
   });
 
@@ -112,16 +108,16 @@ describe("ChromiumDriver (e2e, headless)", () => {
   });
 
   it("rejects an out-of-range nth with TARGET_NOT_FOUND", async () => {
-    await expectTabCtxError(driver.click(session, { ...deleteButton, nth: 5 }), "TARGET_NOT_FOUND", { matched: 2 });
+    await expectAtcError(driver.click(session, { ...deleteButton, nth: 5 }), "TARGET_NOT_FOUND", { matched: 2 });
   });
 
   it("does not count hidden elements", async () => {
-    await expectTabCtxError(
+    await expectAtcError(
       driver.click(session, { kind: "role", role: "button", name: "Hidden Only" }),
       "TARGET_NOT_FOUND",
       { matched: 0 },
     );
-    await expectTabCtxError(
+    await expectAtcError(
       driver.click(session, { kind: "selector", selector: "section button" }),
       "AMBIGUOUS_TARGET",
       { matched: 2 },
@@ -129,7 +125,7 @@ describe("ChromiumDriver (e2e, headless)", () => {
   });
 
   it("matches names exactly, not by substring", async () => {
-    await expectTabCtxError(driver.click(session, { kind: "role", role: "button", name: "Sav" }), "TARGET_NOT_FOUND");
+    await expectAtcError(driver.click(session, { kind: "role", role: "button", name: "Sav" }), "TARGET_NOT_FOUND");
   });
 
   it("types into a labelled field and the page sees the value", async () => {
@@ -142,7 +138,7 @@ describe("ChromiumDriver (e2e, headless)", () => {
 
   it("never leaks the typed value in errors", async () => {
     const secret = "hunter2-secret";
-    const error = await expectTabCtxError(
+    const error = await expectAtcError(
       driver.type(session, { kind: "label", label: "No Such Field" }, secret),
       "TARGET_NOT_FOUND",
     );
@@ -155,7 +151,7 @@ describe("ChromiumDriver (e2e, headless)", () => {
     expect(await driver.select(session, env, "Stage")).toEqual({ matched: 1 });
     expect((await driver.inspect(session)).aria).toMatch(/combobox "Environment"[^\n]*\n(?:[^\n]*\n)*?[^\n]*option "Stage" \[selected\]/);
     expect(await driver.select(session, env, "Prod")).toEqual({ matched: 1 });
-    await expectTabCtxError(driver.select(session, env, "Nope"), "TARGET_NOT_FOUND");
+    await expectAtcError(driver.select(session, env, "Nope"), "TARGET_NOT_FOUND");
   });
 
   it("captures console logs and errors with increasing seq", async () => {
@@ -202,7 +198,7 @@ describe("ChromiumDriver (e2e, headless)", () => {
   it("records failed requests with a failure reason, and the next navigation still works", async () => {
     const before = (await driver.network(session, 0)).at(-1)?.seq ?? 0;
     const unreachable = `http://127.0.0.1:${await closedPort()}/unreachable`;
-    await expectTabCtxError(driver.navigate(session, unreachable), "NAVIGATION_FAILED", { url: unreachable });
+    await expectAtcError(driver.navigate(session, unreachable), "NAVIGATION_FAILED", { url: unreachable });
     const entries = await driver.network(session, before);
     const failed = entries.find((entry) => entry.url === unreachable);
     expect(failed?.failure).toBeTruthy();
@@ -233,7 +229,7 @@ describe("ChromiumDriver (e2e, headless)", () => {
   });
 
   it("refuses to open a profile that is already in use", async () => {
-    const error = await expectTabCtxError(driver.open({ profile: "main", headless: true }), "ACTION_FAILED");
+    const error = await expectAtcError(driver.open({ profile: "main", headless: true }), "ACTION_FAILED");
     expect(error.message).toContain("main");
   });
 
@@ -241,7 +237,7 @@ describe("ChromiumDriver (e2e, headless)", () => {
     const lockedDir = join(workDir, "profiles", "locked-elsewhere");
     await mkdir(lockedDir, { recursive: true });
     await symlink(`${hostname()}-${process.ppid}`, join(lockedDir, "SingletonLock"));
-    await expectTabCtxError(driver.open({ profile: "locked-elsewhere", headless: true }), "ACTION_FAILED", {
+    await expectAtcError(driver.open({ profile: "locked-elsewhere", headless: true }), "ACTION_FAILED", {
       profile: "locked-elsewhere",
     });
   });
@@ -255,7 +251,7 @@ describe("ChromiumDriver (e2e, headless)", () => {
   });
 
   it("rejects profile names that would escape the profiles dir", async () => {
-    await expectTabCtxError(driver.open({ profile: "../evil", headless: true }), "INVALID_ARGUMENT");
+    await expectAtcError(driver.open({ profile: "../evil", headless: true }), "INVALID_ARGUMENT");
   });
 
   it("fires onDisconnect exactly once, then reports CONTEXT_CLOSED", async () => {
@@ -268,11 +264,11 @@ describe("ChromiumDriver (e2e, headless)", () => {
     await driver.close(other); // idempotent
     expect(fired).toBe(1);
 
-    await expectTabCtxError(driver.location(other), "CONTEXT_CLOSED");
-    await expectTabCtxError(driver.navigate(other, `${server.baseUrl}/app.html`), "CONTEXT_CLOSED");
-    await expectTabCtxError(driver.click(other, save), "CONTEXT_CLOSED");
-    await expectTabCtxError(driver.console(other, 0), "CONTEXT_CLOSED");
-    await expectTabCtxError(driver.network(other, 0), "CONTEXT_CLOSED");
+    await expectAtcError(driver.location(other), "CONTEXT_CLOSED");
+    await expectAtcError(driver.navigate(other, `${server.baseUrl}/app.html`), "CONTEXT_CLOSED");
+    await expectAtcError(driver.click(other, save), "CONTEXT_CLOSED");
+    await expectAtcError(driver.console(other, 0), "CONTEXT_CLOSED");
+    await expectAtcError(driver.network(other, 0), "CONTEXT_CLOSED");
   });
 
   it("frees the profile after close so it can be reopened", async () => {
@@ -283,28 +279,30 @@ describe("ChromiumDriver (e2e, headless)", () => {
   });
 
   it("treats unknown sessions as CONTEXT_CLOSED", async () => {
-    await expectTabCtxError(driver.inspect({ sessionId: "nope" }), "CONTEXT_CLOSED");
+    await expectAtcError(driver.inspect({ sessionId: "nope" }), "CONTEXT_CLOSED");
   });
 });
 
 describe("createDriver", () => {
-  it("returns drivers for chromium, chrome, brave, edge, firefox, safari, webkit, and extension", () => {
-    expect(createDriver("chromium", { profilesDir: tmpdir() }).name).toBe("chromium");
-    expect(createDriver("chrome", { profilesDir: tmpdir() }).name).toBe("chrome");
-    expect(createDriver("brave", { profilesDir: tmpdir() }).name).toBe("brave");
-    expect(createDriver("edge", { profilesDir: tmpdir() }).name).toBe("edge");
-    expect(createDriver("firefox", { profilesDir: tmpdir() }).name).toBe("firefox");
-    expect(createDriver("safari", { profilesDir: tmpdir() }).name).toBe("safari");
-    expect(createDriver("webkit", { profilesDir: tmpdir() }).name).toBe("webkit");
-    expect(createDriver("extension", { profilesDir: tmpdir() }).name).toBe("extension");
+  it("returns a managed driver for every browser it can actually launch", () => {
+    for (const name of ["chromium", "chrome", "brave", "edge", "firefox", "webkit"] as const) {
+      expect(createDriver(name, { profilesDir: tmpdir() }).name).toBe(name);
+    }
   });
 
-  it("rejects unknown browser names with UNSUPPORTED_BROWSER", () => {
-    expect(() => createDriver("opera" as never, { profilesDir: tmpdir() })).toThrowError(TabCtxError);
-    try {
-      createDriver("opera" as never, { profilesDir: tmpdir() });
-    } catch (error) {
-      expect((error as TabCtxError).code).toBe("UNSUPPORTED_BROWSER");
-    }
+  it("refuses safari with guidance instead of silently opening WebKit", () => {
+    expect(() => createDriver("safari", { profilesDir: tmpdir() })).toThrowError(/atc bind --browser safari/);
+  });
+
+  it("returns the shared extension driver, and refuses when there is none", () => {
+    const shared = createDriver("chromium", { profilesDir: tmpdir() });
+    expect(createDriver("extension", { profilesDir: tmpdir(), extensionDriver: shared })).toBe(shared);
+    expect(() => createDriver("extension", { profilesDir: tmpdir() })).toThrowError(AtcError);
+  });
+
+  it("fails with UNSUPPORTED_BROWSER when a branded browser is not installed", async () => {
+    const missing = (["brave", "edge"] as const).find((name) => resolveExecutable(name) === undefined);
+    if (missing === undefined) return;
+    await expectAtcError(createDriver(missing, { profilesDir: await mkdtemp(join(tmpdir(), "atc-miss-")) }).open({ profile: "p", headless: true }), "UNSUPPORTED_BROWSER");
   });
 });

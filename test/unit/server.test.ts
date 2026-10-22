@@ -19,9 +19,9 @@ let server: RunningServer | undefined;
 let logs: RequestLogEntry[];
 
 beforeEach(async () => {
-  // Unix socket paths are limited to ~104 bytes, so keep TABCTX_HOME short.
+  // Unix socket paths are limited to ~104 bytes, so keep ATC_HOME short.
   home = await mkdtemp(join(tmpdir(), "tcx-"));
-  paths = resolvePaths({ TABCTX_HOME: join(home, "h") });
+  paths = resolvePaths({ ATC_HOME: join(home, "h") });
   driver = new FakeDriver("chromium");
   const registry = new ContextRegistry({ statePath: paths.state, random: sequenceRandom([0x0001, 0x0002, 0x0003]) });
   service = new DaemonService({ registry, paths, env: {}, driverFactory: () => driver });
@@ -137,7 +137,7 @@ describe("startServer", () => {
 
   it("refuses socket paths the kernel would truncate", async () => {
     const longHome = join(home, "x".repeat(120));
-    await expect(startServer(service, resolvePaths({ TABCTX_HOME: longHome }))).rejects.toMatchObject({
+    await expect(startServer(service, resolvePaths({ ATC_HOME: longHome }))).rejects.toMatchObject({
       code: "INVALID_ARGUMENT",
     });
     expect(() => assertSocketPathFits(`/${"a".repeat(106)}`, "linux")).not.toThrow();

@@ -1,6 +1,9 @@
 {
   "name": "agentic-tab-context",
-  "version": "0.2.0",
-  "description": "Discover and bind to the user's already-open browser tab across Chrome, Safari, Firefox, Brave, and Edge without opening redundant browser windows.",
-  "skills": "./skills"
+  "version": "0.3.0",
+  "description": "Use the browser tab you already have open instead of opening a new browser.",
+  "author": { "name": "GainRatio" },
+  "homepage": "https://github.com/gainratio/agentic-tab-context",
+  "repository": "https://github.com/gainratio/agentic-tab-context",
+  "license": "MIT"
 }

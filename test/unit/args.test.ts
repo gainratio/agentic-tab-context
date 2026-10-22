@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseArgs } from "../../src/cli/args.js";
-import { TabCtxError } from "../../src/contracts/errors.js";
+import { AtcError } from "../../src/contracts/errors.js";
 
 const CTX = "ctx_7f21";
 
@@ -187,8 +187,8 @@ describe("parseArgs rejects malformed input with INVALID_ARGUMENT", () => {
     } catch (error) {
       thrown = error;
     }
-    expect(thrown).toBeInstanceOf(TabCtxError);
-    const error = thrown as TabCtxError;
+    expect(thrown).toBeInstanceOf(AtcError);
+    const error = thrown as AtcError;
     expect(error.code).toBe("INVALID_ARGUMENT");
     expect(error.message).toMatch(message);
   });

@@ -1,8 +1,8 @@
 /**
- * abt / tabctx CLI entry: parse argv, send one request to the daemon (or run local
+ * atc CLI entry: parse argv, send one request to the daemon (or run local
  * setup), print exactly one line of compact JSON on stdout, and return the exit code.
  */
-import { isTabCtxError } from "../contracts/errors.js";
+import { isAtcError } from "../contracts/errors.js";
 import { resolvePaths } from "../contracts/paths.js";
 import type { ErrorResponse, Paths, Request, Response } from "../contracts/protocol.js";
 import { parseArgs, USAGE } from "./args.js";
@@ -22,7 +22,7 @@ const RESERVED_KEYS = new Set(["ok", "error", "message"]);
 const defaultTransport: Transport = (request, paths, env) => sendRequest(request, paths, { env });
 
 function errorResponse(error: unknown): ErrorResponse {
-  if (isTabCtxError(error)) {
+  if (isAtcError(error)) {
     const details = Object.fromEntries(Object.entries(error.details).filter(([key]) => !RESERVED_KEYS.has(key)));
     return { ok: false, error: error.code, message: error.message, ...details };
   }
