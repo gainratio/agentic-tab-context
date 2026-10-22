@@ -57,7 +57,7 @@ You can also click the extension's toolbar icon and press **Let my assistant use
 
 | Browser | Uses your open tabs? | Status |
 |---|---|---|
-| Chrome, Chromium | Yes, with the extension | Tested automatically on every change |
+| Chrome, Chromium | Yes, with the extension | Chromium tested automatically on every change; installed Google Chrome not separately tested |
 | Brave, Edge | Yes, with the extension | Same engine as Chrome; not tested yet |
 | Firefox | Extension is written to support it | Not tested yet |
 | Safari (Mac) | Discovery only: can list tabs; binding and actions are unsupported because Safari exposes no stable tab identity | Discovery tested with simulated responses; physical Safari unverified |
