@@ -32,12 +32,20 @@ async function captureSelected(tabId, windowId) {
   const state = await beginCapture(tabId, windowId);
   try {
     await selectTarget(state);
-    nextCaptureAt = performance.now() + CAPTURE_INTERVAL_MS;
-    const data = await chrome.tabs.captureVisibleTab(windowId, { format: "png" });
+    const data = await capturePixels(windowId);
     await assertTarget(state);
     return data;
   } finally {
     await finishCapture(state);
+  }
+}
+
+async function capturePixels(windowId) {
+  try {
+    return await chrome.tabs.captureVisibleTab(windowId, { format: "png" });
+  } finally {
+    // Browser admission precedes settlement, even when IPC delivery is delayed.
+    nextCaptureAt = performance.now() + CAPTURE_INTERVAL_MS;
   }
 }
 

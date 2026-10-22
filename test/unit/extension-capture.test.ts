@@ -105,4 +105,22 @@ describe("extension screenshot isolation", () => {
     expect(starts[1]! - starts[0]!).toBeGreaterThanOrEqual(500);
     expect(h.listeners.size).toBe(0);
   });
+
+  it("spaces browser admissions after an API call is delivered and settles late", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const h = captureHarness(2);
+    const admissions: number[] = [];
+    let calls = 0;
+    h.setCapture(async (windowId) => {
+      if (++calls === 1) await new Promise((resolve) => setTimeout(resolve, 750));
+      admissions.push(Date.now());
+      return `png-of-tab-${h.windows.get(windowId)}`;
+    });
+    const burst = Promise.all([h.capture(1), h.capture(4), h.capture(2)]);
+    await vi.runAllTimersAsync();
+    expect(await burst).toEqual(["png-of-tab-1", "png-of-tab-4", "png-of-tab-2"]);
+    expect(admissions[2]! - admissions[0]!).toBeGreaterThanOrEqual(1000);
+    expect([h.windows.get(1), h.windows.get(2)]).toEqual([99, 98]);
+  });
 });
