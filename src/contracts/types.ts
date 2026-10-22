@@ -1,5 +1,5 @@
 /**
- * Shared contracts for agentic-browser-tab (abt / tabctx). Every module (cli,
+ * Shared contracts for agentic-tab-context (atc). Every module (cli,
  * daemon, drivers) imports from here and never from each other's internals.
  */
 
@@ -53,6 +53,14 @@ export interface BindOptions {
   use?: boolean;
 }
 
+/** Locator kinds whose value lives in a field named after the kind (label.label, text.text, ...). */
+export const SIMPLE_LOCATOR_KINDS = ["label", "text", "placeholder", "testid", "selector"] as const;
+export type SimpleLocatorKind = (typeof SIMPLE_LOCATOR_KINDS)[number];
+
+export function simpleTarget(kind: SimpleLocatorKind, value: string): Target {
+  return { kind, [kind]: value } as unknown as Target;
+}
+
 /** How a command picks exactly one element. Exactly one locator kind is set. */
 export type Target =
   | { kind: "role"; role: string; name?: string; nth?: number }
@@ -104,6 +112,8 @@ export interface OpenOptions {
 /** Opaque handle owned by a driver. The daemon never looks inside. */
 export interface BrowserSession {
   readonly sessionId: string;
+  /** Stable target identity, when the driver can enumerate and rebind tabs. */
+  readonly tabId?: string;
 }
 
 /** One adapter per browser family. Every method is deterministic: it never guesses. */

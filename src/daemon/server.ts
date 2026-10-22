@@ -6,12 +6,14 @@
  * per-context promise chain) so two commands never interleave on one tab;
  * requests for different contexts, or for no context, run concurrently.
  */
-import { chmod, lstat, mkdir, unlink } from "node:fs/promises";
-import { type Server, type Socket, createConnection, createServer } from "node:net";
-import { TabCtxError } from "../contracts/errors.js";
+import type { Socket } from "node:net";
 import type { Paths, Request, RequestEnvelope, Response, ResponseEnvelope } from "../contracts/protocol.js";
+import { readLines, writeLine } from "../transport/lines.js";
+import { type RunningServer, listenOwnerOnly } from "../transport/unix-server.js";
 import { isRecord } from "./params.js";
 import type { DaemonService } from "./service.js";
+
+export { assertSocketPathFits, type RunningServer } from "../transport/unix-server.js";
 
 /** Metadata about one handled request. Never contains params or page content. */
 export interface RequestLogEntry {
@@ -26,135 +28,22 @@ export interface ServerOptions {
   onRequest?: (entry: RequestLogEntry) => void;
 }
 
-export interface RunningServer {
-  close(): Promise<void>;
-}
-
 const MAX_LINE_BYTES = 1024 * 1024;
-const PROBE_TIMEOUT_MS = 1000;
-const SOCKET_DRAIN_MS = 1000;
 
-export async function startServer(service: DaemonService, paths: Paths, options: ServerOptions = {}): Promise<RunningServer> {
-  assertSocketPathFits(paths.socket);
-  await mkdir(paths.home, { recursive: true, mode: 0o700 });
-  await chmod(paths.home, 0o700);
-  await clearStaleSocket(paths.socket);
+export function startServer(service: DaemonService, paths: Paths, options: ServerOptions = {}): Promise<RunningServer> {
   const queue = new KeyedQueue();
-  const sockets = new Set<Socket>();
-  const server = createServer((socket) => {
-    sockets.add(socket);
-    socket.on("close", () => sockets.delete(socket));
-    serveConnection(socket, (line) => dispatchLine(line, service, queue, options));
-  });
-  await listen(server, paths.socket);
-  const close = (): Promise<void> => closeServer(server, sockets, paths.socket);
-  try {
-    await chmod(paths.socket, 0o600);
-  } catch (err) {
-    await close();
-    throw err;
-  }
-  return { close };
+  return listenOwnerOnly(paths.socket, (socket) => serveConnection(socket, service, queue, options));
 }
 
-/**
- * The kernel silently truncates over-long Unix socket paths (sun_path is 108
- * bytes on Linux, 104 on macOS, including the NUL), so fail loudly instead.
- */
-export function assertSocketPathFits(socketPath: string, platform: NodeJS.Platform = process.platform): void {
-  const limit = platform === "linux" ? 107 : 103;
-  if (Buffer.byteLength(socketPath) > limit) {
-    throw new TabCtxError(
-      "INVALID_ARGUMENT",
-      `socket path is ${Buffer.byteLength(socketPath)} bytes (max ${limit}); set TABCTX_HOME to a shorter directory`,
-      { socket: socketPath },
-    );
-  }
-}
-
-// --- socket lifecycle ---------------------------------------------------------
-
-async function clearStaleSocket(socketPath: string): Promise<void> {
-  let isSocket: boolean;
-  try {
-    isSocket = (await lstat(socketPath)).isSocket();
-  } catch (err) {
-    if (errnoCode(err) === "ENOENT") return;
-    throw err;
-  }
-  if (!isSocket) throw new TabCtxError("INTERNAL", `${socketPath} exists and is not a socket`);
-  if (await isAlive(socketPath)) {
-    throw new TabCtxError("INTERNAL", `a daemon is already listening on ${socketPath}`);
-  }
-  await unlink(socketPath).catch((err: unknown) => {
-    if (errnoCode(err) !== "ENOENT") throw err;
-  });
-}
-
-/** True if something accepts connections on the socket. */
-function isAlive(socketPath: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    const probe = createConnection(socketPath);
-    const finish = (alive: boolean): void => {
-      probe.destroy();
-      resolve(alive);
-    };
-    probe.setTimeout(PROBE_TIMEOUT_MS, () => finish(true)); // hung but present: do not steal it
-    probe.once("connect", () => finish(true));
-    probe.once("error", () => finish(false));
-  });
-}
-
-function listen(server: Server, socketPath: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(socketPath, () => {
-      server.off("error", reject);
-      resolve();
-    });
-  });
-}
-
-function closeServer(server: Server, sockets: Set<Socket>, socketPath: string): Promise<void> {
-  return new Promise((resolve) => {
-    server.close(() => {
-      unlink(socketPath).catch(() => undefined).finally(resolve);
-    });
-    for (const socket of sockets) {
-      socket.end(); // flush pending replies, then force-close stragglers
-      setTimeout(() => socket.destroy(), SOCKET_DRAIN_MS).unref();
-    }
-  });
-}
-
-// --- NDJSON framing -------------------------------------------------------------
-
-function serveConnection(socket: Socket, onLine: (line: string) => Promise<ResponseEnvelope>): void {
-  socket.setEncoding("utf8");
-  let buffer = "";
-  socket.on("data", (chunk: string) => {
-    buffer += chunk;
-    let newline = buffer.indexOf("\n");
-    while (newline !== -1) {
-      const line = buffer.slice(0, newline);
-      buffer = buffer.slice(newline + 1);
-      if (line.trim() !== "") void onLine(line).then((envelope) => reply(socket, envelope));
-      newline = buffer.indexOf("\n");
-    }
-    if (Buffer.byteLength(buffer) > MAX_LINE_BYTES) {
-      reply(socket, invalidEnvelope(-1, "request line too long"));
+function serveConnection(socket: Socket, service: DaemonService, queue: KeyedQueue, options: ServerOptions): void {
+  readLines(socket, MAX_LINE_BYTES, {
+    onLine: (line) => void dispatchLine(line, service, queue, options).then((envelope) => writeLine(socket, envelope)),
+    onOverflow: () => {
+      writeLine(socket, invalidEnvelope(-1, "request line too long"));
       socket.end();
-      buffer = "";
-    }
+    },
   });
-  socket.on("error", () => socket.destroy());
 }
-
-function reply(socket: Socket, envelope: ResponseEnvelope): void {
-  if (socket.writable) socket.write(`${JSON.stringify(envelope)}\n`);
-}
-
-// --- dispatch -------------------------------------------------------------------
 
 async function dispatchLine(
   line: string,
@@ -227,8 +116,4 @@ export class KeyedQueue {
     });
     return result;
   }
-}
-
-function errnoCode(err: unknown): unknown {
-  return isRecord(err) ? err.code : undefined;
 }

@@ -1,6 +1,6 @@
 /**
  * CLI <-> daemon wire protocol: newline-delimited JSON over a Unix domain socket
- * at `${TABCTX_HOME}/daemon.sock`. One request line, one response line.
+ * at `${ATC_HOME}/daemon.sock`. One request line, one response line.
  */
 import type { ErrorCode } from "./errors.js";
 import type { BindOptions, BrowserName, Target } from "./types.js";
@@ -46,12 +46,17 @@ export interface ResponseEnvelope {
   response: Response;
 }
 
-/** Paths derived from ABT_HOME / TABCTX_HOME (default: ~/.tabctx). */
+/** Paths derived from ATC_HOME (default: ~/.atc). */
 export interface Paths {
   home: string;
+  /** CLI <-> daemon socket. */
   socket: string;
+  /** Native messaging host <-> daemon socket (browser extension traffic). */
+  extensionSocket: string;
   state: string;
   profiles: string;
   screenshots: string;
   daemonLog: string;
+  /** Launcher script the browser runs for native messaging. */
+  nativeHost: string;
 }

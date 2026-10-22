@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { main, type Transport } from "../../src/cli/main.js";
-import { TabCtxError } from "../../src/contracts/errors.js";
+import { AtcError } from "../../src/contracts/errors.js";
 import type { Paths, Request, Response } from "../../src/contracts/protocol.js";
 
 interface Captured {
@@ -17,7 +17,7 @@ async function runMain(argv: string[], respond: (request: Request) => Promise<Re
     sent.push({ request, paths });
     return respond(request);
   };
-  const code = await main(argv, { stdout: (s) => writes.push(s), env: { TABCTX_HOME: "/tmp/tabctx-main-test" }, transport });
+  const code = await main(argv, { stdout: (s) => writes.push(s), env: { ATC_HOME: "/tmp/atc-main-test" }, transport });
   expect(writes).toHaveLength(1);
   const line = writes[0] ?? "";
   expect(line.endsWith("\n")).toBe(true);
@@ -39,7 +39,7 @@ describe("main", () => {
 
   it("resolves paths from the injected env", async () => {
     const result = await runMain(["list"], () => ({ ok: true, contexts: [], current: null }));
-    expect(result.sent[0]?.paths.socket).toBe("/tmp/tabctx-main-test/daemon.sock");
+    expect(result.sent[0]?.paths.socket).toBe("/tmp/atc-main-test/daemon.sock");
   });
 
   it("exits 1 and passes daemon errors through", async () => {
@@ -69,9 +69,9 @@ describe("main", () => {
     expect(result.json).toMatchObject({ ok: false, error: "INVALID_ARGUMENT" });
   });
 
-  it("spreads TabCtxError details but never lets them override ok/error/message", async () => {
+  it("spreads AtcError details but never lets them override ok/error/message", async () => {
     const result = await runMain(["list"], () => {
-      throw new TabCtxError("DAEMON_UNAVAILABLE", "no daemon", { log: "/x/daemon.log", ok: true, error: "X" });
+      throw new AtcError("DAEMON_UNAVAILABLE", "no daemon", { log: "/x/daemon.log", ok: true, error: "X" });
     });
     expect(result.code).toBe(1);
     expect(result.json).toStrictEqual({
@@ -98,7 +98,7 @@ describe("main", () => {
     expect(Array.isArray(usage)).toBe(true);
     expect(usage.every((line) => typeof line === "string")).toBe(true);
     for (const command of ["open", "goto", "click", "type", "select", "console", "network", "shutdown"]) {
-      expect(usage.some((line) => String(line).startsWith(`tabctx ${command}`) || String(line).includes(` ${command} `))).toBe(
+      expect(usage.some((line) => String(line).startsWith(`atc ${command}`) || String(line).includes(` ${command} `))).toBe(
         true,
       );
     }

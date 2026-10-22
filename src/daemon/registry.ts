@@ -2,10 +2,9 @@
  * ContextRegistry: the daemon's single source of truth for TabContext records.
  */
 import { randomBytes } from "node:crypto";
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
-import { TabCtxError } from "../contracts/errors.js";
-import { BROWSERS, type BrowserName, type BrowserSession, type TabContext, type TabSource } from "../contracts/types.js";
+import { AtcError } from "../contracts/errors.js";
+import type { BrowserName, BrowserSession, TabContext, TabSource } from "../contracts/types.js";
+import { ID_PATTERN, compareContexts, loadContexts, writeStateFile } from "./registry-store.js";
 
 /** Returns `size` random bytes. Injectable so tests can force id collisions. */
 export type RandomSource = (size: number) => Uint8Array;
@@ -28,7 +27,6 @@ export interface RegistrySnapshot {
   contexts: TabContext[];
 }
 
-const ID_PATTERN = /^ctx_[0-9a-f]{4}$/;
 const MAX_ID_ATTEMPTS = 4096;
 
 export class ContextRegistry {
@@ -38,7 +36,6 @@ export class ContextRegistry {
   private readonly sessions = new Map<string, BrowserSession>();
   private readonly usedIds = new Set<string>();
   private currentId: string | null = null;
-  private writeCounter = 0;
 
   constructor(options: ContextRegistryOptions) {
     this.statePath = options.statePath;
@@ -117,7 +114,7 @@ export class ContextRegistry {
 
   setCurrent(id: string | null): void {
     if (id !== null && this.contexts.get(id)?.status !== "open") {
-      throw new TabCtxError("INTERNAL", `cannot make ${id} current: not an open context`);
+      throw new AtcError("INTERNAL", `cannot make ${id} current: not an open context`);
     }
     if (this.currentId === id) return;
     this.currentId = id;
@@ -136,13 +133,13 @@ export class ContextRegistry {
         return id;
       }
     }
-    throw new TabCtxError("INTERNAL", "could not allocate a unique context id");
+    throw new AtcError("INTERNAL", "could not allocate a unique context id");
   }
 
   private load(): void {
-    const raw = readStateFile(this.statePath);
-    if (raw === undefined) return;
-    for (const ctx of parseContexts(raw)) {
+    const restored = loadContexts(this.statePath);
+    if (restored === undefined) return;
+    for (const ctx of restored) {
       this.contexts.set(ctx.id, { ...ctx, status: "closed" });
       this.usedIds.add(ctx.id);
     }
@@ -151,68 +148,6 @@ export class ContextRegistry {
   }
 
   private persist(): void {
-    const data = `${JSON.stringify(this.snapshot(), null, 2)}\n`;
-    mkdirSync(dirname(this.statePath), { recursive: true, mode: 0o700 });
-    this.writeCounter += 1;
-    const tmp = `${this.statePath}.${process.pid}.${this.writeCounter}.tmp`;
-    writeFileSync(tmp, data, { mode: 0o600 });
-    renameSync(tmp, this.statePath);
+    writeStateFile(this.statePath, this.snapshot());
   }
-}
-
-function compareContexts(a: TabContext, b: TabContext): number {
-  if (a.createdAt !== b.createdAt) return a.createdAt < b.createdAt ? -1 : 1;
-  if (a.id === b.id) return 0;
-  return a.id < b.id ? -1 : 1;
-}
-
-function readStateFile(path: string): unknown {
-  let text: string;
-  try {
-    text = readFileSync(path, "utf8");
-  } catch (err) {
-    if (isErrnoCode(err, "ENOENT")) return undefined;
-    throw err;
-  }
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    return undefined;
-  }
-}
-
-function parseContexts(raw: unknown): TabContext[] {
-  if (!isRecord(raw) || !Array.isArray(raw.contexts)) return [];
-  const out: TabContext[] = [];
-  for (const item of raw.contexts) {
-    const ctx = toTabContext(item);
-    if (ctx !== undefined) out.push(ctx);
-  }
-  return out;
-}
-
-function toTabContext(item: unknown): TabContext | undefined {
-  if (!isRecord(item)) return undefined;
-  const { id, browser, profile, createdAt, url, title, source, tabId } = item;
-  if (typeof id !== "string" || !ID_PATTERN.test(id)) return undefined;
-  if (typeof browser !== "string" || !isBrowserName(browser)) return undefined;
-  if (typeof profile !== "string" || typeof createdAt !== "string") return undefined;
-  const ctx: TabContext = { id, browser, status: "closed", profile, createdAt };
-  if (typeof url === "string") ctx.url = url;
-  if (typeof title === "string") ctx.title = title;
-  if (source === "extension" || source === "managed" || source === "macos") ctx.source = source;
-  if (typeof tabId === "string") ctx.tabId = tabId;
-  return ctx;
-}
-
-function isBrowserName(value: string): value is BrowserName {
-  return (BROWSERS as readonly string[]).includes(value);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isErrnoCode(err: unknown, code: string): boolean {
-  return isRecord(err) && err.code === code;
 }

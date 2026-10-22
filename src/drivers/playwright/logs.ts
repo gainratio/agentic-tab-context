@@ -2,7 +2,7 @@
  * Bounded sequence-numbered console and network ring buffers for Playwright pages.
  */
 import type { ConsoleMessage, Page, Request } from "playwright-core";
-import { TabCtxError } from "../../contracts/errors.js";
+import { AtcError } from "../../contracts/errors.js";
 import type { ConsoleEntry, NetworkEntry } from "../../contracts/types.js";
 
 export const LOG_CAPACITY = 500;
@@ -27,7 +27,7 @@ export class SeqLog<T extends { seq: number }> {
 
 export function validateSinceSeq(sinceSeq: number): number {
   if (!Number.isFinite(sinceSeq)) {
-    throw new TabCtxError("INVALID_ARGUMENT", "since must be a finite number");
+    throw new AtcError("INVALID_ARGUMENT", "since must be a finite number");
   }
   return sinceSeq;
 }
@@ -38,46 +38,34 @@ export function attachPageLogs(page: Page, consoleLog: SeqLog<ConsoleEntry>, net
 }
 
 function recordConsole(page: Page, consoleLog: SeqLog<ConsoleEntry>): void {
-  page.on("console", (message: ConsoleMessage) => {
-    const url = message.location().url;
-    consoleLog.push((seq) => ({
-      seq,
-      type: message.type(),
-      text: message.text(),
-      ...(url === "" ? {} : { url }),
-      at: new Date().toISOString(),
-    }));
-  });
+  page.on("console", (message: ConsoleMessage) => consoleLog.push((seq) => consoleEntry(seq, message)));
   page.on("pageerror", (error: Error) => {
-    consoleLog.push((seq) => ({
-      seq,
-      type: "pageerror",
-      text: error.message,
-      url: page.url(),
-      at: new Date().toISOString(),
-    }));
+    consoleLog.push((seq) => ({ seq, type: "pageerror", text: error.message, url: page.url(), at: new Date().toISOString() }));
   });
+}
+
+function consoleEntry(seq: number, message: ConsoleMessage): ConsoleEntry {
+  const url = message.location().url;
+  return { seq, type: message.type(), text: message.text(), ...(url === "" ? {} : { url }), at: new Date().toISOString() };
 }
 
 function recordNetwork(page: Page, networkLog: SeqLog<NetworkEntry>): void {
   page.on("requestfinished", (request: Request) => {
-    void request
-      .response()
-      .then((response) => response?.status())
-      .catch(() => undefined)
-      .then((status) => {
-        networkLog.push((seq) => ({
-          ...requestFields(seq, request),
-          ...(status === undefined ? {} : { status }),
-        }));
-      });
+    void responseStatus(request).then((status) => {
+      networkLog.push((seq) => ({ ...requestFields(seq, request), ...(status === undefined ? {} : { status }) }));
+    });
   });
   page.on("requestfailed", (request: Request) => {
-    networkLog.push((seq) => ({
-      ...requestFields(seq, request),
-      failure: request.failure()?.errorText ?? "unknown failure",
-    }));
+    networkLog.push((seq) => ({ ...requestFields(seq, request), failure: request.failure()?.errorText ?? "unknown failure" }));
   });
+}
+
+async function responseStatus(request: Request): Promise<number | undefined> {
+  try {
+    return (await request.response())?.status();
+  } catch {
+    return undefined;
+  }
 }
 
 function requestFields(seq: number, request: Request): NetworkEntry {

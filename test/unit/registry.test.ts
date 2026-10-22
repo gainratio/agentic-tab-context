@@ -9,7 +9,7 @@ let home: string;
 let statePath: string;
 
 beforeEach(async () => {
-  home = await mkdtemp(join(tmpdir(), "tabctx-registry-"));
+  home = await mkdtemp(join(tmpdir(), "atc-registry-"));
   statePath = join(home, "state.json");
 });
 

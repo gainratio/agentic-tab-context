@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { sendRequest, type SpawnFn } from "../../src/cli/client.js";
-import { TabCtxError } from "../../src/contracts/errors.js";
+import { AtcError } from "../../src/contracts/errors.js";
 import { resolvePaths } from "../../src/contracts/paths.js";
 import type { Paths, RequestEnvelope, Response } from "../../src/contracts/protocol.js";
 
@@ -44,19 +44,19 @@ async function startServer(handler: Handler = echo): Promise<Server> {
   return server;
 }
 
-async function rejection(promise: Promise<unknown>): Promise<TabCtxError> {
+async function rejection(promise: Promise<unknown>): Promise<AtcError> {
   try {
     await promise;
   } catch (error) {
-    expect(error).toBeInstanceOf(TabCtxError);
-    return error as TabCtxError;
+    expect(error).toBeInstanceOf(AtcError);
+    return error as AtcError;
   }
   throw new Error("expected the promise to reject");
 }
 
 beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), "tabctx-client-"));
-  paths = resolvePaths({ TABCTX_HOME: join(root, "home") });
+  root = await mkdtemp(join(tmpdir(), "atc-client-"));
+  paths = resolvePaths({ ATC_HOME: join(root, "home") });
 });
 
 afterEach(async () => {
@@ -121,7 +121,7 @@ describe("sendRequest auto-start", () => {
       setTimeout(() => void startServer(), 250);
       return { unref: () => void (unrefs += 1) };
     };
-    const env = { TABCTX_HOME: paths.home, MARKER: "1" };
+    const env = { ATC_HOME: paths.home, MARKER: "1" };
 
     const response = await sendRequest({ method: "list", params: {} }, paths, {
       spawn,

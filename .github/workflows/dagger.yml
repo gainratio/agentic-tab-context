@@ -21,7 +21,20 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
           ref: ${{ github.sha }}
-      - uses: dagger/dagger-for-github@27b130bf0f79a7f6fbbbe0fbca6760dc9bb40a77 # v8.4.1
+      - name: Install Dagger
+        uses: dagger/dagger-for-github@27b130bf0f79a7f6fbbbe0fbca6760dc9bb40a77 # v8.4.1
         with:
           version: "0.21.8"
-          call: ci --commit-sha=${{ github.sha }} --repository=${{ github.repository }}
+      # The repository is private, so Dagger's exact-commit fetches need credentials.
+      # The job's own short-lived read-only token is turned into a git Basic header,
+      # masked, and handed to Dagger as a secret (never as a plain argument).
+      - name: Run the canonical gate
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          COMMIT_SHA: ${{ github.sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          GIT_AUTH_HEADER="Basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)"
+          echo "::add-mask::$GIT_AUTH_HEADER"
+          export GIT_AUTH_HEADER
+          dagger call ci --commit-sha="$COMMIT_SHA" --repository="$REPOSITORY" --git-auth-header=env://GIT_AUTH_HEADER

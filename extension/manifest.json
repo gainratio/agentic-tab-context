@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Agentic Tab Context (atc)",
-  "version": "0.2.0",
-  "description": "Bind your already-open browser tabs to coding assistants (Claude Code, Codex, Antigravity) without opening new windows or tabs.",
+  "name": "Agentic Tab Context",
+  "version": "0.3.0",
+  "description": "Lets your coding assistant see and use the browser tab you already have open, instead of opening a new one.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAlmYfGT13T69EBn+53uQoge4dNjjkASRh1ppr7Ncm2jQ3POmht7PSo+gz4s+QB6uT4+a70uVx4DW1dVHlPX1I1rnBzIsy8gA9B3gWhMRWU7vr0JjkLe4f+oiYUz/CDprDXocYSoiWJ+YohVuvbab5rM5zKPaG0iKx6H6dHwUXIeDn6wxOASQQnbGpkqwLTsuIfWuP+alkjXJRdJPPOBxD/b/UAM2OVyYckSOfmcpd6FN8IvFw1comtOyvUIt4BzGQVqNubMJwxUh8CRuzyRlF49C2ZCaNUQggiraKqdf9d4mXFLxVy4JhLzRP4FKRjkX87gtoefpi7d+K10SV+v5tfwIDAQAB",
   "icons": {
     "16": "icons/icon-16.png",
     "48": "icons/icon-48.png",
@@ -19,15 +20,25 @@
   },
   "background": {
     "service_worker": "service-worker.js",
+    "scripts": [
+      "service-worker.js"
+    ],
     "type": "module"
   },
   "permissions": [
     "tabs",
     "scripting",
     "storage",
-    "alarms"
+    "alarms",
+    "nativeMessaging"
   ],
   "host_permissions": [
     "<all_urls>"
-  ]
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "agentic-tab-context@gainratio",
+      "strict_min_version": "128.0"
+    }
+  }
 }

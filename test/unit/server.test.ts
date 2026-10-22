@@ -19,9 +19,9 @@ let server: RunningServer | undefined;
 let logs: RequestLogEntry[];
 
 beforeEach(async () => {
-  // Unix socket paths are limited to ~104 bytes, so keep TABCTX_HOME short.
+  // Unix socket paths are limited to ~104 bytes, so keep ATC_HOME short.
   home = await mkdtemp(join(tmpdir(), "tcx-"));
-  paths = resolvePaths({ TABCTX_HOME: join(home, "h") });
+  paths = resolvePaths({ ATC_HOME: join(home, "h") });
   driver = new FakeDriver("chromium");
   const registry = new ContextRegistry({ statePath: paths.state, random: sequenceRandom([0x0001, 0x0002, 0x0003]) });
   service = new DaemonService({ registry, paths, env: {}, driverFactory: () => driver });
@@ -109,6 +109,15 @@ describe("startServer", () => {
     expect(await send(5, { method: "ping", params: {} })).toMatchObject({ id: 5, response: { ok: true } });
   });
 
+  it.each([[], null, 42, "invalid"].map((params) => ({ params })))("rejects malformed close params before routing to the current context: $params", async ({ params }) => {
+    await start();
+    const context = await openContext(1);
+    const [reply] = await sendRaw(`${JSON.stringify({ id: 2, request: { method: "close", params } })}\n`);
+    expect(reply).toMatchObject({ id: 2, response: { ok: false, error: "INVALID_ARGUMENT" } });
+    expect(driver.calls.filter((call) => call.method === "close")).toHaveLength(0);
+    expect(await send(3, { method: "inspect", params: { context } })).toMatchObject({ response: { ok: true, context } });
+  });
+
   it("removes a stale socket file nobody answers on", async () => {
     await mkdir(paths.home, { recursive: true });
     // Simulate a crashed daemon: a process listens, then dies by SIGKILL, leaving the file.
@@ -137,7 +146,7 @@ describe("startServer", () => {
 
   it("refuses socket paths the kernel would truncate", async () => {
     const longHome = join(home, "x".repeat(120));
-    await expect(startServer(service, resolvePaths({ TABCTX_HOME: longHome }))).rejects.toMatchObject({
+    await expect(startServer(service, resolvePaths({ ATC_HOME: longHome }))).rejects.toMatchObject({
       code: "INVALID_ARGUMENT",
     });
     expect(() => assertSocketPathFits(`/${"a".repeat(106)}`, "linux")).not.toThrow();

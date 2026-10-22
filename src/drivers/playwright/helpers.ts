@@ -2,7 +2,7 @@
  * Action helpers, error mapping, and navigation settling for PlaywrightDriver.
  */
 import { errors, type Locator, type Page } from "playwright-core";
-import { TabCtxError, type ErrorCode } from "../../contracts/errors.js";
+import { AtcError, type ErrorCode } from "../../contracts/errors.js";
 import type { Target } from "../../contracts/types.js";
 import { describeTarget, pickOption, type SelectOptionInfo } from "../target.js";
 
@@ -38,11 +38,11 @@ export function fireDisconnect(state: DisconnectableState): void {
 export async function selectOption(locator: Locator, target: Target, value: string): Promise<void> {
   const options = await readSelectOptions(locator);
   if (options === null) {
-    throw new TabCtxError("ACTION_FAILED", `Target ${describeTarget(target)} is not a <select> element`);
+    throw new AtcError("ACTION_FAILED", `Target ${describeTarget(target)} is not a <select> element`);
   }
   const choice = pickOption(options, value);
   if (choice === null) {
-    throw new TabCtxError(
+    throw new AtcError(
       "TARGET_NOT_FOUND",
       `The <select> matched by ${describeTarget(target)} has no option with that label or value`,
       { matched: 0 },
@@ -102,24 +102,24 @@ export async function guard<T>(
   try {
     return await work();
   } catch (error) {
-    if (state.closing !== undefined && !(error instanceof TabCtxError)) {
-      throw new TabCtxError("CONTEXT_CLOSED", `Cannot ${failure.action}: the browser context closed`);
+    if (state.closing !== undefined && !(error instanceof AtcError)) {
+      throw new AtcError("CONTEXT_CLOSED", `Cannot ${failure.action}: the browser context closed`);
     }
-    throw toTabCtxError(error, failure);
+    throw toAtcError(error, failure);
   }
 }
 
-export function toTabCtxError(error: unknown, failure: FailureContext): TabCtxError {
-  if (error instanceof TabCtxError) return error;
+export function toAtcError(error: unknown, failure: FailureContext): AtcError {
+  if (error instanceof AtcError) return error;
   const reason = scrub(firstLine(error), failure.secret);
   const details = failure.details ?? {};
   if (error instanceof errors.TimeoutError) {
-    return new TabCtxError("TIMEOUT", `Timed out trying to ${failure.action}: ${reason}`, details);
+    return new AtcError("TIMEOUT", `Timed out trying to ${failure.action}: ${reason}`, details);
   }
   if (/has been closed/i.test(reason)) {
-    return new TabCtxError("CONTEXT_CLOSED", `Cannot ${failure.action}: the browser context closed`, details);
+    return new AtcError("CONTEXT_CLOSED", `Cannot ${failure.action}: the browser context closed`, details);
   }
-  return new TabCtxError(failure.code, `Failed to ${failure.action}: ${reason}`, details);
+  return new AtcError(failure.code, `Failed to ${failure.action}: ${reason}`, details);
 }
 
 function firstLine(error: unknown): string {

@@ -4,7 +4,7 @@
 import { readlink } from "node:fs/promises";
 import { hostname } from "node:os";
 import { join } from "node:path";
-import { TabCtxError } from "../../contracts/errors.js";
+import { AtcError } from "../../contracts/errors.js";
 
 /** User-data dirs currently owned by a session in this process (all driver instances). */
 const profilesInUse = new Set<string>();
@@ -12,7 +12,7 @@ const profilesInUse = new Set<string>();
 export function validateProfileName(profile: string): string {
   const invalid = profile === "" || profile === "." || profile === ".." || /[/\\\0]/.test(profile);
   if (invalid) {
-    throw new TabCtxError("INVALID_ARGUMENT", "Profile name must be a non-empty name without path separators", {
+    throw new AtcError("INVALID_ARGUMENT", "Profile name must be a non-empty name without path separators", {
       profile,
     });
   }
@@ -35,8 +35,8 @@ export async function assertNotLockedByOtherProcess(profileDir: string, profile:
   }
 }
 
-function profileInUse(profile: string): TabCtxError {
-  return new TabCtxError(
+function profileInUse(profile: string): AtcError {
+  return new AtcError(
     "ACTION_FAILED",
     `Profile "${profile}" is already in use by another open context; close it first or use a different --profile`,
     { profile },

@@ -2,12 +2,13 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { TabCtxError } from "../../src/contracts/errors.js";
+import { AtcError } from "../../src/contracts/errors.js";
 import { resolvePaths } from "../../src/contracts/paths.js";
 import type { Paths, Request, Response } from "../../src/contracts/protocol.js";
 import type { BrowserName } from "../../src/contracts/types.js";
 import { ContextRegistry } from "../../src/daemon/registry.js";
-import { DaemonService, fileTimestamp } from "../../src/daemon/service.js";
+import { fileTimestamp } from "../../src/daemon/responses.js";
+import { DaemonService } from "../../src/daemon/service.js";
 import { resolveGotoUrl } from "../../src/daemon/url.js";
 import { FakeDriver, sequenceRandom } from "../helpers/fake-driver.js";
 
@@ -29,7 +30,7 @@ function makeService(env: NodeJS.ProcessEnv = {}): DaemonService {
     driverFactory: (browser) => {
       factoryCalls.push(browser);
       if (browser === "safari" || browser === "firefox") {
-        throw new TabCtxError("UNSUPPORTED_BROWSER", `${browser} is not supported`, { browser });
+        throw new AtcError("UNSUPPORTED_BROWSER", `${browser} is not supported`, { browser });
       }
       const driver = new FakeDriver(browser);
       drivers.set(browser, driver);
@@ -39,8 +40,8 @@ function makeService(env: NodeJS.ProcessEnv = {}): DaemonService {
 }
 
 beforeEach(async () => {
-  home = await mkdtemp(join(tmpdir(), "tabctx-service-"));
-  paths = resolvePaths({ TABCTX_HOME: home });
+  home = await mkdtemp(join(tmpdir(), "atc-service-"));
+  paths = resolvePaths({ ATC_HOME: home });
   drivers = new Map();
   factoryCalls = [];
   registry = new ContextRegistry({ statePath: paths.state, random: sequenceRandom([0x0001, 0x0002, 0x0003, 0x0004]) });
@@ -92,8 +93,8 @@ describe("open", () => {
     expect(factoryCalls).toEqual(["chromium", "chrome"]);
   });
 
-  it("takes headless from params, else TABCTX_HEADLESS=1", async () => {
-    service = makeService({ TABCTX_HEADLESS: "1" });
+  it("takes headless from params, else ATC_HEADLESS=1", async () => {
+    service = makeService({ ATC_HEADLESS: "1" });
     await openOk();
     await openOk({ headless: false });
     const [a, b] = chromium().sessionIds();
@@ -113,6 +114,16 @@ describe("open", () => {
     expect(await call({ method: "open", params: { browser: "chromium", headless: "yes" } })).toMatchObject({
       error: "INVALID_ARGUMENT",
     });
+  });
+
+  it.each([null, "yes", 1, {}, []].map((use) => ({ use })))("rejects invalid open.use before creating a driver or context: $use", async ({ use }) => {
+    expect(await call({ method: "open", params: { browser: "chromium", use } })).toMatchObject({
+      ok: false,
+      error: "INVALID_ARGUMENT",
+    });
+    expect(factoryCalls).toEqual([]);
+    expect(registry.list()).toEqual([]);
+    expect(registry.current).toBeNull();
   });
 
   it("passes UNSUPPORTED_BROWSER through with details", async () => {
@@ -239,7 +250,7 @@ describe("goto and history", () => {
 
   it("passes NAVIGATION_FAILED through", async () => {
     await openOk();
-    chromium().failNext("navigate", new TabCtxError("NAVIGATION_FAILED", "net::ERR_NAME_NOT_RESOLVED"));
+    chromium().failNext("navigate", new AtcError("NAVIGATION_FAILED", "net::ERR_NAME_NOT_RESOLVED"));
     expect(await call({ method: "goto", params: { url: "https://nope.invalid/" } })).toEqual({
       ok: false,
       error: "NAVIGATION_FAILED",
@@ -378,7 +389,7 @@ describe("actions", () => {
 
   it("passes AMBIGUOUS_TARGET details through", async () => {
     await openOk();
-    chromium().failNext("click", new TabCtxError("AMBIGUOUS_TARGET", "2 elements match", { matched: 2 }));
+    chromium().failNext("click", new AtcError("AMBIGUOUS_TARGET", "2 elements match", { matched: 2 }));
     expect(await call({ method: "click", params: { target: { kind: "role", role: "button", name: "Delete" } } })).toEqual({
       ok: false,
       error: "AMBIGUOUS_TARGET",
@@ -389,7 +400,7 @@ describe("actions", () => {
 
   it("details can never override ok/error/message", async () => {
     await openOk();
-    chromium().failNext("click", new TabCtxError("TARGET_NOT_FOUND", "nothing", { ok: true, error: "X", message: "y" }));
+    chromium().failNext("click", new AtcError("TARGET_NOT_FOUND", "nothing", { ok: true, error: "X", message: "y" }));
     expect(await call({ method: "click", params: { target } })).toEqual({
       ok: false,
       error: "TARGET_NOT_FOUND",
@@ -413,7 +424,7 @@ describe("actions", () => {
     await openOk();
     chromium().failNext(
       "type",
-      new TabCtxError("ACTION_FAILED", 'fill("s3cret-pw") failed', { detail: "value s3cret-pw", nested: ["s3cret-pw"] }),
+      new AtcError("ACTION_FAILED", 'fill("s3cret-pw") failed', { detail: "value s3cret-pw", nested: ["s3cret-pw"] }),
     );
     const res = await call({ method: "type", params: { target, value: "s3cret-pw" } });
     expect(res).toMatchObject({ ok: false, error: "ACTION_FAILED" });
@@ -428,6 +439,7 @@ describe("protocol-level", () => {
     expect(await call({ params: {} })).toMatchObject({ error: "INVALID_ARGUMENT" });
     expect(await call(null)).toMatchObject({ error: "INVALID_ARGUMENT" });
     expect(await call({ method: "list", params: 3 })).toMatchObject({ error: "INVALID_ARGUMENT" });
+    expect(await call({ method: "list", params: null })).toMatchObject({ error: "INVALID_ARGUMENT" });
     expect(await call({ method: "toString", params: {} })).toMatchObject({ error: "INVALID_ARGUMENT" });
   });
 

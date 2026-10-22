@@ -8,10 +8,12 @@
  * - `nth` is the only way to pick among several matches. Nothing is ever auto-picked.
  */
 import type { Locator, Page } from "playwright-core";
-import { TabCtxError } from "../contracts/errors.js";
+import { AtcError } from "../contracts/errors.js";
 import type { Target } from "../contracts/types.js";
 
 type AriaRole = Parameters<Page["getByRole"]>[0];
+type SimpleTarget = Exclude<Target, { kind: "role" }>;
+const EXACT = { exact: true } as const;
 
 /** Human-readable description of a target for error messages, e.g. `role=button name="Delete" nth=1`. */
 export function describeTarget(target: Target): string {
@@ -19,23 +21,14 @@ export function describeTarget(target: Target): string {
   return target.nth === undefined ? base : `${base} nth=${target.nth}`;
 }
 
+/** The locator value of a non-role target: its field is named after its kind (label.label, text.text, ...). */
+function simpleValue(target: SimpleTarget): string {
+  return (target as unknown as Record<string, string>)[target.kind] ?? "";
+}
+
 function describeLocatorPart(target: Target): string {
-  switch (target.kind) {
-    case "role":
-      return target.name === undefined
-        ? `role=${target.role}`
-        : `role=${target.role} name=${JSON.stringify(target.name)}`;
-    case "label":
-      return `label=${JSON.stringify(target.label)}`;
-    case "text":
-      return `text=${JSON.stringify(target.text)}`;
-    case "placeholder":
-      return `placeholder=${JSON.stringify(target.placeholder)}`;
-    case "testid":
-      return `testid=${JSON.stringify(target.testid)}`;
-    case "selector":
-      return `selector=${JSON.stringify(target.selector)}`;
-  }
+  if (target.kind !== "role") return `${target.kind}=${JSON.stringify(simpleValue(target))}`;
+  return target.name === undefined ? `role=${target.role}` : `role=${target.role} name=${JSON.stringify(target.name)}`;
 }
 
 /**
@@ -45,27 +38,14 @@ function describeLocatorPart(target: Target): string {
  */
 export function chooseIndex(target: Target, matched: number): number | undefined {
   const label = describeTarget(target);
-  if (matched === 0) {
-    throw new TabCtxError("TARGET_NOT_FOUND", `No visible element matches ${label}`, { matched: 0 });
-  }
+  if (matched === 0) throw new AtcError("TARGET_NOT_FOUND", `No visible element matches ${label}`, { matched: 0 });
   if (target.nth === undefined) {
-    if (matched > 1) {
-      throw new TabCtxError(
-        "AMBIGUOUS_TARGET",
-        `${matched} visible elements match ${label}; pass --nth N (0-based) to pick one`,
-        { matched },
-      );
-    }
-    return undefined;
+    if (matched === 1) return undefined;
+    throw new AtcError("AMBIGUOUS_TARGET", `${matched} visible elements match ${label}; pass --nth N (0-based) to pick one`, { matched });
   }
-  if (!isValidNth(target.nth, matched)) {
-    throw new TabCtxError(
-      "TARGET_NOT_FOUND",
-      `nth=${String(target.nth)} is out of range: ${matched} visible element(s) match ${describeLocatorPart(target)}`,
-      { matched },
-    );
-  }
-  return target.nth;
+  if (isValidNth(target.nth, matched)) return target.nth;
+  const message = `nth=${String(target.nth)} is out of range: ${matched} visible element(s) match ${describeLocatorPart(target)}`;
+  throw new AtcError("TARGET_NOT_FOUND", message, { matched });
 }
 
 /** `nth` must be an integer in [0, matched). */
@@ -75,29 +55,21 @@ export function isValidNth(nth: number, matched: number): boolean {
 
 /** Build the raw (unfiltered) locator for a target. Exact matching everywhere. */
 export function buildLocator(page: Page, target: Target): Locator {
-  switch (target.kind) {
-    case "role":
-      return target.name === undefined
-        ? page.getByRole(target.role as AriaRole)
-        : page.getByRole(target.role as AriaRole, { name: target.name, exact: true });
-    case "label":
-      return page.getByLabel(target.label, { exact: true });
-    case "text":
-      return page.getByText(target.text, { exact: true });
-    case "placeholder":
-      return page.getByPlaceholder(target.placeholder, { exact: true });
-    case "testid":
-      return page.getByTestId(target.testid);
-    case "selector":
-      return page.locator(target.selector);
+  if (target.kind === "role") {
+    const role = target.role as AriaRole;
+    return target.name === undefined ? page.getByRole(role) : page.getByRole(role, { name: target.name, exact: true });
   }
+  if (target.kind === "label") return page.getByLabel(target.label, EXACT);
+  if (target.kind === "text") return page.getByText(target.text, EXACT);
+  if (target.kind === "placeholder") return page.getByPlaceholder(target.placeholder, EXACT);
+  if (target.kind === "testid") return page.getByTestId(target.testid);
+  return page.locator(target.selector);
 }
 
 /** Resolve a target to exactly one visible element, or throw a typed error. */
 export async function resolveTarget(page: Page, target: Target): Promise<Locator> {
   const visible = buildLocator(page, target).filter({ visible: true });
-  const matched = await visible.count();
-  const index = chooseIndex(target, matched);
+  const index = chooseIndex(target, await visible.count());
   return index === undefined ? visible : visible.nth(index);
 }
 
@@ -110,10 +82,7 @@ export interface SelectOptionInfo {
  * Pick how to select `wanted` in a <select>: by label first, then by value.
  * Returns `null` when no option has that label or value.
  */
-export function pickOption(
-  options: readonly SelectOptionInfo[],
-  wanted: string,
-): { label: string } | { value: string } | null {
+export function pickOption(options: readonly SelectOptionInfo[], wanted: string): { label: string } | { value: string } | null {
   if (options.some((option) => option.label === wanted)) return { label: wanted };
   if (options.some((option) => option.value === wanted)) return { value: wanted };
   return null;

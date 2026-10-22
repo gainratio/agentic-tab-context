@@ -45,6 +45,20 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Install pinned Dagger CLI
+        uses: dagger/dagger-for-github@27b130bf0f79a7f6fbbbe0fbca6760dc9bb40a77 # v8.4.1
+        with:
+          version: "0.21.8"
+      - name: Install pinned Python quality tooling
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.13.5"
+          python-version: "3.13.14"
+      - name: Generate the typed Dagger SDK
+        run: dagger develop
+      - name: Run Python module contracts, lint, types, and complexity
+        working-directory: .dagger
+        run: uv run --frozen --extra quality poe gate
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24

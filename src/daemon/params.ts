@@ -3,9 +3,9 @@
  * the static `Request` type is only a promise; these helpers enforce it and
  * fail with INVALID_ARGUMENT. Messages never echo typed values.
  */
-import { TabCtxError } from "../contracts/errors.js";
+import { AtcError } from "../contracts/errors.js";
 import { PROFILE_PATTERN } from "../contracts/patterns.js";
-import { BROWSERS, type BindOptions, type BrowserName, type Target } from "../contracts/types.js";
+import { BROWSERS, type BindOptions, type BrowserName, SIMPLE_LOCATOR_KINDS, type Target, simpleTarget } from "../contracts/types.js";
 
 export type Params = Record<string, unknown>;
 
@@ -13,8 +13,8 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function invalid(message: string): TabCtxError {
-  return new TabCtxError("INVALID_ARGUMENT", message);
+function invalid(message: string): AtcError {
+  return new AtcError("INVALID_ARGUMENT", message);
 }
 
 export function optionalString(params: Params, key: string): string | undefined {
@@ -64,22 +64,20 @@ export function requireBrowser(params: Params): BrowserName {
 }
 
 export function parseBindOptions(params: Params): BindOptions {
-  const tab = optionalString(params, "tab");
-  const query = optionalString(params, "query");
-  const url = optionalString(params, "url");
-  const title = optionalString(params, "title");
-  const browser = optionalBrowser(params);
-  const active = optionalBoolean(params, "active");
-  const use = optionalBoolean(params, "use");
-  return {
-    ...(tab === undefined ? {} : { tab }),
-    ...(query === undefined ? {} : { query }),
-    ...(url === undefined ? {} : { url }),
-    ...(title === undefined ? {} : { title }),
-    ...(browser === undefined ? {} : { browser }),
-    ...(active === undefined ? {} : { active }),
-    ...(use === undefined ? {} : { use }),
-  };
+  return definedOnly({
+    tab: optionalString(params, "tab"),
+    query: optionalString(params, "query"),
+    url: optionalString(params, "url"),
+    title: optionalString(params, "title"),
+    browser: optionalBrowser(params),
+    active: optionalBoolean(params, "active"),
+    use: optionalBoolean(params, "use"),
+  });
+}
+
+/** Drop undefined fields so optional properties are absent rather than present-but-undefined. */
+export function definedOnly<T extends object>(value: { [K in keyof T]: T[K] | undefined }): T {
+  return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined)) as T;
 }
 
 export function profileParam(params: Params): string {
@@ -99,22 +97,10 @@ export function requireTarget(params: Params): Target {
 }
 
 function targetByKind(raw: Params): Target {
-  switch (raw.kind) {
-    case "role":
-      return roleTarget(raw);
-    case "label":
-      return { kind: "label", label: nonEmpty(raw, "label") };
-    case "text":
-      return { kind: "text", text: nonEmpty(raw, "text") };
-    case "placeholder":
-      return { kind: "placeholder", placeholder: nonEmpty(raw, "placeholder") };
-    case "testid":
-      return { kind: "testid", testid: nonEmpty(raw, "testid") };
-    case "selector":
-      return { kind: "selector", selector: nonEmpty(raw, "selector") };
-    default:
-      throw invalid("target.kind must be one of: role, label, text, placeholder, testid, selector");
-  }
+  if (raw.kind === "role") return roleTarget(raw);
+  const kind = SIMPLE_LOCATOR_KINDS.find((candidate) => candidate === raw.kind);
+  if (kind === undefined) throw invalid("target.kind must be one of: role, label, text, placeholder, testid, selector");
+  return simpleTarget(kind, nonEmpty(raw, kind));
 }
 
 function roleTarget(raw: Params): Target {
