@@ -12,11 +12,19 @@ function describeStatus(status) {
 }
 
 async function showStatus() {
-  const status = (await chrome.runtime.sendMessage({ type: "atc:status" })) || {};
+  const status = await request({ type: "atc:status" });
   const { ready, text } = describeStatus(status);
   statusDot.classList.toggle("connected", ready);
   statusText.textContent = text;
   bindButton.disabled = !ready;
+}
+
+async function request(message) {
+  try {
+    return (await chrome.runtime.sendMessage(message)) || {};
+  } catch {
+    return { ok: false, message: "Connection to atc was lost. Reopen this popup." };
+  }
 }
 
 async function activeTab() {
@@ -30,15 +38,28 @@ async function showTab() {
   tabUrl.textContent = (tab && tab.url) || "";
 }
 
-async function bindActiveTab() {
-  bindButton.disabled = true;
+async function pinActiveTab() {
   const tab = await activeTab();
-  const reply = await chrome.runtime.sendMessage({ type: "atc:pin", tabId: tab.id });
+  if (!tab?.id) return { ok: false, message: "No active tab is available." };
+  return request({ type: "atc:pin", tabId: tab.id });
+}
+
+function showFeedback(reply) {
   feedback.hidden = false;
   feedback.textContent = reply && reply.ok
-    ? `Bound. Your assistant can now use this tab (context ${reply.context}).`
+    ? "Bound. Your assistant can now use this tab."
     : `Could not bind: ${(reply && reply.message) || "atc is not running"}`;
-  bindButton.disabled = false;
+}
+
+async function bindActiveTab() {
+  bindButton.disabled = true;
+  try {
+    showFeedback(await pinActiveTab());
+  } catch {
+    showFeedback({ ok: false, message: "Could not read the active tab. Reopen this popup." });
+  } finally {
+    bindButton.disabled = false;
+  }
 }
 
 bindButton.addEventListener("click", () => void bindActiveTab());

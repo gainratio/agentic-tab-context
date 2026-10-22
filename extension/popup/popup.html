@@ -12,7 +12,7 @@
         <span class="dot" id="status-dot"></span>
         <h1>Agentic Tab Context</h1>
       </header>
-      <p class="badge" id="status-text">Checking…</p>
+      <p class="badge" id="status-text" role="status" aria-live="polite">Checking…</p>
 
       <section class="tab-box">
         <div class="label">This tab</div>
@@ -24,7 +24,7 @@
         Let my assistant use this tab
       </button>
 
-      <div class="feedback" id="feedback" hidden></div>
+      <div class="feedback" id="feedback" role="status" aria-live="polite" aria-atomic="true" hidden></div>
 
       <footer class="footer">
         Or just ask your assistant to <em>"look at my browser"</em>.
