@@ -9,6 +9,9 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AtcError } from "../../src/contracts/errors.js";
 import { EXTENSION_NAVIGATION_TIMEOUT_MS } from "../../src/contracts/extension.js";
+import { resolvePaths } from "../../src/contracts/paths.js";
+import { ContextRegistry } from "../../src/daemon/registry.js";
+import { DaemonService } from "../../src/daemon/service.js";
 import { ExtensionBridge } from "../../src/drivers/extension/bridge.js";
 import { ExtensionDriver } from "../../src/drivers/extension/driver.js";
 import { parseExtensionMessage } from "../../src/drivers/extension/messages.js";
@@ -75,6 +78,13 @@ let socketPath: string;
 let bridge: ExtensionBridge;
 let driver: ExtensionDriver;
 let host: FakeHost;
+
+function daemon(): { service: DaemonService; registry: ContextRegistry } {
+  const paths = resolvePaths({ ATC_HOME: dir });
+  const registry = new ContextRegistry({ statePath: paths.state });
+  const service = new DaemonService({ registry, paths, env: {}, extensionBridge: bridge, extensionDriver: driver, driverFactory: () => driver });
+  return { service, registry };
+}
 
 async function connectBrowser(tabs: Json[] = [{ id: 7, url: "http://localhost:3000/app", title: "My App", active: true }]): Promise<void> {
   host = await FakeHost.connect(socketPath);
@@ -161,6 +171,63 @@ describe("ExtensionBridge", () => {
     host.socket.destroy();
     await until(() => bridge.connected().length === 0);
     await expect(bridge.dispatch(TAB, "location")).rejects.toMatchObject({ code: "ACTION_FAILED" });
+  });
+
+  it("closes disconnected daemon contexts once and starts capture when rebound", async () => {
+    await connectBrowser();
+    const { service, registry } = daemon();
+    const binding = service.handle({ method: "bind", params: { tab: TAB } });
+    await host.answer({ ok: true });
+    const bound = await binding;
+    if (!bound.ok || typeof bound.context !== "string") throw new Error("binding did not create a context");
+    const session = registry.session(bound.context);
+    if (session === undefined) throw new Error("binding did not create a session");
+    let closed = 0;
+    driver.onDisconnect(session, () => (closed += 1));
+    host.socket.destroy();
+    await until(() => bridge.connected().length === 0);
+    expect(closed).toBe(1);
+    expect(registry.get(bound.context)?.status).toBe("closed");
+    expect(registry.current).toBeNull();
+    expect(await service.handle({ method: "inspect", params: { context: bound.context } })).toMatchObject({ ok: false, error: "CONTEXT_CLOSED" });
+    await connectBrowser();
+    const rebinding = service.handle({ method: "bind", params: { tab: TAB } });
+    expect(await host.answer({ ok: true })).toMatchObject({ action: "watch", tabId: 7 });
+    const rebound = await rebinding;
+    expect(rebound).toMatchObject({ ok: true, reused: false });
+    expect(rebound.ok && rebound.context).not.toBe(bound.context);
+    expect(closed).toBe(1);
+  });
+
+  it("invalidates replaced connections without closing their replacement sessions", async () => {
+    await connectBrowser();
+    const binding = driver.bindTab(TAB);
+    await host.answer({ ok: true });
+    let closed = 0;
+    driver.onDisconnect(await binding, () => (closed += 1));
+    const previousHost = host;
+    try {
+      await connectBrowser([{ id: 7, url: "http://localhost:3000/replacement", title: "Replacement", active: true }]);
+      await until(() => bridge.listTabs()[0]?.title === "Replacement");
+      expect(closed).toBe(1);
+      const rebinding = driver.bindTab(TAB);
+      expect(await host.answer({ ok: true })).toMatchObject({ action: "watch" });
+      const replacement = await rebinding;
+      let replacementClosed = 0;
+      driver.onDisconnect(replacement, () => (replacementClosed += 1));
+      previousHost.send({ type: "tabs", tabs: [] });
+      previousHost.socket.destroy();
+      const inspected = driver.inspect(replacement);
+      await host.answer({ url: "http://localhost:3000/replacement", title: "Replacement", aria: "" });
+      expect(await inspected).toMatchObject({ title: "Replacement" });
+      expect(replacementClosed).toBe(0);
+      expect(closed).toBe(1);
+      host.socket.destroy();
+      await until(() => bridge.connected().length === 0);
+      expect(replacementClosed).toBe(1);
+    } finally {
+      previousHost.socket.destroy();
+    }
   });
 
   it("answers the popup's 'use this tab' request through the pin handler", async () => {

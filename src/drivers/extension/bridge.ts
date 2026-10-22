@@ -30,8 +30,8 @@ export class ExtensionBridge {
     this.startedAt = Date.now();
     this.server = await listenOwnerOnly(socketPath, (socket) => {
       const connection = new ExtensionConnection(socket, {
-        onIdentified: (conn) => this.connections.set(conn.key, conn),
-        onTabs: (conn) => this.tabsListener(conn.key, conn.tabs),
+        onIdentified: (conn) => this.identify(conn),
+        onTabs: (conn) => this.tabsChanged(conn),
         onPin: (tabId) => this.pinHandler(tabId),
       });
       socket.on("close", () => this.forget(connection));
@@ -76,7 +76,19 @@ export class ExtensionBridge {
   }
 
   private forget(connection: ExtensionConnection): void {
-    if (this.connections.get(connection.key) === connection) this.connections.delete(connection.key);
+    if (this.connections.get(connection.key) !== connection) return;
+    this.connections.delete(connection.key);
+    this.tabsListener(connection.key, []);
+  }
+
+  private identify(connection: ExtensionConnection): void {
+    const previous = this.connections.get(connection.key);
+    this.connections.set(connection.key, connection);
+    if (previous !== undefined && previous !== connection) this.tabsListener(connection.key, []);
+  }
+
+  private tabsChanged(connection: ExtensionConnection): void {
+    if (this.connections.get(connection.key) === connection) this.tabsListener(connection.key, connection.tabs);
   }
 }
 
