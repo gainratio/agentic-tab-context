@@ -2,17 +2,31 @@
 
 **Let your coding assistant use the browser tab you already have open.**
 
-## The problem
+Keep your website open and ask Claude Code, Codex or Antigravity for help. Agentic Tab Context connects your assistant to that page, with your existing logins. You write requests in your usual assistant chat.
 
-You ask Claude Code, Codex or Antigravity to check something on a web page. It opens a brand-new browser window. That window isn't logged in, isn't on the page you were looking at, and leaves another stray window behind.
+First time here? Complete the [one-time installation](#one-time-installation), including the steps for your assistant.
 
-## What this does
+## Everyday use: just ask
 
-Agentic Tab Context (the command is `atc`) connects your assistant to the browser you're already using.
+1. **Open your website** in the browser you normally use. Log in yourself if needed.
+2. **Ask your assistant about the page.** For example: “On my open Example app settings page, why does Save do nothing?” Include the site name or address when you have several tabs open.
+3. **The assistant finds the tab and checks it.** It uses the open tabs' titles, addresses, and active-tab information to choose the page. If the target is still unclear, it asks which tab you mean.
 
-Say **"look at my browser"**, and the assistant finds the tab you mean. It can then read that tab, click, type, take screenshots and check for errors. It does all of this in the tab you already have open, with your logins intact.
+You do not need to click the extension for each request or type terminal commands yourself. The assistant uses `atc` to read the page, interact with it, take screenshots, and check errors.
 
-## Quick start (about 2 minutes)
+## Optional: point to one exact tab
+
+If you prefer to choose the page yourself, use the small popup in your browser toolbar:
+
+1. On the page you want help with, open Chrome's **Extensions** menu and select **Agentic Tab Context**. If its icon is pinned, click that directly.
+2. Check the page shown under **This tab**, then press **Let my assistant use this tab**.
+3. Wait for **“Bound. Your assistant can now use this tab.”** Return to your assistant chat and say, “Look at the tab I selected.”
+
+<img src="docs/images/extension-popup.png" width="320" alt="Actual Agentic Tab Context popup showing Connected to atc, the Example app settings tab, the Let my assistant use this tab button, and successful connection feedback.">
+
+*The actual Chrome popup, shown with a local demonstration page. This popup selects a page; your conversation stays in your coding assistant.*
+
+## One-time installation
 
 You need macOS or Linux, Git, [Node.js](https://nodejs.org) 22 or newer with npm, and Chrome (or another Chromium browser). Open the browser once before installing so setup can find its profile. Windows installation is unsupported and stops before writing files.
 
@@ -40,15 +54,13 @@ atc doctor
 
 The `extension.connected` array should list your browser. If not, `nextSteps` tells you what to do. This checks the browser bridge; verify assistant discovery separately using the steps below.
 
-**4. Choose a tab**
-
-Open the page you want help with. Click the extension's icon in the browser toolbar, then **Let my assistant use this tab**. Open the popup from the toolbar, rather than opening `popup.html` as a file.
-
-**5. Connect your assistant and ask**
+**4. Connect your assistant and ask**
 
 Follow the activation steps for [Claude Code](#claude-code), [Codex](#codex), or [Antigravity](#antigravity) below. The installer adds the skill files; your assistant also needs to discover them and be able to run `atc`. Once connected, ask:
 
 > "Look at my browser. The checkout page shows an error after I click Pay. What's wrong?"
+
+The assistant discovers the page automatically. The [toolbar popup](#optional-point-to-one-exact-tab) is an optional way to choose a particular tab; open it from the toolbar rather than opening `popup.html` as a file.
 
 ## Connect your assistant
 
@@ -74,10 +86,10 @@ Setup prints `installedSkills`, `nativeHostManifests`, and `extension.folder`. I
 2. Type `/agentic-tab-context` to select the installed skill, then ask:
 
    ```text
-   /agentic-tab-context Look at my browser and describe the tab I selected.
+   /agentic-tab-context Look at my browser and describe the page I have open.
    ```
 
-3. Confirm it runs `atc` and reports the selected page. If the command is missing, restart Claude Code and check the skill file listed above.
+3. Confirm it runs `atc` and reports the intended page. If the command is missing, restart Claude Code and check the skill file listed above.
 
 The clone also includes a Claude Code plugin manifest. For an optional, session-only plugin load, launch Claude Code with the clone's absolute path:
 
@@ -93,10 +105,10 @@ That exposes `/agentic-tab-context:agentic-tab-context` for that session. It sti
 2. In Codex CLI or the IDE extension, use `/skills` or type `$` and select `agentic-tab-context`. You can invoke it directly with:
 
    ```text
-   $agentic-tab-context Look at my browser and describe the tab I selected.
+   $agentic-tab-context Look at my browser and describe the page I have open.
    ```
 
-3. Confirm Codex runs `atc` and reports the selected page. The desktop app can also use the skill when you explicitly ask it to use `agentic-tab-context`.
+3. Confirm Codex runs `atc` and reports the intended page. The desktop app can also use the skill when you explicitly ask it to use `agentic-tab-context`.
 
 Codex discovers user skills from `~/.agents/skills`; no Claude plugin command is needed. See the official [Codex skills documentation](https://developers.openai.com/codex/skills).
 
@@ -106,16 +118,16 @@ Codex discovers user skills from `~/.agents/skills`; no Claude plugin command is
 2. In the standalone IDE, check **Customizations** in the agent side panel for `agentic-tab-context`. In the Antigravity App, invoke `/agentic-tab-context`, or ask in any surface:
 
    ```text
-   Use the agentic-tab-context skill to describe the browser tab I selected.
+   Use the agentic-tab-context skill to describe the page I have open in my browser.
    ```
 
-3. Confirm the agent runs `atc` and reports the selected page.
+3. Confirm the agent runs `atc` and reports the intended page.
 
 The installer uses Antigravity's documented global skill folder, `~/.gemini/config/skills`. Actual Antigravity discovery and invocation have not been tested in this project. See the official [Antigravity skills documentation](https://antigravity.google/docs/skills/).
 
 ### Verify the whole connection
 
-Ask your assistant to run `atc doctor`, list tabs with `atc tabs`, and inspect the tab you selected with `atc inspect`. Success means it reports the actual page's title and visible content. If the toolbar button has not bound a tab, use `atc bind --tab <id>` with an ID returned by `atc tabs` before inspecting.
+Ask your assistant to run `atc doctor`, list tabs with `atc tabs`, choose the intended page by title or address with `atc bind`, and read it with `atc inspect`. Success means it reports the actual page's title and visible content. These are commands for the assistant to run; manually choosing a tab in the popup is optional.
 
 If the assistant reports `atc: command not found`, check `command -v atc` in its terminal environment. Ensure npm's global executable folder (`npm prefix -g`, followed by `/bin` on macOS/Linux) is on that environment's PATH, then restart the assistant. From the clone, `node bin/atc.js doctor` checks the CLI without the global link.
 
@@ -125,8 +137,6 @@ If the assistant reports `atc: command not found`, check `command -v atc` in its
 - "On the localhost tab, fill in the signup form with test data and submit it."
 - "Check the console on my open dashboard tab for errors."
 - "Take a screenshot of the pricing page I have open."
-
-You can also click the extension's toolbar icon and press **Let my assistant use this tab**.
 
 ## Which browsers work
 
@@ -171,6 +181,14 @@ Element actions require one exact match. Tab binding prefers a unique exact URL/
 Live extension screenshots capture the viewport. `--full-page` is supported for managed windows and explicitly rejected for live tabs.
 
 The full reference (every flag, the output format, error codes) is in [docs/SPEC.md](docs/SPEC.md).
+
+## Optional: Browser MCP and Chrome DevTools
+
+ATC's extension already provides tab discovery, page actions, screenshots, and console/network capture. That is the default connection described above.
+
+For additional debugging, [Chrome DevTools for agents](https://github.com/ChromeDevTools/chrome-devtools-mcp) offers performance traces and deeper browser diagnostics. [Browser MCP](https://browsermcp.io/) is another way to automate an existing browser through its own extension and MCP server. These are optional, separately configured tools; ATC does not install them.
+
+When using another tool, select and verify the intended page in that tool before taking actions. ATC does not currently map its tab IDs to another connector's targets or hand sessions between connectors. Do not assume their current pages are the same. Combined use has not been tested in this project.
 
 ## How it works
 
