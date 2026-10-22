@@ -62,6 +62,21 @@ async function bindActiveTab() {
   }
 }
 
-bindButton.addEventListener("click", () => void bindActiveTab());
-void showStatus();
-void showTab();
+function startPopup() {
+  if (typeof globalThis.chrome?.runtime?.sendMessage !== "function" || typeof globalThis.chrome?.tabs?.query !== "function") {
+    showStandaloneHelp();
+    return;
+  }
+  bindButton.addEventListener("click", () => void bindActiveTab());
+  void showStatus();
+  void showTab();
+}
+
+function showStandaloneHelp() {
+  document.body.classList.add("standalone");
+  statusText.textContent = "Opened outside the browser extension";
+  document.getElementById("standalone-help").hidden = false;
+  for (const element of [bindButton, document.querySelector(".tab-box"), document.querySelector(".footer")]) element.hidden = true;
+}
+
+startPopup();

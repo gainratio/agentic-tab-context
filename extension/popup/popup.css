@@ -16,6 +16,10 @@
   padding: 0;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   width: 320px;
   background: var(--bg);
@@ -134,4 +138,48 @@ body {
 code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   color: #38bdf8;
+}
+
+body.standalone {
+  width: auto;
+  min-height: 100vh;
+  display: grid;
+  place-items: start center;
+  padding: clamp(20px, 8vh, 72px) 16px;
+  font-size: 14px;
+}
+
+.standalone .card {
+  width: min(100%, 560px);
+  padding: 24px;
+  gap: 18px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.standalone .header h1 {
+  font-size: 20px;
+}
+
+.setup-guide h2 {
+  font-size: 18px;
+}
+
+.setup-guide h3 {
+  margin-top: 22px;
+  font-size: 14px;
+}
+
+.setup-guide p, .setup-guide ol {
+  margin-top: 12px;
+  line-height: 1.6;
+}
+
+.setup-guide ol {
+  padding-left: 22px;
+}
+
+.setup-guide li + li {
+  margin-top: 8px;
 }
