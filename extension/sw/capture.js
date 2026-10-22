@@ -1,9 +1,22 @@
-/** A capture changes the active tab, so all captures in one window share a lock. */
+/** Captures share an extension-wide quota and a focus lock for each window. */
 const windowCaptures = new Map();
+const CAPTURE_INTERVAL_MS = Math.ceil(1000 / (chrome.tabs.MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND || 2)) + 1;
+let captureTail = Promise.resolve();
+let nextCaptureAt = 0;
 
 export async function captureTab(tabId) {
   const tab = await chrome.tabs.get(tabId);
-  return inWindow(tab.windowId, () => captureSelected(tabId, tab.windowId));
+  return inWindow(tab.windowId, () => withinQuota(() => captureSelected(tabId, tab.windowId)));
+}
+
+function withinQuota(work) {
+  const result = captureTail.then(async () => {
+    const delay = Math.max(0, nextCaptureAt - performance.now());
+    if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
+    return work();
+  });
+  captureTail = result.then(() => undefined, () => undefined);
+  return result;
 }
 
 function inWindow(windowId, work) {
@@ -19,6 +32,7 @@ async function captureSelected(tabId, windowId) {
   const state = await beginCapture(tabId, windowId);
   try {
     await selectTarget(state);
+    nextCaptureAt = performance.now() + CAPTURE_INTERVAL_MS;
     const data = await chrome.tabs.captureVisibleTab(windowId, { format: "png" });
     await assertTarget(state);
     return data;

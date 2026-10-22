@@ -215,7 +215,7 @@ describe("browser extension end to end", () => {
       const listed = await eventually(() => atc("tabs", "--query", "Capture", "--browser", "chromium"), (r) => tabsOf(r).length === 2);
       for (const index of [0, 1]) ids.push(String((await atc("bind", "--tab", String(tabsOf(listed).find((t) => t.title === `Capture ${index}`)?.tabId))).json.context));
       const shots = await Promise.all(ids.map((id) => atc("screenshot", "--context", id)));
-      expect(shots.map((shot) => shot.json.ok)).toEqual([true, true]);
+      expect(shots.map((shot) => shot.json.ok), JSON.stringify(shots)).toEqual([true, true]);
       for (const [index, shot] of shots.entries()) {
         const data = `data:image/png;base64,${readFileSync(String(shot.json.path)).toString("base64")}`;
         const pixel = await page.evaluate(async (url) => {
