@@ -72,6 +72,7 @@ export class DaemonService {
   route(req: Request): RoutedRequest {
     const raw: unknown = req;
     if (!isRecord(raw) || typeof raw.method !== "string" || !CONTEXT_METHODS.has(raw.method)) return { key: null, request: req };
+    if (raw.params !== undefined && !isRecord(raw.params)) return { key: null, request: req };
     const params = isRecord(raw.params) ? raw.params : {};
     const explicit = params.context;
     if (typeof explicit === "string") return { key: explicit, request: req };
@@ -108,13 +109,15 @@ export class DaemonService {
     const browser = requireBrowser(params);
     const profile = profileParam(params);
     const headless = optionalBoolean(params, "headless") ?? this.env.ATC_HEADLESS === "1";
+    const makeCurrent = optionalBoolean(params, "use") ?? false;
     const driver = this.driverFor(browser);
     const session = await driver.open({ profile, headless });
-    const ctx = this.registry.create({ browser, profile, createdAt: this.now().toISOString() }, session);
+    const identity = session.tabId === undefined ? {} : { source: "managed" as const, tabId: session.tabId };
+    const ctx = this.registry.create({ browser, profile, ...identity, createdAt: this.now().toISOString() }, session);
     this.attach(ctx.id, driver, session);
     await refreshLocation(this.registry, ctx.id, driver, session);
     const stillOpen = this.registry.session(ctx.id) === session;
-    if (stillOpen && ((optionalBoolean(params, "use") ?? false) || this.registry.current === null)) this.registry.setCurrent(ctx.id);
+    if (stillOpen && (makeCurrent || this.registry.current === null)) this.registry.setCurrent(ctx.id);
     return { ok: true, context: ctx.id, browser, profile, current: this.registry.current === ctx.id };
   }
 

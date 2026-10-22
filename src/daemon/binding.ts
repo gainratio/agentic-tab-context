@@ -23,6 +23,8 @@ export interface BinderDeps {
 }
 
 export class TabBinder {
+  private readonly pendingBindings = new Map<string, Promise<void>>();
+
   constructor(private readonly deps: BinderDeps) {}
 
   async tabs(params: Params): Promise<OkResponse> {
@@ -36,11 +38,7 @@ export class TabBinder {
   async bind(params: Params): Promise<OkResponse> {
     const options = parseBindOptions(params);
     const chosen = selectTabToBind(await this.discover(), options);
-    const makeCurrent = options.use ?? true;
-    const { registry } = this.deps;
-    const existing = chosen.context === undefined ? registry.findOpenByTabId(chosen.tabId) : registry.get(chosen.context);
-    if (existing?.status === "open") return this.reuse(existing, chosen, makeCurrent);
-    return this.bindNew(chosen, makeCurrent);
+    return this.bindSerialized(chosen, options.use ?? true);
   }
 
   async discover(): Promise<LiveTab[]> {
@@ -52,6 +50,21 @@ export class TabBinder {
   private reuse(existing: TabContext, chosen: LiveTab, makeCurrent: boolean): OkResponse {
     if (makeCurrent) this.deps.registry.setCurrent(existing.id);
     return this.bound(existing.id, chosen, true);
+  }
+
+  private bindSerialized(tab: LiveTab, makeCurrent: boolean): Promise<OkResponse> {
+    const previous = this.pendingBindings.get(tab.tabId) ?? Promise.resolve();
+    const result = previous.then(() => this.bindSelected(tab, makeCurrent));
+    const tail = result.then(() => undefined, () => undefined);
+    this.pendingBindings.set(tab.tabId, tail);
+    void tail.then(() => { if (this.pendingBindings.get(tab.tabId) === tail) this.pendingBindings.delete(tab.tabId); });
+    return result;
+  }
+
+  private bindSelected(tab: LiveTab, makeCurrent: boolean): Promise<OkResponse> {
+    const { registry } = this.deps;
+    const existing = registry.findOpenByTabId(tab.tabId) ?? (tab.context === undefined ? undefined : registry.get(tab.context));
+    return existing?.status === "open" ? Promise.resolve(this.reuse(existing, tab, makeCurrent)) : this.bindNew(tab, makeCurrent);
   }
 
   private async bindNew(chosen: LiveTab, makeCurrent: boolean): Promise<OkResponse> {

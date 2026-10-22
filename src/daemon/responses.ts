@@ -15,7 +15,7 @@ export function parseRequest(raw: unknown, methods: Readonly<Record<Method, unkn
   if (!Object.hasOwn(methods, raw.method)) {
     throw new AtcError("INVALID_ARGUMENT", `unknown method: ${raw.method.slice(0, 64)}`);
   }
-  const params = raw.params ?? {};
+  const params = raw.params === undefined ? {} : raw.params;
   if (!isRecord(params)) throw new AtcError("INVALID_ARGUMENT", "params must be an object");
   return { method: raw.method as Method, params };
 }

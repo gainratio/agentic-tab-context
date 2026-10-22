@@ -112,6 +112,8 @@ export interface OpenOptions {
 /** Opaque handle owned by a driver. The daemon never looks inside. */
 export interface BrowserSession {
   readonly sessionId: string;
+  /** Stable target identity, when the driver can enumerate and rebind tabs. */
+  readonly tabId?: string;
 }
 
 /** One adapter per browser family. Every method is deterministic: it never guesses. */

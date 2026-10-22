@@ -6,13 +6,14 @@ import type { Socket } from "node:net";
 
 export interface LineHandlers {
   onLine: (line: string) => void;
-  /** Called once if a single line grows past `maxBytes`; the buffer is dropped. */
+  /** Called once if a line exceeds `maxBytes`; the remaining stream is ignored. */
   onOverflow: () => void;
 }
 
 /** Splits a UTF-8 socket stream into complete lines, enforcing a per-line byte cap. */
 export class LineSplitter {
   private buffer = "";
+  private overflowed = false;
   private readonly maxBytes: number;
   private readonly handlers: LineHandlers;
 
@@ -22,18 +23,30 @@ export class LineSplitter {
   }
 
   push(chunk: string): void {
+    if (this.overflowed) return;
     this.buffer += chunk;
     let newline = this.buffer.indexOf("\n");
     while (newline !== -1) {
       const line = this.buffer.slice(0, newline);
       this.buffer = this.buffer.slice(newline + 1);
-      if (line.trim() !== "") this.handlers.onLine(line);
+      if (!this.acceptLine(line)) return;
       newline = this.buffer.indexOf("\n");
     }
-    if (Buffer.byteLength(this.buffer) > this.maxBytes) {
-      this.buffer = "";
-      this.handlers.onOverflow();
-    }
+    this.withinLimit(this.buffer);
+  }
+
+  private acceptLine(line: string): boolean {
+    if (!this.withinLimit(line)) return false;
+    if (line.trim() !== "") this.handlers.onLine(line);
+    return true;
+  }
+
+  private withinLimit(text: string): boolean {
+    if (Buffer.byteLength(text) <= this.maxBytes) return true;
+    this.buffer = "";
+    this.overflowed = true;
+    this.handlers.onOverflow();
+    return false;
   }
 }
 

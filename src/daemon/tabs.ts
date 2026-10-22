@@ -49,7 +49,7 @@ function attachContextIds(registry: ContextRegistry, tabs: LiveTab[]): LiveTab[]
   const open = registry.list().filter((c) => c.status === "open");
   return tabs.map((tab) => {
     if (tab.context !== undefined) return tab;
-    const match = open.find((c) => c.tabId === tab.tabId || (c.source === undefined && c.url === tab.url && c.browser === tab.browser));
+    const match = open.find((c) => c.tabId === tab.tabId && c.browser === tab.browser && c.source === tab.source);
     return match === undefined ? tab : { ...tab, context: match.id };
   });
 }

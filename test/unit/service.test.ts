@@ -116,6 +116,16 @@ describe("open", () => {
     });
   });
 
+  it.each([null, "yes", 1, {}, []].map((use) => ({ use })))("rejects invalid open.use before creating a driver or context: $use", async ({ use }) => {
+    expect(await call({ method: "open", params: { browser: "chromium", use } })).toMatchObject({
+      ok: false,
+      error: "INVALID_ARGUMENT",
+    });
+    expect(factoryCalls).toEqual([]);
+    expect(registry.list()).toEqual([]);
+    expect(registry.current).toBeNull();
+  });
+
   it("passes UNSUPPORTED_BROWSER through with details", async () => {
     expect(await call({ method: "open", params: { browser: "safari" } })).toEqual({
       ok: false,
@@ -429,6 +439,7 @@ describe("protocol-level", () => {
     expect(await call({ params: {} })).toMatchObject({ error: "INVALID_ARGUMENT" });
     expect(await call(null)).toMatchObject({ error: "INVALID_ARGUMENT" });
     expect(await call({ method: "list", params: 3 })).toMatchObject({ error: "INVALID_ARGUMENT" });
+    expect(await call({ method: "list", params: null })).toMatchObject({ error: "INVALID_ARGUMENT" });
     expect(await call({ method: "toString", params: {} })).toMatchObject({ error: "INVALID_ARGUMENT" });
   });
 

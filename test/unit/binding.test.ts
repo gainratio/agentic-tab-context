@@ -101,6 +101,76 @@ describe("binding through the daemon", () => {
     expect(live.bound).toHaveLength(1);
   });
 
+  it("does not identify an extension tab by an unrelated managed context's URL", async () => {
+    const paths = resolvePaths({ ATC_HOME: home });
+    const registry = new ContextRegistry({ statePath: paths.state, random: sequenceRandom([0x0010, 0x0020]) });
+    const managed = new FakeDriver("chrome");
+    const extension = new FakeLiveDriver(TABS.filter((tab) => tab.source === "extension"));
+    service = new DaemonService({ registry, paths, env: {}, extensionDriver: extension, driverFactory: () => managed });
+    const opened = await service.handle({ method: "open", params: { browser: "chrome" } });
+    await service.handle({ method: "goto", params: { url: TABS[0]?.url } });
+    const bound = await service.handle({ method: "bind", params: { tab: TABS[0]?.tabId } });
+    expect(bound).toMatchObject({ ok: true, source: "extension", reused: false });
+    expect(bound.ok && bound.context).not.toBe(opened.ok && opened.context);
+    await service.handle({ method: "click", params: { target: { kind: "text", text: "Submit" } } });
+    expect(extension.bound).toEqual([TABS[0]?.tabId]);
+    expect(managed.calls.filter((call) => call.method === "click")).toHaveLength(0);
+    expect(extension.calls.filter((call) => call.method === "click")).toHaveLength(1);
+  });
+
+  it("persists the stable managed tab identity and reuses its original open context", async () => {
+    const paths = resolvePaths({ ATC_HOME: home });
+    const registry = new ContextRegistry({ statePath: paths.state, random: sequenceRandom([0x0010, 0x0020]) });
+    const tabId = "managed:chrome:owner:1";
+    class ManagedDriver extends FakeDriver {
+      readonly bound: string[] = [];
+      override async open(options: Parameters<FakeDriver["open"]>[0]): Promise<BrowserSession> {
+        return { ...await super.open(options), tabId };
+      }
+      listTabs(): Promise<LiveTab[]> {
+        return Promise.resolve([{ tabId, browser: "chrome", source: "managed", url: "about:blank", title: "", active: true }]);
+      }
+      bindTab(id: string): Promise<BrowserSession> {
+        this.bound.push(id);
+        return Promise.resolve({ sessionId: this.sessionIds()[0] ?? "", tabId });
+      }
+    }
+    const managed = new ManagedDriver("chrome");
+    service = new DaemonService({ registry, paths, env: {}, driverFactory: () => managed });
+    const opened = await service.handle({ method: "open", params: { browser: "chrome" } });
+    if (!opened.ok) throw new Error(opened.message);
+    expect(registry.get(String(opened.context))).toMatchObject({ source: "managed", tabId });
+    expect(await service.handle({ method: "bind", params: { tab: tabId } })).toMatchObject({ context: opened.context, reused: true });
+    expect(managed.bound).toHaveLength(0);
+  });
+
+  it("deduplicates concurrent binds to the same stable tab", async () => {
+    let release = (): void => undefined;
+    let started = (): void => undefined;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    const entered = new Promise<void>((resolve) => { started = resolve; });
+    const originalBind = live.bindTab.bind(live);
+    let entries = 0;
+    live.bindTab = async (tabId) => {
+      entries += 1;
+      started();
+      await pending;
+      return originalBind(tabId);
+    };
+    const first = service.handle({ method: "bind", params: { tab: "macos:safari:1:1" } });
+    await entered;
+    const second = service.handle({ method: "bind", params: { tab: "macos:safari:1:1" } });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    const beforeRelease = entries;
+    release();
+    const [a, b] = await Promise.all([first, second]);
+    expect(beforeRelease).toBe(1);
+    expect(a).toMatchObject({ ok: true, reused: false });
+    expect(b).toMatchObject({ ok: true, reused: true });
+    expect(a.ok && a.context).toBe(b.ok && b.context);
+    expect(live.bound).toEqual(["macos:safari:1:1"]);
+  });
+
   it("marks the context closed when the live tab goes away", async () => {
     await service.handle({ method: "bind", params: { query: "aml-filter" } });
     live.disconnect(live.sessionIds()[0] ?? "");

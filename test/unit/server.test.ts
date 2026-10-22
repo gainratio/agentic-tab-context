@@ -109,6 +109,15 @@ describe("startServer", () => {
     expect(await send(5, { method: "ping", params: {} })).toMatchObject({ id: 5, response: { ok: true } });
   });
 
+  it.each([[], null, 42, "invalid"].map((params) => ({ params })))("rejects malformed close params before routing to the current context: $params", async ({ params }) => {
+    await start();
+    const context = await openContext(1);
+    const [reply] = await sendRaw(`${JSON.stringify({ id: 2, request: { method: "close", params } })}\n`);
+    expect(reply).toMatchObject({ id: 2, response: { ok: false, error: "INVALID_ARGUMENT" } });
+    expect(driver.calls.filter((call) => call.method === "close")).toHaveLength(0);
+    expect(await send(3, { method: "inspect", params: { context } })).toMatchObject({ response: { ok: true, context } });
+  });
+
   it("removes a stale socket file nobody answers on", async () => {
     await mkdir(paths.home, { recursive: true });
     // Simulate a crashed daemon: a process listens, then dies by SIGKILL, leaving the file.
