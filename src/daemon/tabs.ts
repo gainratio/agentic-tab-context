@@ -15,20 +15,28 @@ export interface TabCollectorDeps {
 export async function collectAllTabs(deps: TabCollectorDeps): Promise<LiveTab[]> {
   const extTabs = (await deps.extensionDriver?.listTabs?.().catch(() => [])) ?? [];
   const extBrowsers = new Set(extTabs.map((t) => t.browser));
-  const managedTabs = await collectManagedTabs(deps.registry, deps.drivers);
+  const managedTabs = await collectManagedTabs(deps);
   const macosTabs = ((await deps.macosDriver?.listTabs?.().catch(() => [])) ?? []).filter(
     (t) => !extBrowsers.has(t.browser),
   );
   return attachContextIds(deps.registry, [...extTabs, ...managedTabs, ...macosTabs]);
 }
 
-async function collectManagedTabs(
-  registry: ContextRegistry,
-  drivers: ReadonlyMap<BrowserName, BrowserDriver>,
-): Promise<LiveTab[]> {
-  const unique = [...new Set(drivers.values())].filter((driver) => driver.listTabs !== undefined);
+async function collectManagedTabs(deps: TabCollectorDeps): Promise<LiveTab[]> {
+  const unique = [...new Set(deps.drivers.values())].filter(
+    (driver) => driver !== deps.extensionDriver && driver !== deps.macosDriver && driver.name !== "extension" && driver.listTabs !== undefined,
+  );
   const listed = (await Promise.all(unique.map((driver) => driver.listTabs?.().catch(() => []) ?? []))).flat();
-  return listed.length > 0 ? listed : registryManagedTabs(registry);
+  return listed.length > 0 ? listed : registryManagedTabs(deps.registry);
+}
+
+/** `open extension` selects the same existing tab as the extension driver's open operation. */
+export async function extensionTabToOpen(driver: BrowserDriver | undefined): Promise<LiveTab> {
+  if (driver === undefined) throw new AtcError("UNSUPPORTED_BROWSER", "browser extension support is unavailable");
+  const tabs = (await driver.listTabs?.()) ?? [];
+  const chosen = tabs.find((tab) => tab.active) ?? tabs[0];
+  if (chosen === undefined) throw new AtcError("TARGET_NOT_FOUND", "no browser extension is connected; run `atc doctor` for setup steps");
+  return chosen;
 }
 
 /** Fallback when no managed driver can list pages: describe open managed contexts from the registry. */

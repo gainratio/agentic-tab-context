@@ -12,6 +12,7 @@ import { type Handler, PageCommands, type Resolved, refreshLocation } from "./pa
 import { type Params, isRecord, optionalBoolean, optionalString, profileParam, requireBrowser, requireString } from "./params.js";
 import type { ContextRegistry } from "./registry.js";
 import { noCurrent, parseRequest, redact, toErrorResponse, typedValueOf } from "./responses.js";
+import { extensionTabToOpen } from "./tabs.js";
 
 export interface DaemonServiceDeps {
   registry: ContextRegistry;
@@ -110,6 +111,7 @@ export class DaemonService {
     const profile = profileParam(params);
     const headless = optionalBoolean(params, "headless") ?? this.env.ATC_HEADLESS === "1";
     const makeCurrent = optionalBoolean(params, "use") ?? false;
+    if (browser === "extension") return this.binder.bind({ tab: (await extensionTabToOpen(this.deps.extensionDriver)).tabId, use: makeCurrent });
     const driver = this.driverFor(browser);
     const session = await driver.open({ profile, headless });
     const identity = session.tabId === undefined ? {} : { source: "managed" as const, tabId: session.tabId };

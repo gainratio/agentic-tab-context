@@ -21,6 +21,7 @@ const INSTANCE = "0a1b2c3d";
 const TAB = `ext:chromium-${INSTANCE}:7`;
 
 class FakeHost {
+  commandHandler: ((command: Json) => void) | null = null;
   private buffer = "";
   private readonly inbox: Json[] = [];
   private waiter: ((message: Json) => void) | null = null;
@@ -60,6 +61,10 @@ class FakeHost {
     for (let i = this.buffer.indexOf("\n"); i !== -1; i = this.buffer.indexOf("\n")) {
       const message = JSON.parse(this.buffer.slice(0, i)) as Json;
       this.buffer = this.buffer.slice(i + 1);
+      if (message.type === "command" && this.commandHandler !== null) {
+        this.commandHandler(message);
+        continue;
+      }
       const waiter = this.waiter;
       this.waiter = null;
       if (waiter === null) this.inbox.push(message);
@@ -197,6 +202,25 @@ describe("ExtensionBridge", () => {
     expect(rebound).toMatchObject({ ok: true, reused: false });
     expect(rebound.ok && rebound.context).not.toBe(bound.context);
     expect(closed).toBe(1);
+  });
+
+  it("opens and rebinds one extension context without duplicating live tabs", async () => {
+    await connectBrowser();
+    const commands: Json[] = [];
+    host.commandHandler = (command) => {
+      commands.push(command);
+      host.send({ type: "result", id: command.id, ok: true, result: { url: "http://localhost:3000/app", title: "My App", aria: "" } });
+    };
+    const { service, registry } = daemon();
+    const opened = await service.handle({ method: "open", params: { browser: "extension" } });
+    if (!opened.ok || typeof opened.context !== "string") throw new Error("extension open failed");
+    expect(await service.handle({ method: "bind", params: { tab: TAB } })).toMatchObject({ ok: true, context: opened.context, reused: true });
+    expect(registry.get(opened.context)).toMatchObject({ source: "extension", tabId: TAB, browser: "chromium" });
+    expect(await service.handle({ method: "open", params: { browser: "extension" } })).toMatchObject({ ok: true, context: opened.context, reused: true });
+    const listed = await service.handle({ method: "tabs", params: {} });
+    expect(listed.ok && listed.tabs).toEqual([expect.objectContaining({ tabId: TAB, context: opened.context, source: "extension" })]);
+    expect(registry.openSessions()).toHaveLength(1);
+    expect(commands.filter((command) => command.action === "watch")).toHaveLength(1);
   });
 
   it("invalidates replaced connections without closing their replacement sessions", async () => {
