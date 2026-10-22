@@ -14,7 +14,7 @@ Say **"look at my browser"**, and the assistant finds the tab you mean. It can t
 
 ## Quick start (about 2 minutes)
 
-You need macOS or Linux, [Node.js](https://nodejs.org) 22 or newer, and Chrome (or another Chromium browser). Windows installation is unsupported and stops before writing files.
+You need macOS or Linux, Git, [Node.js](https://nodejs.org) 22 or newer with npm, and Chrome (or another Chromium browser). Open the browser once before installing so setup can find its profile. Windows installation is unsupported and stops before writing files.
 
 **1. Install**
 
@@ -24,7 +24,7 @@ cd agentic-tab-context
 ./install.sh
 ```
 
-This puts `atc` on your PATH and teaches Claude Code, Codex and Antigravity how to use it.
+This builds the CLI, links `atc` into npm's global executable folder, installs the assistant skill for all three assistants, and registers the browser bridge. Keep the clone in place: the CLI and browser bridge use files inside it.
 
 **2. Add the browser extension**
 
@@ -32,17 +32,92 @@ This puts `atc` on your PATH and teaches Claude Code, Codex and Antigravity how 
 2. Turn on **Developer mode** (top right).
 3. Click **Load unpacked** and choose the `extension` folder inside this project.
 
-**3. Check it works**
+**3. Check the browser connection**
 
 ```sh
 atc doctor
 ```
 
-The `extension` section should list your browser as connected. If not, `nextSteps` tells you what to do.
+The `extension.connected` array should list your browser. If not, `nextSteps` tells you what to do. This checks the browser bridge; verify assistant discovery separately using the steps below.
 
-**4. Ask your assistant**
+**4. Choose a tab**
+
+Open the page you want help with. Click the extension's icon in the browser toolbar, then **Let my assistant use this tab**. Open the popup from the toolbar, rather than opening `popup.html` as a file.
+
+**5. Connect your assistant and ask**
+
+Follow the activation steps for [Claude Code](#claude-code), [Codex](#codex), or [Antigravity](#antigravity) below. The installer adds the skill files; your assistant also needs to discover them and be able to run `atc`. Once connected, ask:
 
 > "Look at my browser. The checkout page shows an error after I click Pay. What's wrong?"
+
+## Connect your assistant
+
+There are two pieces: the **browser extension** gives access to your open tabs, and an **assistant skill** teaches your coding assistant to run `atc`. The standard installation uses local skill folders; it requires no MCP server or marketplace registration. Run the assistant on the same machine as the browser.
+
+`./install.sh` already installs all three skill copies. If you installed the CLI earlier and need to add or refresh them, run:
+
+```sh
+atc setup
+```
+
+Setup prints `installedSkills`, `nativeHostManifests`, and `extension.folder`. It replaces the bundled skill copies at these locations:
+
+| Assistant | Skill file installed for your user account |
+|---|---|
+| Claude Code | `~/.claude/skills/agentic-tab-context/SKILL.md` |
+| Codex | `~/.agents/skills/agentic-tab-context/SKILL.md` |
+| Antigravity | `~/.gemini/config/skills/agentic-tab-context/SKILL.md` |
+
+### Claude Code
+
+1. Start a new local Claude Code session after installation.
+2. Type `/agentic-tab-context` to select the installed skill, then ask:
+
+   ```text
+   /agentic-tab-context Look at my browser and describe the tab I selected.
+   ```
+
+3. Confirm it runs `atc` and reports the selected page. If the command is missing, restart Claude Code and check the skill file listed above.
+
+The clone also includes a Claude Code plugin manifest. For an optional, session-only plugin load, launch Claude Code with the clone's absolute path:
+
+```sh
+claude --plugin-dir /absolute/path/to/agentic-tab-context
+```
+
+That exposes `/agentic-tab-context:agentic-tab-context` for that session. It still needs the CLI and browser setup above. The standard skill installation is sufficient; the local plugin route has not been exercised in this project's end-to-end tests. See Claude Code's [skills](https://code.claude.com/docs/en/skills) and [local plugin loading](https://code.claude.com/docs/en/plugins/install) documentation.
+
+### Codex
+
+1. Start a new local Codex chat after installation. If the skill is missing, restart Codex.
+2. In Codex CLI or the IDE extension, use `/skills` or type `$` and select `agentic-tab-context`. You can invoke it directly with:
+
+   ```text
+   $agentic-tab-context Look at my browser and describe the tab I selected.
+   ```
+
+3. Confirm Codex runs `atc` and reports the selected page. The desktop app can also use the skill when you explicitly ask it to use `agentic-tab-context`.
+
+Codex discovers user skills from `~/.agents/skills`; no Claude plugin command is needed. See the official [Codex skills documentation](https://developers.openai.com/codex/skills).
+
+### Antigravity
+
+1. Start a new local Antigravity conversation after installation; restart the app if the skill is missing.
+2. In the standalone IDE, check **Customizations** in the agent side panel for `agentic-tab-context`. In the Antigravity App, invoke `/agentic-tab-context`, or ask in any surface:
+
+   ```text
+   Use the agentic-tab-context skill to describe the browser tab I selected.
+   ```
+
+3. Confirm the agent runs `atc` and reports the selected page.
+
+The installer uses Antigravity's documented global skill folder, `~/.gemini/config/skills`. Actual Antigravity discovery and invocation have not been tested in this project. See the official [Antigravity skills documentation](https://antigravity.google/docs/skills/).
+
+### Verify the whole connection
+
+Ask your assistant to run `atc doctor`, list tabs with `atc tabs`, and inspect the tab you selected with `atc inspect`. Success means it reports the actual page's title and visible content. If the toolbar button has not bound a tab, use `atc bind --tab <id>` with an ID returned by `atc tabs` before inspecting.
+
+If the assistant reports `atc: command not found`, check `command -v atc` in its terminal environment. Ensure npm's global executable folder (`npm prefix -g`, followed by `/bin` on macOS/Linux) is on that environment's PATH, then restart the assistant. From the clone, `node bin/atc.js doctor` checks the CLI without the global link.
 
 ## Things you can ask
 
@@ -57,7 +132,7 @@ You can also click the extension's toolbar icon and press **Let my assistant use
 
 | Browser | Uses your open tabs? | Status |
 |---|---|---|
-| Chrome, Chromium | Yes, with the extension | Chromium tested automatically on every change; installed Google Chrome not separately tested |
+| Chrome, Chromium | Yes, with the extension | Chromium tested automatically on every change; installed Google Chrome 155 tested locally on macOS for toolbar binding, page actions, screenshots, logs, redaction, and close/rebind |
 | Brave, Edge | Yes, with the extension | Same engine as Chrome; not tested yet |
 | Firefox | Extension is written to support it | Not tested yet |
 | Safari (Mac) | Discovery only: can list tabs; binding and actions are unsupported because Safari exposes no stable tab identity | Discovery tested with simulated responses; physical Safari unverified |
@@ -115,6 +190,8 @@ The first `atc` command starts a small background service. It remembers which ta
 | You see | Do this |
 |---|---|
 | `atc doctor` shows no connected extension | Run `atc setup`, then reload the extension at `chrome://extensions` |
+| Extension connected, but the assistant cannot find the skill | Follow [Connect your assistant](#connect-your-assistant); check its installed skill file and start a new session |
+| Assistant reports `atc: command not found` | Check npm's global executable folder is on the assistant's PATH; see [Verify the whole connection](#verify-the-whole-connection) |
 | "blocks page access from other apps" | Install the extension, or turn on the Apple Events setting above |
 | `AMBIGUOUS_TARGET` | Several things matched. Use `atc tabs` and `atc bind --tab <id>`, or add `--nth 1` for elements |
 | Safari binding is unsupported | Use tab discovery only, or choose a supported Chromium browser |
