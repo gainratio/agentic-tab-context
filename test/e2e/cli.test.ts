@@ -23,7 +23,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await atc("shutdown");
   await fixtures.close();
-  rmSync(home, { recursive: true, force: true });
+  rmSync(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
 describe("atc end to end (managed window)", () => {
