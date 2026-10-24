@@ -60,8 +60,8 @@ afterAll(async () => {
   await atc("shutdown");
   await context?.close();
   await fixtures?.close();
-  rmSync(home, { recursive: true, force: true });
-  rmSync(userDataDir, { recursive: true, force: true });
+  rmSync(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  rmSync(userDataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
 describe("browser extension end to end", () => {
