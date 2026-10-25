@@ -1,6 +1,6 @@
 {
   "name": "agentic-tab-context",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Let your coding assistant use the browser tab you already have open, instead of opening a new one.",
   "license": "MIT",
   "private": true,
@@ -16,7 +16,15 @@
   "bin": {
     "atc": "bin/atc.js"
   },
-  "files": ["bin/", "dist/", "extension/", "skills/", "README.md", "PRIVACY.md", "LICENSE"],
+  "files": [
+    "bin/",
+    "dist/",
+    "extension/",
+    "skills/",
+    "README.md",
+    "PRIVACY.md",
+    "LICENSE"
+  ],
   "engines": {
     "node": ">=22"
   },

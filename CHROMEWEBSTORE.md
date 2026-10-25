@@ -81,4 +81,5 @@ https://github.com/gainratio/agentic-tab-context/blob/main/PRIVACY.md (works onc
 
 | Version | Date | Changes | Status |
 |---|---|---|---|
+| 0.4.0 | 2026-10-25 | `press`, `upload`, `eval`, and `--within` scoped locators; normalized accessible-name fallback; page agent v3 | Draft |
 | 0.3.0 | 2026-10-22 | Native messaging replaces the localhost port; isolated-world page access; screenshots restore the user's tab | Draft |
