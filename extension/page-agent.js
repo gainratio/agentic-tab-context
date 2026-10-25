@@ -23,7 +23,6 @@ globalThis.__atcAgent =
           if (op.op === "logs") return this.logs(op.kind, op.since);
           return { ok: false, error: "INVALID_ARGUMENT", message: "unknown page operation" };
         },
-
         visible(el) {
           if (!(el instanceof Element) || el.closest("[hidden], [aria-hidden='true']")) return false;
           const style = getComputedStyle(el);
@@ -31,7 +30,6 @@ globalThis.__atcAgent =
           const rect = el.getBoundingClientRect();
           return rect.width > 0 && rect.height > 0;
         },
-
         role(el) {
           const explicit = el.getAttribute("role");
           if (explicit) return explicit;
@@ -44,7 +42,6 @@ globalThis.__atcAgent =
           if (tag === "textarea" || tag === "input") return "textbox";
           return /^h[1-6]$/.test(tag) ? "heading" : "";
         },
-
         label(el) {
           const aria = el.getAttribute("aria-label");
           if (aria) return aria.trim();
@@ -56,18 +53,15 @@ globalThis.__atcAgent =
           for (const control of clone.querySelectorAll("input,select,textarea,button")) control.remove();
           return (clone.textContent || "").trim();
         },
-
         name(el) {
           const label = this.label(el);
           if (label) return label;
           if (el instanceof HTMLInputElement && ["button", "submit", "reset"].includes(el.type)) return el.value.trim();
           return this.text(el);
         },
-
         text(el) {
           return (el.textContent || "").replace(/\s+/g, " ").trim();
         },
-
         describe(el) {
           const role = this.role(el);
           const name = JSON.stringify(this.name(el));
@@ -80,12 +74,10 @@ globalThis.__atcAgent =
           if (["heading", "button", "link", "checkbox", "radio"].includes(role) && this.name(el)) return [`- ${role} ${name}`];
           return el.children.length === 0 && this.text(el) ? [`- text: ${this.text(el)}`] : [];
         },
-
         inspect() {
           const lines = this.elements(document.body).filter((el) => this.visible(el)).flatMap((el) => this.describe(el));
           return { url: location.href, title: document.title, aria: lines.join("\n") };
         },
-
         elements(root = document) {
           const elements = root ? [...root.querySelectorAll("*")] : [];
           for (const el of [...elements]) {
@@ -93,19 +85,29 @@ globalThis.__atcAgent =
           }
           return elements;
         },
-
         candidates(target) {
           const all = this.elements();
           if (target.kind === "selector") return all.filter((el) => el.matches(target.selector));
           if (target.kind === "role") {
-            return all.filter((el) => this.role(el) === target.role && (target.name === undefined || this.name(el) === target.name));
+            const byRole = all.filter((el) => this.role(el) === target.role);
+            if (target.name === undefined) return byRole;
+            const exact = byRole.filter((el) => this.name(el) === target.name);
+            if (exact.length > 0) return exact;
+            return this.nameFallback(byRole, target.name);
           }
           if (target.kind === "label") return all.filter((el) => /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName) && this.label(el) === target.label);
           if (target.kind === "text") return all.filter((el) => this.text(el) === target.text);
           const attribute = target.kind === "placeholder" ? "placeholder" : "data-testid";
           return all.filter((el) => el.getAttribute(attribute) === target[target.kind]);
         },
-
+        nameFallback(byRole, wanted) {
+          const needle = this.normalizeName(wanted);
+          if (needle.length < 6) return [];
+          return byRole.filter((el) => this.normalizeName(this.name(el)).includes(needle));
+        },
+        normalizeName(value) {
+          return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+        },
         pick(target, label) {
           const matches = this.candidates(target).filter((el) => this.visible(el));
           const count = matches.length;
@@ -117,7 +119,6 @@ globalThis.__atcAgent =
           if (index >= count) return { error: "TARGET_NOT_FOUND", message: `nth=${index} is out of range (${count} matched)`, matched: count };
           return { element: matches[index] };
         },
-
         act(op) {
           const picked = this.pick(op.target, op.label);
           if (!picked.element) return { ok: false, ...picked };
@@ -138,12 +139,10 @@ globalThis.__atcAgent =
           target.dispatchEvent(new KeyboardEvent("keyup", init));
           return { ok: true, matched: 1 };
         },
-
         pressKey(raw) {
           const key = String(raw || "");
           return this.pressKeys.includes(key) ? key : "";
         },
-
         pressDefault(key, target, notPrevented) {
           const button = target instanceof HTMLButtonElement || target instanceof HTMLAnchorElement;
           if (notPrevented && key === "Enter" && button) target.click();
@@ -151,21 +150,18 @@ globalThis.__atcAgent =
           else if (notPrevented && key === " " && target instanceof HTMLButtonElement) target.click();
           else if (key === "Tab") this.pressTab(target);
         },
-
         pressTab(target) {
           const selector = 'a[href],button,input,select,textarea,[tabindex]:not([tabindex="-1"])';
           const focusable = [...document.querySelectorAll(selector)].filter((el) => !el.disabled && el.getClientRects().length > 0);
           const next = focusable[(focusable.indexOf(target) + 1) % focusable.length];
           if (next) next.focus();
         },
-
         fill(el, value) {
           el.focus();
           el.value = value;
           el.dispatchEvent(new Event("input", { bubbles: true }));
           el.dispatchEvent(new Event("change", { bubbles: true }));
         },
-
         choose(el, value, label) {
           if (!(el instanceof HTMLSelectElement)) return { ok: false, error: "ACTION_FAILED", message: `${label} is not a <select>` };
           const options = [...el.options];
@@ -176,7 +172,6 @@ globalThis.__atcAgent =
           el.dispatchEvent(new Event("change", { bubbles: true }));
           return { ok: true, matched: 1 };
         },
-
         password(el) {
           if (!(el instanceof HTMLInputElement)) return false;
           const tokens = (el.getAttribute("autocomplete") || "").toLowerCase().split(/\s+/);
@@ -184,7 +179,6 @@ globalThis.__atcAgent =
           if (el.type === "password" || tokens.some((value) => ["current-password", "new-password"].includes(value))) this.passwords.add(el);
           return this.passwords.has(el);
         },
-
         watch() {
           return globalThis.__atcWatch.start(this);
         },
