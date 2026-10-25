@@ -136,6 +136,14 @@ export const COMMANDS: Readonly<Record<string, CommandSpec>> = {
   type: { positionals: [], flags: [...PAGE, ...TARGET_FLAGS, "value"], build: buildFill("type") },
   select: { positionals: [], flags: [...PAGE, ...TARGET_FLAGS, "value"], build: buildFill("select") },
   press: { positionals: ["key"], flags: [...PAGE], build: buildPress },
+  upload: {
+    positionals: ["file"],
+    flags: [...PAGE, ...TARGET_FLAGS],
+    build: (p) => ({
+      method: "upload",
+      params: { ...contextFlag(p), target: parseTarget(p), file: resolve(requiredPositional(p, 0, "file")) },
+    }),
+  },
   doctor: { positionals: [], flags: [], build: () => ({ method: "doctor", params: {} }) },
   setup: { positionals: [], flags: [], build: () => ({ setup: true }) },
   shutdown: { positionals: [], flags: [], build: () => ({ method: "shutdown", params: {} }) },

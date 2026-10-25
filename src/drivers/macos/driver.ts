@@ -19,7 +19,7 @@ import type {
   ScreenshotResult,
   Target,
 } from "../../contracts/types.js";
-import { type ActAction, type PageOp, actOp, pageExpression, toActionResult, toEntries, toPageState } from "../page-agent.js";
+import { type ActAction, type PageOp, actOp, pageExpression, toActionResult, toEntries, toPageState, uploadOp } from "../page-agent.js";
 import { APP_BY_BROWSER, type JxaRunner, LIST_SCRIPT, chromiumPrelude, defaultJxaRunner, toJxaError } from "./jxa.js";
 
 const TAB_ID_PATTERN = /^macos:([a-z]+):(.+)$/;
@@ -110,6 +110,10 @@ export class MacosTabDriver implements BrowserDriver {
 
   async press(session: BrowserSession, key: string): Promise<ActionResult> {
     return toActionResult(await this.page(session, { op: "press", key }));
+  }
+
+  async upload(session: BrowserSession, target: Target, path: string): Promise<ActionResult> {
+    return toActionResult(await this.page(session, uploadOp(target, path)));
   }
 
   screenshot(_session: BrowserSession, _path: string, _fullPage: boolean): Promise<ScreenshotResult> {

@@ -127,7 +127,7 @@ export class FakeDriver implements BrowserDriver {
     return this.page("inspect", session, [], (s) => ({ ...locationOf(s), aria: `- heading "${titleOf(currentUrl(s))}"` }));
   }
 
-  setActionResult(method: "click" | "type" | "select" | "press", result: ActionResult): void {
+  setActionResult(method: "click" | "type" | "select" | "press" | "upload", result: ActionResult): void {
     this.actionResults.set(method, result);
   }
 
@@ -145,6 +145,10 @@ export class FakeDriver implements BrowserDriver {
 
   press(session: BrowserSession, key: string): Promise<ActionResult> {
     return this.page("press", session, [key], () => this.actionResults.get("press") ?? { matched: 1 });
+  }
+
+  upload(session: BrowserSession, target: Target, path: string): Promise<ActionResult> {
+    return this.page("upload", session, [target, path], () => this.actionResults.get("upload") ?? { matched: 1 });
   }
 
   screenshot(session: BrowserSession, path: string, fullPage: boolean): Promise<ScreenshotResult> {

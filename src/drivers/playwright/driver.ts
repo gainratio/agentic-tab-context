@@ -117,6 +117,13 @@ export class PlaywrightDriver implements BrowserDriver {
     });
   }
 
+  upload(session: BrowserSession, target: Target, path: string): Promise<ActionResult> {
+    const failure: FailureContext = { action: "upload", code: "ACTION_FAILED", details: { path } };
+    return this.act(session, target, failure, async (locator) => {
+      await locator.setInputFiles(path);
+    });
+  }
+
   async screenshot(session: BrowserSession, path: string, fullPage: boolean): Promise<ScreenshotResult> {
     const state = this.live(session);
     const absolute = resolve(path);

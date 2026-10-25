@@ -84,6 +84,11 @@ const HAPPY: ReadonlyArray<readonly [string, string[], unknown]> = [
     ["click", "--role", "button", "--name", "Delete", "--within", "almamesh-bot-fix"],
     { method: "click", params: { target: { kind: "role", role: "button", name: "Delete", within: "almamesh-bot-fix" } } },
   ],
+  [
+    "upload",
+    ["upload", "--label", "Resume", "/tmp/resume.pdf"],
+    { method: "upload", params: { target: { kind: "label", label: "Resume" }, file: "/tmp/resume.pdf" } },
+  ],
   ["press Enter", ["press", "Enter"], { method: "press", params: { key: "Enter" } }],
   ["press Space", ["press", "Space"], { method: "press", params: { key: " " } }],
   ["press with context", ["press", "Escape", "-c", CTX], { method: "press", params: { context: CTX, key: "Escape" } }],

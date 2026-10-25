@@ -21,7 +21,7 @@ interface Agent {
 }
 
 function agentHarness() {
-  const source = ["page-agent-watch.js", "page-agent.js"].map((name) => readFileSync(join(import.meta.dirname, "../../extension", name), "utf8")).join("\n");
+  const source = ["page-agent-watch.js", "page-agent-actions.js", "page-agent.js"].map((name) => readFileSync(join(import.meta.dirname, "../../extension", name), "utf8")).join("\n");
   const listeners = new Set<unknown>();
   const input = new Input();
   const originalCalls: unknown[][] = [];

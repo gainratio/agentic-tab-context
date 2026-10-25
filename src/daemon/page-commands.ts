@@ -19,7 +19,7 @@ export interface Resolved {
 }
 
 export type Handler = (params: Params) => Promise<OkResponse>;
-export type PageMethod = "goto" | "back" | "forward" | "reload" | "inspect" | "screenshot" | "console" | "network" | "click" | "type" | "select" | "press";
+export type PageMethod = "goto" | "back" | "forward" | "reload" | "inspect" | "screenshot" | "console" | "network" | "click" | "type" | "select" | "press" | "upload";
 type DriverOp<T> = (driver: BrowserDriver, session: BrowserSession, params: Params) => Promise<T>;
 type EntriesOp = (driver: BrowserDriver, session: BrowserSession, since: number) => Promise<Array<{ seq: number }>>;
 
@@ -56,6 +56,7 @@ export class PageCommands {
       type: (p) => this.act(p, (d, s, r) => d.type(s, requireTarget(r), requireString(r, "value"))),
       select: (p) => this.act(p, (d, s, r) => d.select(s, requireTarget(r), requireString(r, "value"))),
       press: (p) => this.press(p),
+      upload: (p) => this.upload(p),
     };
   }
 
@@ -103,6 +104,14 @@ export class PageCommands {
     const key = requireString(params, "key");
     const { ctx, driver, session } = this.deps.resolve(params);
     const result = await driver.press(session, key);
+    await refreshLocation(this.deps.registry, ctx.id, driver, session);
+    return { ok: true, context: ctx.id, matched: result.matched };
+  }
+
+  private async upload(params: Params): Promise<OkResponse> {
+    const file = requireString(params, "file");
+    const { ctx, driver, session } = this.deps.resolve(params);
+    const result = await driver.upload(session, requireTarget(params), file);
     await refreshLocation(this.deps.registry, ctx.id, driver, session);
     return { ok: true, context: ctx.id, matched: result.matched };
   }

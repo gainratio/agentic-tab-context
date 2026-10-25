@@ -18,6 +18,7 @@ globalThis.__atcAgent =
           if (op.op === "inspect") return this.inspect();
           if (op.op === "act") return this.act(op);
           if (op.op === "press") return this.press(op);
+          if (op.op === "upload") return this.upload(op);
           if (op.op === "watch") return this.watch();
           if (op.op === "unwatch") return this.unwatch();
           if (op.op === "logs") return this.logs(op.kind, op.since);
@@ -137,32 +138,10 @@ globalThis.__atcAgent =
           return { ok: true, matched: 1 };
         },
         press(op) {
-          const key = this.pressKey(op.key);
-          if (key === "") return { ok: false, error: "INVALID_ARGUMENT", message: `unsupported key ${JSON.stringify(String(op.key || ""))}` };
-          const active = document.activeElement;
-          const target = active && active !== document.body ? active : document.body;
-          const init = { key, bubbles: true, cancelable: true };
-          const notPrevented = target.dispatchEvent(new KeyboardEvent("keydown", init));
-          this.pressDefault(key, target, notPrevented);
-          target.dispatchEvent(new KeyboardEvent("keyup", init));
-          return { ok: true, matched: 1 };
+          return globalThis.__atcActions.press(this, op);
         },
-        pressKey(raw) {
-          const key = String(raw || "");
-          return this.pressKeys.includes(key) ? key : "";
-        },
-        pressDefault(key, target, notPrevented) {
-          const button = target instanceof HTMLButtonElement || target instanceof HTMLAnchorElement;
-          if (notPrevented && key === "Enter" && button) target.click();
-          else if (notPrevented && key === "Enter" && target instanceof HTMLInputElement && target.form) target.form.requestSubmit();
-          else if (notPrevented && key === " " && target instanceof HTMLButtonElement) target.click();
-          else if (key === "Tab") this.pressTab(target);
-        },
-        pressTab(target) {
-          const selector = 'a[href],button,input,select,textarea,[tabindex]:not([tabindex="-1"])';
-          const focusable = [...document.querySelectorAll(selector)].filter((el) => !el.disabled && el.getClientRects().length > 0);
-          const next = focusable[(focusable.indexOf(target) + 1) % focusable.length];
-          if (next) next.focus();
+        upload(op) {
+          return globalThis.__atcActions.upload(this, op);
         },
         fill(el, value) {
           el.focus();

@@ -20,7 +20,7 @@ async function executePageOp(tabId, op) {
   if (op.op === "watch" && !(await watchedTabs()).has(tabId)) return { ok: true };
   const world = PAGE_WORLD_OPS.has(op.op) ? "MAIN" : "ISOLATED";
   const target = { tabId };
-  await chrome.scripting.executeScript({ target, world, files: ["page-agent-watch.js", "page-agent.js"], injectImmediately: true });
+  await chrome.scripting.executeScript({ target, world, files: ["page-agent-watch.js", "page-agent-actions.js", "page-agent.js"], injectImmediately: true });
   const [frame] = await chrome.scripting.executeScript({
     target,
     world,
