@@ -109,6 +109,14 @@ export class PlaywrightDriver implements BrowserDriver {
     return this.act(session, target, failure, (locator) => selectOption(locator, target, value));
   }
 
+  press(session: BrowserSession, key: string): Promise<ActionResult> {
+    const state = this.live(session);
+    return guard(state, { action: "press", code: "ACTION_FAILED" }, async () => {
+      await state.page.keyboard.press(key);
+      return { matched: 1 };
+    });
+  }
+
   async screenshot(session: BrowserSession, path: string, fullPage: boolean): Promise<ScreenshotResult> {
     const state = this.live(session);
     const absolute = resolve(path);

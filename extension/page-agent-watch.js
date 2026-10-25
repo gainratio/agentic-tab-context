@@ -1,7 +1,7 @@
 /** Restorable capture hooks shared by the extension and macOS page agent. */
 globalThis.__atcWatch = {
   checkUpgrade(agent) {
-    if (!agent || agent.version === 2) return;
+    if (!agent || agent.version === 3) return;
     if (agent.reloadRequired || (agent.store?.watching && typeof agent.unwatch !== "function")) {
       this.disableLegacy(agent);
       throw new Error("ATC_RELOAD_REQUIRED: Reload this tab before binding it again; old capture hooks cannot be safely removed.");

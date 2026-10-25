@@ -79,6 +79,9 @@ const HAPPY: ReadonlyArray<readonly [string, string[], unknown]> = [
     ["click", "--selector=a[href='/x']", "--nth=0", "-c", CTX],
     { method: "click", params: { context: CTX, target: { kind: "selector", selector: "a[href='/x']", nth: 0 } } },
   ],
+  ["press Enter", ["press", "Enter"], { method: "press", params: { key: "Enter" } }],
+  ["press Space", ["press", "Space"], { method: "press", params: { key: " " } }],
+  ["press with context", ["press", "Escape", "-c", CTX], { method: "press", params: { context: CTX, key: "Escape" } }],
   [
     "type",
     ["type", "--label", "Product Name", "--value", "Blue Shirt"],

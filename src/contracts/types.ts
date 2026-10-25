@@ -131,6 +131,7 @@ export interface BrowserDriver {
   click(session: BrowserSession, target: Target): Promise<ActionResult>;
   type(session: BrowserSession, target: Target, value: string): Promise<ActionResult>;
   select(session: BrowserSession, target: Target, value: string): Promise<ActionResult>;
+  press(session: BrowserSession, key: string): Promise<ActionResult>;
   screenshot(session: BrowserSession, path: string, fullPage: boolean): Promise<ScreenshotResult>;
   console(session: BrowserSession, sinceSeq: number): Promise<ConsoleEntry[]>;
   network(session: BrowserSession, sinceSeq: number): Promise<NetworkEntry[]>;
