@@ -4,7 +4,7 @@
 
 > [!IMPORTANT]
 > **The repository is public (2026-10-24), so the privacy-policy URL below is live.**
-> Screenshots are still missing. After store approval, set
+> The 1280×800 screenshot is in `store/screenshot-1.png`. After store approval, set
 > `ATC_EXTENSION_IDS=<store id>` and run `atc setup`, so the native host also allows the
 > store build. The store assigns its own id and ignores the manifest `key`.
 
@@ -47,7 +47,7 @@ English
 | Asset | Dimensions | Status | File |
 |---|---|---|---|
 | Store icon | 128×128 PNG | ✅ Ready | `extension/icons/icon-128.png` |
-| Screenshot 1 | 1280×800 | ⬜ Not created | |
+| Screenshot 1 | 1280×800 | ✅ Ready | `store/screenshot-1.png` |
 
 ## Permissions justification
 
