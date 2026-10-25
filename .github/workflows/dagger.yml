@@ -25,9 +25,9 @@ jobs:
         uses: dagger/dagger-for-github@27b130bf0f79a7f6fbbbe0fbca6760dc9bb40a77 # v8.4.1
         with:
           version: "0.21.8"
-      # The repository is private, so Dagger's exact-commit fetches need credentials.
-      # The job's own short-lived read-only token is turned into a git Basic header,
-      # masked, and handed to Dagger as a secret (never as a plain argument).
+      # A short-lived, read-only token can be turned into a git Basic header so the
+      # same gate also works from a private fork or mirror. It is masked and handed to
+      # Dagger as a secret, never as a plain argument; public checkouts ignore it.
       - name: Run the canonical gate
         env:
           GITHUB_TOKEN: ${{ github.token }}

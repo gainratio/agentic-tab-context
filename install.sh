@@ -12,7 +12,7 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO_DIR"
 
 echo "==> 1/4 Installing dependencies"
-npm install --no-fund --no-audit
+npm ci --no-fund --no-audit
 
 echo "==> 2/4 Building"
 npm run build
