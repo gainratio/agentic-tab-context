@@ -81,6 +81,20 @@ function buildHistory(method: "back" | "forward" | "reload"): (parsed: Parsed) =
   return (parsed) => ({ method, params: contextFlag(parsed) });
 }
 
+const PRESS_KEYS =
+  /^(?:Enter|Escape|Tab|Space|Backspace|Delete|ArrowUp|ArrowDown|ArrowLeft|ArrowRight|Home|End|PageUp|PageDown)$/;
+
+function buildPress(parsed: Parsed): Request {
+  const raw = requiredPositional(parsed, 0, "key");
+  if (!PRESS_KEYS.test(raw)) {
+    invalid(`press: unsupported key "${raw}" (use Enter, Escape, Tab, Space, Backspace, Delete, ArrowUp/Down/Left/Right, Home, End, PageUp or PageDown)`);
+  }
+  return {
+    method: "press",
+    params: { ...contextFlag(parsed), key: raw === "Space" ? " " : raw },
+  };
+}
+
 function buildFill(method: "type" | "select"): (parsed: Parsed) => Request {
   return (parsed) => {
     const target = parseTarget(parsed);
@@ -121,6 +135,7 @@ export const COMMANDS: Readonly<Record<string, CommandSpec>> = {
   },
   type: { positionals: [], flags: [...PAGE, ...TARGET_FLAGS, "value"], build: buildFill("type") },
   select: { positionals: [], flags: [...PAGE, ...TARGET_FLAGS, "value"], build: buildFill("select") },
+  press: { positionals: ["key"], flags: [...PAGE], build: buildPress },
   doctor: { positionals: [], flags: [], build: () => ({ method: "doctor", params: {} }) },
   setup: { positionals: [], flags: [], build: () => ({ setup: true }) },
   shutdown: { positionals: [], flags: [], build: () => ({ method: "shutdown", params: {} }) },

@@ -6,16 +6,18 @@
  */
 globalThis.__atcWatch.checkUpgrade(globalThis.__atcAgent);
 globalThis.__atcAgent =
-  globalThis.__atcAgent && globalThis.__atcAgent.version === 2
+  globalThis.__atcAgent && globalThis.__atcAgent.version === 3
     ? globalThis.__atcAgent
     : {
-        version: 2,
-        store: { console: [], network: [], seq: 0, watching: false },
+        version: 3,
+        store: globalThis.__atcAgent?.store ?? { console: [], network: [], seq: 0, watching: false },
+        pressKeys: ["Enter", "Escape", "Tab", " ", "Backspace", "Delete", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End", "PageUp", "PageDown"],
         cap: 500,
 
         run(op) {
           if (op.op === "inspect") return this.inspect();
           if (op.op === "act") return this.act(op);
+          if (op.op === "press") return this.press(op);
           if (op.op === "watch") return this.watch();
           if (op.op === "unwatch") return this.unwatch();
           if (op.op === "logs") return this.logs(op.kind, op.since);
@@ -124,6 +126,37 @@ globalThis.__atcAgent =
           if (op.action === "type") this.fill(el, op.value);
           if (op.action === "select") return this.choose(el, op.value, op.label);
           return { ok: true, matched: 1 };
+        },
+        press(op) {
+          const key = this.pressKey(op.key);
+          if (key === "") return { ok: false, error: "INVALID_ARGUMENT", message: `unsupported key ${JSON.stringify(String(op.key || ""))}` };
+          const active = document.activeElement;
+          const target = active && active !== document.body ? active : document.body;
+          const init = { key, bubbles: true, cancelable: true };
+          const notPrevented = target.dispatchEvent(new KeyboardEvent("keydown", init));
+          this.pressDefault(key, target, notPrevented);
+          target.dispatchEvent(new KeyboardEvent("keyup", init));
+          return { ok: true, matched: 1 };
+        },
+
+        pressKey(raw) {
+          const key = String(raw || "");
+          return this.pressKeys.includes(key) ? key : "";
+        },
+
+        pressDefault(key, target, notPrevented) {
+          const button = target instanceof HTMLButtonElement || target instanceof HTMLAnchorElement;
+          if (notPrevented && key === "Enter" && button) target.click();
+          else if (notPrevented && key === "Enter" && target instanceof HTMLInputElement && target.form) target.form.requestSubmit();
+          else if (notPrevented && key === " " && target instanceof HTMLButtonElement) target.click();
+          else if (key === "Tab") this.pressTab(target);
+        },
+
+        pressTab(target) {
+          const selector = 'a[href],button,input,select,textarea,[tabindex]:not([tabindex="-1"])';
+          const focusable = [...document.querySelectorAll(selector)].filter((el) => !el.disabled && el.getClientRects().length > 0);
+          const next = focusable[(focusable.indexOf(target) + 1) % focusable.length];
+          if (next) next.focus();
         },
 
         fill(el, value) {

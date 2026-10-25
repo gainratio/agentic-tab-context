@@ -19,7 +19,8 @@ export type PageOp =
   | { op: "watch" }
   | { op: "unwatch" }
   | { op: "logs"; kind: "console" | "network"; since: number }
-  | { op: "act"; action: ActAction; target: Target; label: string; value?: string };
+  | { op: "act"; action: ActAction; target: Target; label: string; value?: string }
+  | { op: "press"; key: string };
 
 let cachedSource: string | undefined;
 
