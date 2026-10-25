@@ -35,6 +35,7 @@ export const FLAG_KINDS = {
   testid: "string",
   selector: "string",
   nth: "string",
+  within: "string",
   browser: "string",
   query: "string",
   url: "string",
@@ -49,7 +50,7 @@ export const SHORT_ALIASES: Readonly<Record<string, FlagName>> = { c: "context",
 
 export const LOCATOR_FLAGS = ["role", "label", "text", "placeholder", "testid", "selector"] as const;
 export type LocatorFlag = (typeof LOCATOR_FLAGS)[number];
-export const TARGET_FLAGS: readonly FlagName[] = [...LOCATOR_FLAGS, "name", "nth"];
+export const TARGET_FLAGS: readonly FlagName[] = [...LOCATOR_FLAGS, "name", "nth", "within"];
 
 export interface Parsed {
   command: string;

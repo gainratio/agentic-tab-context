@@ -77,8 +77,10 @@ export function parseTarget(parsed: Parsed): Target {
     invalid(`${parsed.command}: --name is only valid together with --role`);
   }
   const target = baseTarget(parsed, locator);
+  const within = nonEmpty(parsed, "within");
+  const scoped = within === undefined ? target : { ...target, within };
   const nth = intFlag(parsed, "nth");
-  return nth === undefined ? target : { ...target, nth };
+  return nth === undefined ? scoped : { ...scoped, nth };
 }
 
 export function requiredValue(parsed: Parsed): string {

@@ -62,13 +62,14 @@ export function simpleTarget(kind: SimpleLocatorKind, value: string): Target {
 }
 
 /** How a command picks exactly one element. Exactly one locator kind is set. */
-export type Target =
+export type Target = (
   | { kind: "role"; role: string; name?: string; nth?: number }
   | { kind: "label"; label: string; nth?: number }
   | { kind: "text"; text: string; nth?: number }
   | { kind: "placeholder"; placeholder: string; nth?: number }
   | { kind: "testid"; testid: string; nth?: number }
-  | { kind: "selector"; selector: string; nth?: number };
+  | { kind: "selector"; selector: string; nth?: number }
+) & { readonly within?: string };
 
 export interface PageState {
   url: string;
