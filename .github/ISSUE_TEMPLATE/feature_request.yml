@@ -1,0 +1,23 @@
+name: Feature request
+description: Suggest a capability or an improvement
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do, and where does the current tool stop?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: A possible solution
+      description: Optional. Include the permission or privacy impact if you can.
+  - type: checkboxes
+    id: permissions
+    attributes:
+      label: Permissions
+      options:
+        - label: This can be done without adding a browser/host permission or a network call
+          required: false

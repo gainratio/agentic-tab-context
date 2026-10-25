@@ -1,0 +1,36 @@
+name: Bug report
+description: Something does not work as described
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include page content, credentials, or customer data. For a security
+        issue, use SECURITY.md instead of this form.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `atc --version` (or the commit).
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Browser and assistant
+      description: Chrome/Firefox version, and Claude Code / Codex / Antigravity.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: What happened
+      description: Steps to reproduce, expected result, and what you saw instead.
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: `atc doctor` output
+      description: Redact paths or identifiers you do not want public.
+      render: json
