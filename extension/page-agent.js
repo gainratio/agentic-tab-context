@@ -86,19 +86,27 @@ globalThis.__atcAgent =
           return elements;
         },
         candidates(target) {
-          const all = this.elements();
+          const matches = this.matchKind(target, this.elements());
+          return target.within === undefined ? matches : this.within(matches, target.within);
+        },
+        matchKind(target, all) {
           if (target.kind === "selector") return all.filter((el) => el.matches(target.selector));
-          if (target.kind === "role") {
-            const byRole = all.filter((el) => this.role(el) === target.role);
-            if (target.name === undefined) return byRole;
-            const exact = byRole.filter((el) => this.name(el) === target.name);
-            if (exact.length > 0) return exact;
-            return this.nameFallback(byRole, target.name);
-          }
+          if (target.kind === "role") return this.matchRole(target, all);
           if (target.kind === "label") return all.filter((el) => /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName) && this.label(el) === target.label);
           if (target.kind === "text") return all.filter((el) => this.text(el) === target.text);
           const attribute = target.kind === "placeholder" ? "placeholder" : "data-testid";
           return all.filter((el) => el.getAttribute(attribute) === target[target.kind]);
+        },
+        matchRole(target, all) {
+          const byRole = all.filter((el) => this.role(el) === target.role);
+          if (target.name === undefined) return byRole;
+          const exact = byRole.filter((el) => this.name(el) === target.name);
+          return exact.length > 0 ? exact : this.nameFallback(byRole, target.name);
+        },
+        within(matches, text) {
+          const needle = text.toLowerCase();
+          const containers = this.elements().filter((el) => this.visible(el) && this.text(el).toLowerCase().includes(needle));
+          return matches.filter((el) => containers.some((container) => container !== el && container.contains(el)));
         },
         nameFallback(byRole, wanted) {
           const needle = this.normalizeName(wanted);
@@ -182,11 +190,9 @@ globalThis.__atcAgent =
         watch() {
           return globalThis.__atcWatch.start(this);
         },
-
         unwatch() {
           return globalThis.__atcWatch.stop(this);
         },
-
         logs(kind, since) {
           return this.store[kind === "network" ? "network" : "console"].filter((entry) => entry.seq > since);
         },

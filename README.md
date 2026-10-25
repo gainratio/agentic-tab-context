@@ -171,6 +171,7 @@ You rarely need these yourself; your assistant runs them. Every command prints o
 | `atc type --label "Email" --value "a@b.co"` | Type into a field |
 | `atc select --label "Plan" --value "Pro"` | Choose a dropdown option |
 | `atc press Enter` | Press a key on the focused element (Enter, Escape, Tab, Space, arrows, Home/End, PageUp/Down, Backspace, Delete) |
+| `atc click --role button --name "Delete" --within "row text"` | Scope the search to a container that contains that text |
 | `atc screenshot` | Save a picture of the tab |
 | `atc console` / `atc network` | Show console messages / network requests |
 | `atc goto <url>` / `back` / `reload` | Move around |
