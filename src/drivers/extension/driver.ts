@@ -141,6 +141,12 @@ export class ExtensionDriver implements BrowserDriver {
     return toActionResult(await this.page(session, uploadOp(target, path)));
   }
 
+  async evaluate(session: BrowserSession, script: string): Promise<unknown> {
+    const raw = await this.page(session, { op: "eval", script });
+    toActionResult(raw);
+    return (raw as { value?: unknown }).value;
+  }
+
   async screenshot(session: BrowserSession, path: string, fullPage: boolean): Promise<ScreenshotResult> {
     if (fullPage) throw new AtcError("UNSUPPORTED_ACTION", "full-page screenshots are not supported for live extension tabs");
     const dataUrl = String(await this.send(session, "screenshot"));

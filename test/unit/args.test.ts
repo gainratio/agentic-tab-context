@@ -84,6 +84,7 @@ const HAPPY: ReadonlyArray<readonly [string, string[], unknown]> = [
     ["click", "--role", "button", "--name", "Delete", "--within", "almamesh-bot-fix"],
     { method: "click", params: { target: { kind: "role", role: "button", name: "Delete", within: "almamesh-bot-fix" } } },
   ],
+  ["eval", ["eval", "document.title"], { method: "eval", params: { script: "document.title" } }],
   [
     "upload",
     ["upload", "--label", "Resume", "/tmp/resume.pdf"],

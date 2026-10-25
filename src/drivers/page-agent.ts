@@ -21,7 +21,8 @@ export type PageOp =
   | { op: "logs"; kind: "console" | "network"; since: number }
   | { op: "act"; action: ActAction; target: Target; label: string; value?: string }
   | { op: "press"; key: string }
-  | { op: "upload"; target: Target; label: string; files: ReadonlyArray<{ name: string; type: string; base64: string }> };
+  | { op: "upload"; target: Target; label: string; files: ReadonlyArray<{ name: string; type: string; base64: string }> }
+  | { op: "eval"; script: string };
 
 let cachedSource: string | undefined;
 

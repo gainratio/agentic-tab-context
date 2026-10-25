@@ -19,6 +19,7 @@ globalThis.__atcAgent =
           if (op.op === "act") return this.act(op);
           if (op.op === "press") return this.press(op);
           if (op.op === "upload") return this.upload(op);
+          if (op.op === "eval") return this.evaluate(op);
           if (op.op === "watch") return this.watch();
           if (op.op === "unwatch") return this.unwatch();
           if (op.op === "logs") return this.logs(op.kind, op.since);
@@ -142,6 +143,14 @@ globalThis.__atcAgent =
         },
         upload(op) {
           return globalThis.__atcActions.upload(this, op);
+        },
+        evaluate(op) {
+          try {
+            const value = (0, eval)(String(op.script));
+            return { ok: true, value: value === undefined ? null : value };
+          } catch (error) {
+            return { ok: false, error: "ACTION_FAILED", message: String(error) };
+          }
         },
         fill(el, value) {
           el.focus();

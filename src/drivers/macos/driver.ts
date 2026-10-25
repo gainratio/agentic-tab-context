@@ -116,6 +116,12 @@ export class MacosTabDriver implements BrowserDriver {
     return toActionResult(await this.page(session, uploadOp(target, path)));
   }
 
+  async evaluate(session: BrowserSession, script: string): Promise<unknown> {
+    const raw = await this.page(session, { op: "eval", script });
+    toActionResult(raw);
+    return (raw as { value?: unknown }).value;
+  }
+
   screenshot(_session: BrowserSession, _path: string, _fullPage: boolean): Promise<ScreenshotResult> {
     const message = "screenshots of a live macOS tab need the atc browser extension (Apple Events can only capture the whole screen)";
     return Promise.reject(new AtcError("UNSUPPORTED_ACTION", message));

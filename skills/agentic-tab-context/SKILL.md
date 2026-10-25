@@ -37,6 +37,7 @@ atc type   --label "Email" --value "test@example.com"
 atc select --label "Plan" --value "Pro"
 atc press  Enter
 atc upload --label "Resume" ./resume.pdf
+atc eval   "document.documentElement.scrollWidth"
 atc goto   /settings          # relative to the current page
 atc back
 atc forward

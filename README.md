@@ -173,6 +173,7 @@ You rarely need these yourself; your assistant runs them. Every command prints o
 | `atc press Enter` | Press a key on the focused element (Enter, Escape, Tab, Space, arrows, Home/End, PageUp/Down, Backspace, Delete) |
 | `atc click --role button --name "Delete" --within "row text"` | Scope the search to a container that contains that text |
 | `atc upload --label "Resume" ./resume.pdf` | Attach a local file to a file input (8 MiB cap) |
+| `atc eval "document.documentElement.scrollWidth"` | Evaluate one expression in the bound page and return its JSON value |
 | `atc screenshot` | Save a picture of the tab |
 | `atc console` / `atc network` | Show console messages / network requests |
 | `atc goto <url>` / `back` / `reload` | Move around |
