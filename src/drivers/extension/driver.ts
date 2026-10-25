@@ -20,7 +20,7 @@ import type {
   ScreenshotResult,
   Target,
 } from "../../contracts/types.js";
-import { type ActAction, type PageOp, actOp, toActionResult, toEntries, toPageState } from "../page-agent.js";
+import { type ActAction, type PageOp, actOp, toActionResult, toEntries, toPageState, uploadOp } from "../page-agent.js";
 import { type ExtensionBridge, parseExtensionTabId } from "./bridge.js";
 
 interface ExtSession {
@@ -135,6 +135,16 @@ export class ExtensionDriver implements BrowserDriver {
 
   async press(session: BrowserSession, key: string): Promise<ActionResult> {
     return toActionResult(await this.page(session, { op: "press", key }));
+  }
+
+  async upload(session: BrowserSession, target: Target, path: string): Promise<ActionResult> {
+    return toActionResult(await this.page(session, uploadOp(target, path)));
+  }
+
+  async evaluate(session: BrowserSession, script: string): Promise<unknown> {
+    const raw = await this.page(session, { op: "eval", script });
+    toActionResult(raw);
+    return (raw as { value?: unknown }).value;
   }
 
   async screenshot(session: BrowserSession, path: string, fullPage: boolean): Promise<ScreenshotResult> {

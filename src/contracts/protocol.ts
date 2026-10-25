@@ -22,6 +22,8 @@ export type Request =
   | { method: "click"; params: { context?: string; target: Target } }
   | { method: "type" | "select"; params: { context?: string; target: Target; value: string } }
   | { method: "press"; params: { context?: string; key: string } }
+  | { method: "upload"; params: { context?: string; target: Target; file: string } }
+  | { method: "eval"; params: { context?: string; script: string } }
   | { method: "doctor"; params: Record<string, never> }
   | { method: "ping"; params: Record<string, never> }
   | { method: "shutdown"; params: Record<string, never> };
