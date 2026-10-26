@@ -134,7 +134,6 @@ export interface BrowserDriver {
   select(session: BrowserSession, target: Target, value: string): Promise<ActionResult>;
   press(session: BrowserSession, key: string): Promise<ActionResult>;
   upload(session: BrowserSession, target: Target, path: string): Promise<ActionResult>;
-  evaluate(session: BrowserSession, script: string): Promise<unknown>;
   screenshot(session: BrowserSession, path: string, fullPage: boolean): Promise<ScreenshotResult>;
   console(session: BrowserSession, sinceSeq: number): Promise<ConsoleEntry[]>;
   network(session: BrowserSession, sinceSeq: number): Promise<NetworkEntry[]>;

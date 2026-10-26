@@ -81,5 +81,6 @@ https://github.com/gainratio/agentic-tab-context/blob/main/PRIVACY.md (works onc
 
 | Version | Date | Changes | Status |
 |---|---|---|---|
-| 0.4.0 | 2026-10-25 | `press`, `upload`, `eval`, and `--within` scoped locators; normalized accessible-name fallback; page agent v3 | **Ready to submit** |
+| 0.4.1 | 2026-10-26 | Removes `eval` from the extension so the store build contains no remote-code execution; `press`, `upload`, and `--within` remain | **Ready to submit** |
+| 0.4.0 | 2026-10-25 | `press`, `upload`, `eval`, and `--within` scoped locators; normalized accessible-name fallback; page agent v3 | Superseded |
 | 0.3.0 | 2026-10-22 | Native messaging replaces the localhost port; isolated-world page access; screenshots restore the user's tab | Draft |

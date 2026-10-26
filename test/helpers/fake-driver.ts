@@ -151,9 +151,7 @@ export class FakeDriver implements BrowserDriver {
     return this.page("upload", session, [target, path], () => this.actionResults.get("upload") ?? { matched: 1 });
   }
 
-  evaluate(session: BrowserSession, script: string): Promise<unknown> {
-    return this.page("eval", session, [script], () => ({ value: null }));
-  }
+
 
   screenshot(session: BrowserSession, path: string, fullPage: boolean): Promise<ScreenshotResult> {
     return this.page("screenshot", session, [path, fullPage], async () => {
