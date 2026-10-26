@@ -124,10 +124,7 @@ export class PlaywrightDriver implements BrowserDriver {
     });
   }
 
-  evaluate(session: BrowserSession, script: string): Promise<unknown> {
-    const state = this.live(session);
-    return guard(state, { action: "eval", code: "ACTION_FAILED" }, () => state.page.evaluate(script));
-  }
+
 
   async screenshot(session: BrowserSession, path: string, fullPage: boolean): Promise<ScreenshotResult> {
     const state = this.live(session);

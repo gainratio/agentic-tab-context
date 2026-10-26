@@ -19,7 +19,7 @@ export interface Resolved {
 }
 
 export type Handler = (params: Params) => Promise<OkResponse>;
-export type PageMethod = "goto" | "back" | "forward" | "reload" | "inspect" | "screenshot" | "console" | "network" | "click" | "type" | "select" | "press" | "upload" | "eval";
+export type PageMethod = "goto" | "back" | "forward" | "reload" | "inspect" | "screenshot" | "console" | "network" | "click" | "type" | "select" | "press" | "upload" ;
 type DriverOp<T> = (driver: BrowserDriver, session: BrowserSession, params: Params) => Promise<T>;
 type EntriesOp = (driver: BrowserDriver, session: BrowserSession, since: number) => Promise<Array<{ seq: number }>>;
 
@@ -59,11 +59,10 @@ export class PageCommands {
     };
   }
 
-  private pageActions(): Pick<Record<PageMethod, Handler>, "press" | "upload" | "eval"> {
+  private pageActions(): Pick<Record<PageMethod, Handler>, "press" | "upload" > {
     return {
       press: (p) => this.press(p),
       upload: (p) => this.upload(p),
-      eval: (p) => this.evaluate(p),
     };
   }
 
@@ -121,13 +120,6 @@ export class PageCommands {
     const result = await driver.upload(session, requireTarget(params), file);
     await refreshLocation(this.deps.registry, ctx.id, driver, session);
     return { ok: true, context: ctx.id, matched: result.matched };
-  }
-
-  private async evaluate(params: Params): Promise<OkResponse> {
-    const script = requireString(params, "script");
-    const { ctx, driver, session } = this.deps.resolve(params);
-    const value = await driver.evaluate(session, script);
-    return { ok: true, context: ctx.id, value };
   }
 
   private async act(params: Params, op: DriverOp<{ matched: number }>): Promise<OkResponse> {
