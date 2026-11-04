@@ -444,7 +444,7 @@ describe("protocol-level", () => {
   });
 
   it("ping returns the pid", async () => {
-    expect(await call({ method: "ping", params: {} })).toEqual({ ok: true, pid: process.pid });
+    expect(await call({ method: "ping", params: {} })).toEqual({ ok: true, pid: process.pid, protocol: 2 });
   });
 
   it("shutdown closes every open session, then fires onShutdown after responding", async () => {

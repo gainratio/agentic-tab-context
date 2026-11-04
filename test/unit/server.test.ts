@@ -89,7 +89,7 @@ describe("startServer authentication", () => {
 describe("startServer", () => {
   it("round-trips requests over the Unix socket with restrictive permissions", async () => {
     await start();
-    expect(await send(7, { method: "ping", params: {} })).toEqual({ id: 7, response: { ok: true, pid: process.pid } });
+    expect(await send(7, { method: "ping", params: {} })).toEqual({ id: 7, response: { ok: true, pid: process.pid, protocol: 2 } });
     expect((await stat(paths.socket)).mode & 0o777).toBe(0o600);
     expect((await stat(paths.home)).mode & 0o777).toBe(0o700);
     expect(logs).toEqual([{ id: 7, method: "ping", ok: true, ms: expect.any(Number) as number }]);
