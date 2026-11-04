@@ -1,26 +1,34 @@
-title = "agentic-tab-context gitleaks config"
+# gitleaks configuration: the default rules, the portfolio's required GitHub
+# token rule, and narrow exceptions for verified non-secrets.
 
 [extend]
 useDefault = true
 
+# Required by the gainratio/ci Foundation guard, which canary-tests this file.
 # GitHub App installation tokens and Actions GITHUB_TOKEN use a stateless
-# ghs_<APPID>_<JWT> format (~520 chars, charset [A-Za-z0-9._-]) since 2026-10-02.
-# The built-in github-app-token rule only matches the classic 36-char form, so this
-# rule uses GitHub's documented pattern. Drop it once upstream covers the format.
+# ghs_<APPID>_<JWT> format that gitleaks 8.30.1's built-in rule cannot see
+# (https://github.com/gitleaks/gitleaks/issues/2192). Same rule as Foundation's default.
 [[rules]]
 id = "github-app-token-stateless"
 description = "GitHub App installation or Actions token (stateless ghs_<APPID>_<JWT> format)"
 regex = '''ghs_[A-Za-z0-9._-]{36,}'''
 keywords = ["ghs_"]
 
+# extension/manifest.json "key" is the browser extension's RSA *public* key.
+# Chrome derives the extension's stable id from it, and it is meant to be
+# published. It trips the generic-api-key heuristic, so this exception applies
+# only to that one rule, and only to an RSA-2048 SubjectPublicKeyInfo value.
+# Every other rule still scans every file, including the manifest.
 [[allowlists]]
-description = "Non-secret browser profile prefix fixture in historical side-panel unit test commits"
+description = "RSA public keys are not secrets (Chrome extension manifest key)"
+targetRules = ["generic-api-key"]
+regexTarget = "secret"
+regexes = ['''^MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA[A-Za-z0-9+/=]+$''']
+
+[[allowlists]]
+description = "Historical browser profile prefix fixture in side-panel unit test"
 targetRules = ["generic-api-key"]
 condition = "AND"
-commits = [
-  "e58b8d1e6dd82c31928d4a11f86fc5c050c2d0bb",
-  "5c43209b7cdbebb708da4e4abd6c0e895f00f1df",
-]
-paths = [
-  '''^test/unit/extension-sidepanel-state\.test\.ts$''',
-]
+regexTarget = "secret"
+regexes = ['''^chromium-0a1b2c3d$''']
+paths = ['''^test/unit/extension-sidepanel-state\.test\.ts$''']
