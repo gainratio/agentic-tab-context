@@ -49,6 +49,7 @@ const HAPPY: ReadonlyArray<readonly [string, string[], unknown]> = [
   ["reload", ["reload"], { method: "reload", params: {} }],
   ["inspect", ["inspect", "--context", CTX], { method: "inspect", params: { context: CTX } }],
   ["screenshot", ["screenshot"], { method: "screenshot", params: {} }],
+  ["screenshot redact", ["screenshot", "--redact"], { method: "screenshot", params: { redact: true } }],
   [
     "screenshot all flags",
     ["screenshot", "--out", "/tmp/a.png", "--full-page", "-c", CTX],

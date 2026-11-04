@@ -1,12 +1,32 @@
 /** Captures share an extension-wide quota and a focus lock for each window. */
 const windowCaptures = new Map();
+
+function setRedaction(tabId, enabled) {
+  return chrome.scripting.executeScript({ target: { tabId }, func: enabled ? maskSecrets : unmaskSecrets }).catch(() => undefined);
+}
+
+function maskSecrets() {
+  const selector = 'input[type="password"],[autocomplete~="one-time-code"],[autocomplete*="cc-"]';
+  for (const element of document.querySelectorAll(selector)) {
+    const rect = element.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) continue;
+    const mask = document.createElement("div");
+    mask.dataset.atcRedact = "1";
+    mask.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px;background:#111;z-index:2147483647;pointer-events:none`;
+    document.documentElement.append(mask);
+  }
+}
+
+function unmaskSecrets() {
+  for (const mask of document.querySelectorAll("[data-atc-redact]")) mask.remove();
+}
 const CAPTURE_INTERVAL_MS = Math.ceil(1000 / (chrome.tabs.MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND || 2)) + 1;
 let captureTail = Promise.resolve();
 let nextCaptureAt = 0;
 
-export async function captureTab(tabId) {
+export async function captureTab(tabId, options = {}) {
   const tab = await chrome.tabs.get(tabId);
-  return inWindow(tab.windowId, () => withinQuota(() => captureSelected(tabId, tab.windowId)));
+  return inWindow(tab.windowId, () => withinQuota(() => captureSelected(tabId, tab.windowId, options)));
 }
 
 function withinQuota(work) {
@@ -28,14 +48,16 @@ function inWindow(windowId, work) {
   return result;
 }
 
-async function captureSelected(tabId, windowId) {
+async function captureSelected(tabId, windowId, options = {}) {
   const state = await beginCapture(tabId, windowId);
   try {
     await selectTarget(state);
+    if (options.redact) { await setRedaction(tabId, true); await new Promise((resolve) => setTimeout(resolve, 120)); }
     const data = await capturePixels(windowId);
     await assertTarget(state);
     return data;
   } finally {
+    if (options.redact) await setRedaction(tabId, false);
     await finishCapture(state);
   }
 }

@@ -38,7 +38,7 @@ export const USAGE: readonly string[] = [
   "atc goto <url> [--context C]   relative URLs resolve against the current page",
   "atc back | forward | reload [--context C]",
   "atc inspect [--context C]",
-  "atc screenshot [--out F] [--full-page] [--context C]",
+  "atc screenshot [--out F] [--full-page] [--redact] [--context C]",
   "atc console [--since N] [--context C]",
   "atc network [--since N] [--context C]",
   "atc click <target> [--context C] [--each]",

@@ -117,6 +117,36 @@ describe("browser extension end to end", () => {
     await page.locator("#password-fixture").evaluate((element) => element.remove());
   });
 
+  it("masks secret fields for a redacted screenshot and removes the mask afterwards", async () => {
+    await page.evaluate(() => {
+      const input = document.createElement("input");
+      input.type = "password";
+      input.id = "redact-fixture";
+      input.style.cssText = "position:fixed;left:10px;top:10px;width:220px;height:48px;background:rgb(0,128,0);border:0;z-index:10";
+      document.body.append(input);
+    });
+    try {
+      const shot = await atc("screenshot", "--redact");
+      expect(shot.json).toMatchObject({ ok: true });
+      expect(await page.locator("[data-atc-redact]").count()).toBe(0);
+      const data = `data:image/png;base64,${readFileSync(String(shot.json.path)).toString("base64")}`;
+      const pixel = await page.evaluate(async (url) => {
+        const image = new Image();
+        image.src = url;
+        await image.decode();
+        const canvas = document.createElement("canvas");
+        canvas.width = image.width;
+        canvas.height = image.height;
+        const drawing = canvas.getContext("2d")!;
+        drawing.drawImage(image, 0, 0);
+        return [...drawing.getImageData(60, 30, 1, 1).data].slice(0, 3);
+      }, data);
+      expect(pixel).toEqual([17, 17, 17]);
+    } finally {
+      await page.locator("#redact-fixture").evaluate((element) => element.remove());
+    }
+  });
+
   it("rejects unsupported full-page capture explicitly", async () => {
     expect((await atc("screenshot", "--full-page")).json).toMatchObject({ ok: false, error: "UNSUPPORTED_ACTION" });
   });

@@ -14,7 +14,7 @@ const HANDLERS = {
     const tab = await chrome.tabs.get(tabId);
     return { url: tab.url || "", title: tab.title || "" };
   },
-  screenshot: (tabId) => captureTab(tabId),
+  screenshot: (tabId, p) => captureTab(tabId, { redact: p.redact === true }),
   page: (tabId, p) => runPageOp(tabId, p.op),
   watch: async (tabId) => {
     await setWatched(tabId, true);
