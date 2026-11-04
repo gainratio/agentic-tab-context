@@ -13,6 +13,7 @@ export function resolvePaths(env: NodeJS.ProcessEnv = process.env): Paths {
     socket: join(home, "daemon.sock"),
     extensionSocket: join(home, "extension.sock"),
     state: join(home, "state.json"),
+    token: join(home, "auth-token"),
     profiles: join(home, "profiles"),
     screenshots: join(home, "screenshots"),
     daemonLog: join(home, "daemon.log"),

@@ -85,14 +85,14 @@ class Exchange {
 }
 
 /** Send one envelope and resolve with the decoded response line. */
-export function exchange(socketPath: string, request: Request, timeoutMs: number): Promise<Response> {
+export function exchange(socketPath: string, request: Request, timeoutMs: number, auth?: string): Promise<Response> {
   const id = nextId++;
   return new Promise<Response>((resolve, reject) => {
     const socket = createConnection(socketPath);
     const ex = new Exchange(socket, resolve, reject, { ms: timeoutMs, method: request.method });
     socket.on("connect", () => {
       ex.connected = true;
-      writeLine(socket, { id, request } satisfies RequestEnvelope);
+      writeLine(socket, { id, request, ...(auth === undefined ? {} : { auth }) } satisfies RequestEnvelope);
     });
     readLines(socket, MAX_RESPONSE_BYTES, {
       onLine: (line) => ex.succeed(line, id),

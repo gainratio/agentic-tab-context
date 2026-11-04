@@ -7,6 +7,7 @@ import { spawn, type SpawnOptions } from "node:child_process";
 import { closeSync, openSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { readToken } from "../contracts/auth.js";
 import { AtcError } from "../contracts/errors.js";
 import type { Paths, Request, Response } from "../contracts/protocol.js";
 import { NoDaemon, exchange } from "./exchange.js";
@@ -66,7 +67,7 @@ function delay(ms: number): Promise<void> {
 
 async function pingOnce(paths: Paths): Promise<boolean> {
   try {
-    const response = await exchange(paths.socket, { method: "ping", params: {} }, PING_TIMEOUT_MS);
+    const response = await exchange(paths.socket, { method: "ping", params: {} }, PING_TIMEOUT_MS, readToken(paths));
     return response.ok;
   } catch {
     return false;
@@ -98,7 +99,7 @@ function asDaemonUnavailable(error: unknown): unknown {
 export async function sendRequest(request: Request, paths: Paths, options: ClientOptions = {}): Promise<Response> {
   const timeout = options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
   try {
-    return await exchange(paths.socket, request, timeout);
+    return await exchange(paths.socket, request, timeout, readToken(paths));
   } catch (error) {
     if (!(error instanceof NoDaemon)) throw error;
   }
@@ -106,7 +107,7 @@ export async function sendRequest(request: Request, paths: Paths, options: Clien
   await startDaemon(paths, options);
   await waitForDaemon(paths, options);
   try {
-    return await exchange(paths.socket, request, timeout);
+    return await exchange(paths.socket, request, timeout, readToken(paths));
   } catch (error) {
     throw asDaemonUnavailable(error);
   }

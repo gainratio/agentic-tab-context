@@ -33,6 +33,8 @@ export type Method = Request["method"];
 export interface RequestEnvelope {
   id: number;
   request: Request;
+  /** Per-install daemon token; absent in direct in-process tests. */
+  auth?: string;
 }
 
 export type OkResponse = { ok: true } & Record<string, unknown>;
@@ -57,6 +59,8 @@ export interface Paths {
   /** Native messaging host <-> daemon socket (browser extension traffic). */
   extensionSocket: string;
   state: string;
+  /** Per-install IPC authentication token (owner-only). */
+  token: string;
   profiles: string;
   screenshots: string;
   daemonLog: string;

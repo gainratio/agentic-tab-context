@@ -12,6 +12,8 @@ export interface RelayIo {
   writeToBrowser(frame: Buffer): void;
   connectToDaemon(): Socket;
   schedule(task: () => void, ms: number): void;
+  /** Per-install token injected into the extension hello; never sent to the page. */
+  authToken?: string;
 }
 
 const REPLAYED_TYPES = new Set(["hello", "tabs"]);
@@ -32,9 +34,16 @@ export class NativeRelay {
   }
 
   private forward(message: unknown): void {
-    const type = typeof message === "object" && message !== null ? (message as { type?: unknown }).type : undefined;
-    if (typeof type === "string" && REPLAYED_TYPES.has(type)) this.replay.set(type, message);
-    if (this.daemon !== null) writeLine(this.daemon, message);
+    const shaped = this.authenticated(message);
+    const type = typeof shaped === "object" && shaped !== null ? (shaped as { type?: unknown }).type : undefined;
+    if (typeof type === "string" && REPLAYED_TYPES.has(type)) this.replay.set(type, shaped);
+    if (this.daemon !== null) writeLine(this.daemon, shaped);
+  }
+
+  private authenticated(message: unknown): unknown {
+    if (this.io.authToken === undefined || typeof message !== "object" || message === null) return message;
+    const record = message as Record<string, unknown>;
+    return record.type === "hello" ? { ...record, auth: this.io.authToken } : message;
   }
 
   private connect(): void {

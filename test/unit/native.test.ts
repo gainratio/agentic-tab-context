@@ -108,6 +108,29 @@ describe("NativeRelay", () => {
     daemon.connections[1]?.destroy();
     await daemon.close();
   });
+
+  it("injects the per-install token into hello only", async () => {
+    const socketPath = join(dir, "auth.sock");
+    const daemon = await FakeDaemon.start(socketPath);
+    const decoder = new FrameDecoder();
+    const relay = new NativeRelay({
+      writeToBrowser: (frame) => decoder.push(frame),
+      connectToDaemon: () => createConnection(socketPath),
+      schedule: (task) => setTimeout(task, 1),
+      authToken: "fixture-token",
+    });
+    relay.start();
+    await until(() => daemon.connections.length === 1);
+    relay.fromBrowser(Buffer.concat([
+      encodeFrame({ type: "hello", browser: "chrome", instance: "0a1b2c3d" }),
+      encodeFrame({ type: "tabs", tabs: [] }),
+    ]));
+    await until(() => daemon.lines.length === 2);
+    expect(daemon.lines[0]).toMatchObject({ type: "hello", auth: "fixture-token" });
+    expect(daemon.lines[1]).toEqual({ type: "tabs", tabs: [] });
+    daemon.connections[0]?.destroy();
+    await daemon.close();
+  });
 });
 
 describe("native host registration", () => {

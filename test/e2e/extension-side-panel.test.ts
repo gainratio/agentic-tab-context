@@ -8,6 +8,7 @@ import { type Socket, createConnection } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { readToken } from "../../src/contracts/auth.js";
 import { resolvePaths } from "../../src/contracts/paths.js";
 import { type CliResult, type Json, cli, eventually } from "../helpers/cli.js";
 
@@ -74,9 +75,10 @@ beforeAll(async () => {
   home = mkdtempSync(join(tmpdir(), "atc-panel-"));
   atc = cli({ ATC_HOME: home });
   await atc("tabs");
-  socketPath = resolvePaths({ ATC_HOME: home }).extensionSocket;
+  const paths = resolvePaths({ ATC_HOME: home });
+  socketPath = paths.extensionSocket;
   host = await FakeHost.connect(socketPath);
-  host.send({ type: "hello", browser: "chromium", instance: INSTANCE });
+  host.send({ type: "hello", browser: "chromium", instance: INSTANCE, ...(readToken(paths) === undefined ? {} : { auth: readToken(paths) }) });
   host.send({
     type: "tabs",
     tabs: [

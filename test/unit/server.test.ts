@@ -76,6 +76,16 @@ async function openContext(id: number): Promise<string> {
   return String(reply.response.context);
 }
 
+describe("startServer authentication", () => {
+  it("rejects a request without the configured token and accepts the matching one", async () => {
+    server = await startServer(service, paths, { authToken: "fixture-token" });
+    const rejected = await sendRaw(`${JSON.stringify({ id: 1, request: { method: "ping", params: {} } })}\n`);
+    expect(rejected[0]?.response).toMatchObject({ ok: false, error: "UNAUTHORIZED" });
+    const accepted = await sendRaw(`${JSON.stringify({ id: 2, auth: "fixture-token", request: { method: "ping", params: {} } })}\n`);
+    expect(accepted[0]?.response).toMatchObject({ ok: true, pid: process.pid });
+  });
+});
+
 describe("startServer", () => {
   it("round-trips requests over the Unix socket with restrictive permissions", async () => {
     await start();

@@ -49,7 +49,7 @@ export interface ExtensionBindings {
 }
 
 export type ExtensionToDaemon =
-  | { type: "hello"; browser: ExtensionBrowser; instance: string; protocol?: number; version?: string }
+  | { type: "hello"; browser: ExtensionBrowser; instance: string; protocol?: number; version?: string; auth?: string }
   | { type: "tabs"; tabs: ExtensionTab[] }
   | { type: "result"; id: number; ok: boolean; result?: unknown; error?: string; message?: string }
   | { type: "pin"; id: number; tabId: number }

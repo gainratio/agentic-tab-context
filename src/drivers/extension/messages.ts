@@ -52,6 +52,7 @@ function parseHello(raw: Raw): ExtensionToDaemon | undefined {
     instance: raw.instance,
     ...(protocol === undefined ? {} : { protocol }),
     ...(version === undefined ? {} : { version }),
+    ...(typeof raw.auth === "string" ? { auth: raw.auth } : {}),
   };
 }
 

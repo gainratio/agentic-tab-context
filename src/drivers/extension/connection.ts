@@ -37,6 +37,7 @@ export interface ConnectionEvents {
   onShare: (tabId: string) => Promise<string>;
   onUnshare: (context: string) => Promise<void>;
   onActivate: (context: string) => Promise<void>;
+  authToken?: () => string | undefined;
 }
 
 export class ExtensionConnection {
@@ -45,6 +46,7 @@ export class ExtensionConnection {
   tabs: LiveTab[] = [];
   protocol = 1;
   version = "";
+  auth: string | undefined;
   private nextId = 1;
   private readonly pending = new Map<number, Pending>();
 
@@ -73,7 +75,7 @@ export class ExtensionConnection {
   private receive(line: string): void {
     const message = parseExtensionMessage(line);
     if (message === undefined) return;
-    if (message.type === "hello") this.identify(message.browser, message.instance, message.protocol ?? 1, message.version ?? "");
+    if (message.type === "hello") this.identify(message.browser, message.instance, message.protocol ?? 1, message.version ?? "", message.auth);
     else if (this.key === "") return;
     else if (message.type === "tabs") this.updateTabs(message.tabs);
     else if (message.type === "result") this.complete(message);
@@ -84,7 +86,10 @@ export class ExtensionConnection {
     else void this.activate(message.id, message.context);
   }
 
-  private identify(browser: BrowserName, instance: string, protocol: number, version: string): void {
+  private identify(browser: BrowserName, instance: string, protocol: number, version: string, auth?: string): void {
+    const expected = this.events.authToken?.();
+    if (expected !== undefined && auth !== expected) { this.socket.destroy(); return; }
+    this.auth = auth;
     this.browser = browser;
     this.protocol = protocol;
     this.version = version;

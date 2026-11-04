@@ -7,6 +7,7 @@
  * requests for different contexts, or for no context, run concurrently.
  */
 import type { Socket } from "node:net";
+import { tokenMatches } from "../contracts/auth.js";
 import type { Paths, Request, RequestEnvelope, Response, ResponseEnvelope } from "../contracts/protocol.js";
 import { readLines, writeLine } from "../transport/lines.js";
 import { type RunningServer, listenOwnerOnly } from "../transport/unix-server.js";
@@ -26,6 +27,8 @@ export interface RequestLogEntry {
 
 export interface ServerOptions {
   onRequest?: (entry: RequestLogEntry) => void;
+  /** When set, every CLI envelope must carry the matching per-install token. */
+  authToken?: string;
 }
 
 const MAX_LINE_BYTES = 1024 * 1024;
@@ -66,6 +69,9 @@ async function dispatchParsed(
   options: ServerOptions,
 ): Promise<ResponseEnvelope> {
   if ("response" in parsed) return parsed;
+  if (!tokenMatches(options.authToken, parsed.auth)) {
+    return { id: parsed.id, response: { ok: false, error: "UNAUTHORIZED", message: "daemon authentication failed; restart atc" } };
+  }
   const started = Date.now();
   const { key, request } = service.route(parsed.request);
   const response = await queue.run(key, () => service.handle(request));
@@ -88,7 +94,7 @@ function parseEnvelope(line: string): RequestEnvelope | ResponseEnvelope {
   if (!isRecord(value.request) || typeof value.request.method !== "string") {
     return invalidEnvelope(id, "envelope request must be an object with a string method");
   }
-  return { id, request: value.request as unknown as Request };
+  return { id, request: value.request as unknown as Request, ...(typeof value.auth === "string" ? { auth: value.auth } : {}) };
 }
 
 function invalidEnvelope(id: number, message: string): ResponseEnvelope {
