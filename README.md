@@ -13,6 +13,7 @@ The extension now ships a real multi-tab side panel: search all tabs, share/unsh
 - [Side-panel prototype](prototype/index.html) — interaction reference
 - [UX and reliability spec](docs/ATC-UX-SPEC.md)
 - [Security and privacy review](docs/ATC-SECURITY-REVIEW.md)
+- [Security status after 0.5.0](docs/ATC-SECURITY-STATUS.md)
 - [Extension ↔ daemon contract](docs/ATC-EXTENSION-CONTRACT.md)
 - [Workspace implementation plan](docs/ATC-WORKSPACE-PLAN.md)
 
