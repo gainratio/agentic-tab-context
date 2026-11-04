@@ -3,6 +3,7 @@ const statusText = document.getElementById("status-text");
 const tabTitle = document.getElementById("tab-title");
 const tabUrl = document.getElementById("tab-url");
 const bindButton = document.getElementById("bind-btn");
+const openSharedButton = document.getElementById("open-shared-btn");
 const feedback = document.getElementById("feedback");
 
 function describeStatus(status) {
@@ -62,12 +63,55 @@ async function bindActiveTab() {
   }
 }
 
+async function activeWindowId() {
+  const tab = await activeTab();
+  return Number.isSafeInteger(tab?.windowId) ? tab.windowId : undefined;
+}
+
+async function openSidePanelApi(windowId) {
+  if (typeof globalThis.chrome?.sidePanel?.open !== "function") return false;
+  try {
+    await chrome.sidePanel.open(windowId === undefined ? {} : { windowId });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function openPanelViaWorker(windowId) {
+  const reply = await request({
+    type: "atc:open-sidepanel",
+    ...(windowId === undefined ? {} : { windowId }),
+  });
+  if (reply.ok) return true;
+  feedback.hidden = false;
+  feedback.textContent = `Could not open shared tabs: ${(reply && reply.message) || "the panel is unavailable."}`;
+  return false;
+}
+
+/**
+ * Open the shared-tabs side panel. `chrome.sidePanel.open` must run in the
+ * popup's user gesture, so it is attempted here first. If this browser lacks
+ * the API (or refuses for this window), the service worker retries and then
+ * falls back to opening the panel page in a regular tab.
+ */
+async function openSharedTabs() {
+  openSharedButton.disabled = true;
+  try {
+    const windowId = await activeWindowId();
+    if ((await openSidePanelApi(windowId)) || (await openPanelViaWorker(windowId))) window.close();
+  } finally {
+    openSharedButton.disabled = false;
+  }
+}
+
 function startPopup() {
   if (typeof globalThis.chrome?.runtime?.sendMessage !== "function" || typeof globalThis.chrome?.tabs?.query !== "function") {
     showStandaloneHelp();
     return;
   }
   bindButton.addEventListener("click", () => void bindActiveTab());
+  openSharedButton.addEventListener("click", () => void openSharedTabs());
   void showStatus();
   void showTab();
 }
@@ -76,7 +120,7 @@ function showStandaloneHelp() {
   document.body.classList.add("standalone");
   statusText.textContent = "Opened outside the browser extension";
   document.getElementById("standalone-help").hidden = false;
-  for (const element of [bindButton, document.querySelector(".tab-box"), document.querySelector(".footer")]) element.hidden = true;
+  for (const element of [bindButton, openSharedButton, document.querySelector(".tab-box"), document.querySelector(".footer")]) element.hidden = true;
 }
 
 startPopup();

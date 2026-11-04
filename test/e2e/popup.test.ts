@@ -88,3 +88,25 @@ it("reports a lost connection and restores the bind control", async () => {
   expect(await page.locator("#feedback").innerText()).toContain("Could not bind");
   expect(await page.locator("#bind-btn").isEnabled()).toBe(true);
 });
+
+it("opens the shared-tabs side panel for the current window", async () => {
+  const page = await browser.newPage({ viewport: { width: 320, height: 420 } });
+  pages.push(page);
+  await page.addInitScript(() => {
+    const calls: unknown[] = [];
+    Object.defineProperty(globalThis, "__atcCalls", { value: calls, configurable: true });
+    Object.defineProperty(globalThis, "__atcClosed", { value: false, configurable: true, writable: true });
+    Object.defineProperty(globalThis, "close", { value: () => { (globalThis as unknown as { __atcClosed: boolean }).__atcClosed = true; }, configurable: true });
+    Object.defineProperty(globalThis, "chrome", { value: {
+      tabs: { query: async () => [{ id: 7, title: "Fixture tab", url: "https://example.test/", windowId: 12 }] },
+      sidePanel: { open: async (options: unknown) => { calls.push(options); } },
+      runtime: { sendMessage: async (message: { type: string }) => message.type === "atc:status" ? { atcDaemon: true } : { ok: true } },
+    } });
+  });
+  await page.goto(pathToFileURL(join(ROOT, "extension/popup/popup.html")).href);
+  await page.waitForFunction(() => !(document.getElementById("bind-btn") as HTMLButtonElement).disabled);
+  await page.getByRole("button", { name: "Open shared tabs" }).click();
+  await page.waitForFunction(() => (globalThis as unknown as { __atcCalls: unknown[] }).__atcCalls.length === 1);
+  expect(await page.evaluate(() => (globalThis as unknown as { __atcCalls: unknown[] }).__atcCalls[0])).toEqual({ windowId: 12 });
+  expect(await page.evaluate(() => (globalThis as unknown as { __atcClosed: boolean }).__atcClosed)).toBe(true);
+});

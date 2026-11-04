@@ -5,6 +5,7 @@
 import type { OkResponse } from "../contracts/protocol.js";
 import type { BindingFilter, BindingView, TabContext } from "../contracts/types.js";
 import { type Params, definedOnly, optionalBrowser, optionalString } from "./params.js";
+import { redactText, redactUrl } from "./redaction.js";
 import type { ContextRegistry } from "./registry.js";
 
 export interface BindingList {
@@ -38,8 +39,8 @@ function toBinding(ctx: TabContext, current: string | null): BindingView {
     tabId: ctx.tabId ?? null,
     browser: ctx.browser,
     source: ctx.source ?? null,
-    url: ctx.url ?? null,
-    title: ctx.title ?? null,
+    url: ctx.url === undefined ? null : redactUrl(ctx.url),
+    title: ctx.title === undefined ? null : redactText(ctx.title),
     current: ctx.id === current,
   };
 }

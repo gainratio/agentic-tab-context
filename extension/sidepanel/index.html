@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Shared tabs — Agentic Tab Context</title>
+    <link rel="stylesheet" href="sidepanel.css" />
+  </head>
+  <body>
+    <svg class="svg-sprite" aria-hidden="true" focusable="false">
+      <symbol id="i-search" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="7"></circle>
+        <path d="m20 20-3.5-3.5"></path>
+      </symbol>
+      <symbol id="i-x" viewBox="0 0 24 24">
+        <path d="M6 6l12 12M18 6 6 18"></path>
+      </symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24">
+        <rect x="4.5" y="10" width="15" height="10" rx="2"></rect>
+        <path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
+      </symbol>
+      <symbol id="i-check" viewBox="0 0 24 24">
+        <path d="m5 12.5 4.5 4.5L19 6.5"></path>
+      </symbol>
+      <symbol id="i-key" viewBox="0 0 24 24">
+        <circle cx="8" cy="15" r="4"></circle>
+        <path d="m11 12 8-8M16 7l2 2M14 9l2 2"></path>
+      </symbol>
+      <symbol id="i-target" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="7"></circle>
+        <path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path>
+        <circle cx="12" cy="12" r="2"></circle>
+      </symbol>
+      <symbol id="i-unlink" viewBox="0 0 24 24">
+        <path d="M9 15 7 17a3.5 3.5 0 0 1-5-5l2-2"></path>
+        <path d="m15 9 2-2a3.5 3.5 0 0 1 5 5l-2 2"></path>
+        <path d="M8.5 12h7M4 4l16 16"></path>
+      </symbol>
+      <symbol id="i-panel" viewBox="0 0 24 24">
+        <rect x="3" y="4" width="18" height="16" rx="2.5"></rect>
+        <path d="M15 4v16"></path>
+      </symbol>
+      <symbol id="i-share" viewBox="0 0 24 24">
+        <circle cx="18" cy="5" r="2.5"></circle>
+        <circle cx="6" cy="12" r="2.5"></circle>
+        <circle cx="18" cy="19" r="2.5"></circle>
+        <path d="m8.2 10.8 7.6-4.5M8.2 13.2l7.6 4.5"></path>
+      </symbol>
+      <symbol id="i-warning" viewBox="0 0 24 24">
+        <path d="M12 3.5 21 20H3L12 3.5Z"></path>
+        <path d="M12 9v5M12 17.2v.1"></path>
+      </symbol>
+      <symbol id="i-info" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9"></circle>
+        <path d="M12 11v6M12 7.2v.1"></path>
+      </symbol>
+    </svg>
+
+    <a class="skip-link" href="#tab-search">Skip to tab search</a>
+
+    <main class="panel" id="panel" aria-labelledby="panel-title">
+      <header class="panel-header">
+        <div class="panel-title-row">
+          <h1 id="panel-title">Shared with assistant</h1>
+          <span class="count-pill" aria-hidden="true" id="shared-count">0</span>
+          <span class="sr-only" id="shared-count-sr">0 tabs shared</span>
+        </div>
+        <p class="panel-sub" id="shared-summary">Connecting to atc…</p>
+        <p class="active-target" id="active-target" role="status" aria-live="polite" hidden></p>
+      </header>
+
+      <div class="panel-tools">
+        <div class="search-wrap" id="search-wrap" role="search">
+          <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+          <label class="sr-only" for="tab-search">Search tabs by title, hostname, or URL</label>
+          <input
+            id="tab-search"
+            type="search"
+            placeholder="Search tabs"
+            autocomplete="off"
+            spellcheck="false"
+            aria-keyshortcuts="Meta+K Control+K"
+            aria-describedby="search-hint"
+          />
+          <button class="search-clear" id="clear-search" type="button" aria-label="Clear search" hidden>
+            <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+          </button>
+          <kbd class="search-kbd" id="search-kbd" aria-hidden="true">⌘K</kbd>
+        </div>
+        <p class="sr-only" id="search-hint">
+          Press Command K or Control K from anywhere in the panel to focus search.
+        </p>
+        <div class="filters" role="group" aria-label="Filter tabs">
+          <button type="button" class="filter is-active" data-filter="all" aria-pressed="true">
+            All <span class="filter-count" data-count-for="all">0</span>
+          </button>
+          <button type="button" class="filter" data-filter="shared" aria-pressed="false">
+            Shared <span class="filter-count" data-count-for="shared">0</span>
+          </button>
+          <button type="button" class="filter" data-filter="sensitive" aria-pressed="false">
+            Sensitive <span class="filter-count" data-count-for="sensitive">0</span>
+          </button>
+          <button
+            type="button"
+            class="filter"
+            data-filter="window"
+            aria-pressed="false"
+            title="Tabs in this browser window"
+          >
+            This window <span class="filter-count" data-count-for="window">0</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="list-top">
+        <h2 id="tabs-heading">Open tabs</h2>
+        <p class="results-count" id="results-count" role="status" aria-live="polite">0 tabs</p>
+      </div>
+
+      <div class="list-region" id="list-region">
+        <div class="shared-empty" id="shared-empty" hidden>
+          <span class="empty-icon" aria-hidden="true">
+            <svg class="icon"><use href="#i-share"></use></svg>
+          </span>
+          <div>
+            <strong>Nothing shared yet</strong>
+            <p>Check an unshared tab below, then choose Share selected.</p>
+          </div>
+        </div>
+        <ul class="tab-list" id="tab-list" aria-labelledby="tabs-heading"></ul>
+        <div class="empty-state" id="list-empty" hidden></div>
+      </div>
+
+      <div class="inline-confirm" id="inline-confirm" role="region" aria-label="Confirm sharing" hidden>
+        <p class="inline-copy">
+          Share <strong id="inline-title"></strong> from <span class="inline-host" id="inline-host"></span>?
+        </p>
+        <div class="inline-actions">
+          <button class="btn btn-secondary btn-sm" id="inline-cancel" type="button">Cancel</button>
+          <button class="btn btn-primary btn-sm" id="inline-share" type="button">Share tab</button>
+        </div>
+      </div>
+
+      <footer class="panel-footer">
+        <p class="selection-status" id="selection-status" aria-live="polite">Select tabs to share</p>
+        <button class="btn btn-primary" id="share-selected" type="button" disabled>
+          Share selected
+        </button>
+      </footer>
+    </main>
+
+    <dialog
+      class="sheet"
+      id="share-dialog"
+      aria-labelledby="share-title"
+      aria-describedby="share-desc"
+      tabindex="-1"
+    >
+      <div class="sheet-inner">
+        <div class="sheet-grabber" aria-hidden="true"></div>
+        <header class="sheet-header">
+          <div class="sheet-heading">
+            <h2 class="sheet-title" id="share-title">Share tabs?</h2>
+            <p class="sheet-copy" id="share-desc">
+              Your assistant will be able to read and act on these tabs until you remove them.
+            </p>
+          </div>
+          <button
+            class="sheet-close"
+            type="button"
+            data-close-dialog="share-dialog"
+            aria-label="Close share confirmation"
+          >
+            <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+          </button>
+        </header>
+        <ul class="share-list" id="share-list" aria-label="Tabs to share"></ul>
+        <p class="share-domains" id="share-domains"></p>
+        <div class="share-warning">
+          <svg class="icon" aria-hidden="true"><use href="#i-warning"></use></svg>
+          <p>
+            <strong>Sensitive tabs stay locked.</strong> Mail, banking, health, password manager, and
+            Web Store tabs need their own confirmation.
+            <span id="share-warning-extra"></span>
+          </p>
+        </div>
+        <footer class="sheet-actions">
+          <button class="btn btn-secondary" type="button" data-close-dialog="share-dialog">
+            Cancel
+          </button>
+          <button class="btn btn-primary" id="share-confirm" type="button">Share tabs</button>
+        </footer>
+      </div>
+    </dialog>
+
+    <dialog
+      class="sheet"
+      id="sensitive-dialog"
+      aria-labelledby="sensitive-title"
+      aria-describedby="sensitive-desc"
+      tabindex="-1"
+    >
+      <div class="sheet-inner">
+        <div class="sheet-grabber" aria-hidden="true"></div>
+        <header class="sheet-header">
+          <div class="sheet-heading">
+            <h2 class="sheet-title" id="sensitive-title">Share this sensitive tab?</h2>
+            <p class="sheet-copy" id="sensitive-desc">
+              This tab may contain mail, banking, health, credential, or browser data. Sharing gives
+              your assistant access until you remove it.
+            </p>
+          </div>
+          <button
+            class="sheet-close"
+            type="button"
+            data-close-dialog="sensitive-dialog"
+            aria-label="Close sensitive tab confirmation"
+          >
+            <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+          </button>
+        </header>
+        <div class="sensitive-target" id="sensitive-target"></div>
+        <div class="share-warning is-amber">
+          <svg class="icon" aria-hidden="true"><use href="#i-warning"></use></svg>
+          <p>
+            <strong>Only continue if you mean to share this tab.</strong> The assistant can read and
+            act on it. Unsharing later does not close the browser tab.
+          </p>
+        </div>
+        <p class="dialog-error" id="sensitive-error" role="alert" hidden></p>
+        <footer class="sheet-actions">
+          <button class="btn btn-secondary" type="button" data-close-dialog="sensitive-dialog">
+            Keep locked
+          </button>
+          <button class="btn btn-amber" id="sensitive-confirm" type="button">Share sensitive tab</button>
+        </footer>
+      </div>
+    </dialog>
+
+    <div class="toast-region">
+      <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+    </div>
+    <p class="sr-only" id="a11y-status" aria-live="polite" aria-atomic="true"></p>
+
+    <noscript>
+      <p class="noscript">This panel needs JavaScript enabled.</p>
+    </noscript>
+
+    <script src="state.js"></script>
+    <script src="state-bindings.js"></script>
+    <script src="state-view.js"></script>
+    <script src="sidepanel-core.js"></script>
+    <script src="sidepanel-data.js"></script>
+    <script src="sidepanel-render.js"></script>
+    <script src="sidepanel-rows.js"></script>
+    <script src="sidepanel-dialogs.js"></script>
+    <script src="sidepanel-membership.js"></script>
+    <script src="sidepanel-actions.js"></script>
+    <script src="sidepanel-events.js"></script>
+    <script src="sidepanel.js"></script>
+  </body>
+</html>

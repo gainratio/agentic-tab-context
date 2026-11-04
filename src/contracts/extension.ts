@@ -5,6 +5,10 @@
  * (only for our extension ID); the host relays each message as one NDJSON
  * line over the owner-only `extension.sock`. There is no network port.
  */
+import type { BindingView } from "./types.js";
+
+/** Bumped when the extension/daemon message contract changes incompatibly. */
+export const EXTENSION_PROTOCOL_VERSION = 2;
 
 /** Native messaging host name registered with each browser. */
 export const NATIVE_HOST_NAME = "com.gainratio.atc";
@@ -38,15 +42,29 @@ export interface ExtensionTab {
   active: boolean;
 }
 
+/** Read-only workspace snapshot for the side panel; never includes page content. */
+export interface ExtensionBindings {
+  current: string | null;
+  bindings: BindingView[];
+}
+
 export type ExtensionToDaemon =
-  | { type: "hello"; browser: ExtensionBrowser; instance: string }
+  | { type: "hello"; browser: ExtensionBrowser; instance: string; protocol?: number; version?: string }
   | { type: "tabs"; tabs: ExtensionTab[] }
   | { type: "result"; id: number; ok: boolean; result?: unknown; error?: string; message?: string }
-  | { type: "pin"; id: number; tabId: number };
+  | { type: "pin"; id: number; tabId: number }
+  | { type: "bindings"; id: number }
+  | { type: "share"; id: number; tabId: number }
+  | { type: "unshare"; id: number; context: string }
+  | { type: "activate"; id: number; context: string };
 
 export type DaemonToExtension =
   | { type: "command"; id: number; tabId: number; action: ExtensionAction; payload: Record<string, unknown> }
-  | { type: "pinned"; id: number; ok: boolean; context?: string; message?: string };
+  | { type: "pinned"; id: number; ok: boolean; context?: string; message?: string }
+  | ({ type: "bindings"; id: number; ok: boolean; message?: string } & ExtensionBindings)
+  | { type: "shared"; id: number; ok: boolean; context?: string; message?: string }
+  | { type: "unshared"; id: number; ok: boolean; context?: string; message?: string }
+  | { type: "activated"; id: number; ok: boolean; context?: string; message?: string };
 
 /** Sent by the native host itself so the extension can show whether atc is reachable. */
 export interface HostToExtension {

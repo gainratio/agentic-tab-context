@@ -6,8 +6,9 @@ import { mkdir } from "node:fs/promises";
 import { dirname, isAbsolute, join } from "node:path";
 import { AtcError } from "../contracts/errors.js";
 import type { Method, OkResponse, Paths } from "../contracts/protocol.js";
-import type { BrowserDriver, BrowserSession, TabContext } from "../contracts/types.js";
+import type { ActionResult, BrowserDriver, BrowserSession, TabContext } from "../contracts/types.js";
 import { type Params, optionalBoolean, optionalNonNegativeInteger, optionalString, requireString, requireTarget } from "./params.js";
+import { redactText, redactUrl } from "./redaction.js";
 import type { ContextRegistry } from "./registry.js";
 import { fileTimestamp } from "./responses.js";
 import { isRelativeUrl, resolveGotoUrl } from "./url.js";
@@ -86,7 +87,7 @@ export class PageCommands {
     const { ctx, driver, session } = this.deps.resolve(params);
     const state = await driver.inspect(session);
     this.deps.registry.updateLocation(ctx.id, { url: state.url, title: state.title });
-    return { ok: true, context: ctx.id, url: state.url, title: state.title, aria: state.aria };
+    return { ok: true, context: ctx.id, url: redactUrl(state.url), title: redactText(state.title), aria: redactText(state.aria) };
   }
 
   private async screenshot(params: Params): Promise<OkResponse> {
@@ -103,7 +104,7 @@ export class PageCommands {
     const since = optionalNonNegativeInteger(params, "since") ?? 0;
     const { ctx, driver, session } = this.deps.resolve(params);
     const entries = await fetch(driver, session, since);
-    return { ok: true, context: ctx.id, entries, next: entries.at(-1)?.seq ?? since };
+    return { ok: true, context: ctx.id, entries: redactEntries(entries), next: entries.at(-1)?.seq ?? since };
   }
 
   private async press(params: Params): Promise<OkResponse> {
@@ -111,7 +112,7 @@ export class PageCommands {
     const { ctx, driver, session } = this.deps.resolve(params);
     const result = await driver.press(session, key);
     await refreshLocation(this.deps.registry, ctx.id, driver, session);
-    return { ok: true, context: ctx.id, matched: result.matched };
+    return { ok: true, context: ctx.id, matched: result.matched, ...(result.effect === undefined ? {} : { effect: result.effect }) };
   }
 
   private async upload(params: Params): Promise<OkResponse> {
@@ -119,18 +120,30 @@ export class PageCommands {
     const { ctx, driver, session } = this.deps.resolve(params);
     const result = await driver.upload(session, requireTarget(params), file);
     await refreshLocation(this.deps.registry, ctx.id, driver, session);
-    return { ok: true, context: ctx.id, matched: result.matched };
+    return { ok: true, context: ctx.id, matched: result.matched, ...(result.effect === undefined ? {} : { effect: result.effect }) };
   }
 
-  private async act(params: Params, op: DriverOp<{ matched: number }>): Promise<OkResponse> {
+  private async act(params: Params, op: DriverOp<ActionResult>): Promise<OkResponse> {
     const { ctx, driver, session } = this.deps.resolve(params);
     const result = await op(driver, session, params);
     await refreshLocation(this.deps.registry, ctx.id, driver, session);
-    return { ok: true, context: ctx.id, matched: result.matched };
+    return { ok: true, context: ctx.id, matched: result.matched, ...(result.effect === undefined ? {} : { effect: result.effect }) };
   }
 }
 
 async function currentUrl({ ctx, driver, session }: Resolved): Promise<string | undefined> {
   const loc = await driver.location(session);
   return loc.url === "" ? ctx.url : loc.url;
+}
+
+function redactEntries<T extends { seq: number }>(entries: readonly T[]): Array<Record<string, unknown>> {
+  return entries.map((entry) => {
+    const shaped = entry as Record<string, unknown>;
+    return {
+      ...shaped,
+      ...(typeof shaped.text === "string" ? { text: redactText(shaped.text) } : {}),
+      ...(typeof shaped.url === "string" ? { url: redactUrl(shaped.url) } : {}),
+      ...(typeof shaped.failure === "string" ? { failure: redactText(shaped.failure) } : {}),
+    };
+  });
 }

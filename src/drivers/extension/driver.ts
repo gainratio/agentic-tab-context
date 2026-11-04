@@ -1,7 +1,6 @@
 /**
  * ExtensionDriver: drives a tab the user already has open, through the
- * browser extension. Tab ids are stable for the life of the tab, so a bound
- * context can never silently retarget a different tab.
+ * browser extension. Tab ids are stable for the life of the tab.
  */
 import { randomUUID } from "node:crypto";
 import { mkdir, stat, writeFile } from "node:fs/promises";
@@ -21,6 +20,7 @@ import type {
   Target,
 } from "../../contracts/types.js";
 import { type ActAction, type PageOp, actOp, toActionResult, toEntries, toPageState, uploadOp } from "../page-agent.js";
+import { observedAction } from "../action-observe.js";
 import { type ExtensionBridge, parseExtensionTabId } from "./bridge.js";
 
 interface ExtSession {
@@ -134,13 +134,12 @@ export class ExtensionDriver implements BrowserDriver {
   }
 
   async press(session: BrowserSession, key: string): Promise<ActionResult> {
-    return toActionResult(await this.page(session, { op: "press", key }));
+    return this.observed(session, async () => toActionResult(await this.page(session, { op: "press", key })));
   }
 
   async upload(session: BrowserSession, target: Target, path: string): Promise<ActionResult> {
-    return toActionResult(await this.page(session, uploadOp(target, path)));
+    return this.observed(session, async () => toActionResult(await this.page(session, uploadOp(target, path))));
   }
-
 
 
   async screenshot(session: BrowserSession, path: string, fullPage: boolean): Promise<ScreenshotResult> {
@@ -161,7 +160,16 @@ export class ExtensionDriver implements BrowserDriver {
   }
 
   private async act(session: BrowserSession, action: ActAction, target: Target, value?: string): Promise<ActionResult> {
-    return toActionResult(await this.page(session, actOp(action, target, value)));
+    return this.observed(session, async () => toActionResult(await this.page(session, actOp(action, target, value))));
+  }
+
+  private observed(session: BrowserSession, run: () => Promise<ActionResult>): Promise<ActionResult> {
+    const state = this.sessions.get(session.sessionId);
+    return observedAction(
+      run,
+      () => (state === undefined ? undefined : this.bridge.listTabs().find((tab) => tab.tabId === state.tabId)),
+      () => this.location(session).catch(() => null),
+    );
   }
 
   private page(session: BrowserSession, op: PageOp): Promise<unknown> {

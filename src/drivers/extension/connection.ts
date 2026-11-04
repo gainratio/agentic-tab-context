@@ -8,7 +8,9 @@ import { AtcError, toErrorCode } from "../../contracts/errors.js";
 import {
   EXTENSION_COMMAND_TIMEOUT_MS,
   EXTENSION_NAVIGATION_TIMEOUT_MS,
+  type DaemonToExtension,
   type ExtensionAction,
+  type ExtensionBindings,
   type ExtensionTab,
   type ExtensionToDaemon,
 } from "../../contracts/extension.js";
@@ -29,12 +31,20 @@ export interface ConnectionEvents {
   onIdentified: (connection: ExtensionConnection) => void;
   onTabs: (connection: ExtensionConnection) => void;
   onPin: (tabId: string) => Promise<string>;
+  /** Side-panel workspace snapshot; never includes page content. */
+  onBindings: () => Promise<ExtensionBindings>;
+  /** User-initiated share of one of this browser's tabs: no active change, sensitive URLs allowed. */
+  onShare: (tabId: string) => Promise<string>;
+  onUnshare: (context: string) => Promise<void>;
+  onActivate: (context: string) => Promise<void>;
 }
 
 export class ExtensionConnection {
   key = "";
   browser: BrowserName = "chrome";
   tabs: LiveTab[] = [];
+  protocol = 1;
+  version = "";
   private nextId = 1;
   private readonly pending = new Map<number, Pending>();
 
@@ -63,15 +73,21 @@ export class ExtensionConnection {
   private receive(line: string): void {
     const message = parseExtensionMessage(line);
     if (message === undefined) return;
-    if (message.type === "hello") this.identify(message.browser, message.instance);
+    if (message.type === "hello") this.identify(message.browser, message.instance, message.protocol ?? 1, message.version ?? "");
     else if (this.key === "") return;
     else if (message.type === "tabs") this.updateTabs(message.tabs);
     else if (message.type === "result") this.complete(message);
-    else void this.pin(message.id, message.tabId);
+    else if (message.type === "pin") void this.pin(message.id, message.tabId);
+    else if (message.type === "bindings") void this.bindings(message.id);
+    else if (message.type === "share") void this.share(message.id, message.tabId);
+    else if (message.type === "unshare") void this.unshare(message.id, message.context);
+    else void this.activate(message.id, message.context);
   }
 
-  private identify(browser: BrowserName, instance: string): void {
+  private identify(browser: BrowserName, instance: string, protocol: number, version: string): void {
     this.browser = browser;
+    this.protocol = protocol;
+    this.version = version;
     this.key = `${browser}-${instance}`;
     this.events.onIdentified(this);
   }
@@ -93,17 +109,61 @@ export class ExtensionConnection {
     if (entry === undefined) return;
     this.settle(message.id, () => {
       if (message.ok) entry.resolve(message.result);
-      else entry.reject(new AtcError(toErrorCode(message.error), message.message ?? "browser extension reported an error"));
+      else {
+        const { type: _type, id: _id, ok: _ok, error, message: text, ...details } = message;
+        entry.reject(new AtcError(toErrorCode(error), text ?? "browser extension reported an error", details));
+      }
     });
   }
 
   private async pin(id: number, rawTabId: number): Promise<void> {
     try {
       const context = await this.events.onPin(this.tabId(rawTabId));
-      writeLine(this.socket, { type: "pinned", id, ok: true, context });
+      this.respond({ type: "pinned", id, ok: true, context });
     } catch (error) {
-      writeLine(this.socket, { type: "pinned", id, ok: false, message: error instanceof Error ? error.message : String(error) });
+      this.respond({ type: "pinned", id, ok: false, message: errorMessage(error) });
     }
+  }
+
+  private async bindings(id: number): Promise<void> {
+    try {
+      const { current, bindings } = await this.events.onBindings();
+      this.respond({ type: "bindings", id, ok: true, current, bindings });
+    } catch (error) {
+      this.respond({ type: "bindings", id, ok: false, current: null, bindings: [], message: errorMessage(error) });
+    }
+  }
+
+  private async share(id: number, rawTabId: number): Promise<void> {
+    try {
+      const context = await this.events.onShare(this.tabId(rawTabId));
+      this.respond({ type: "shared", id, ok: true, context });
+    } catch (error) {
+      this.respond({ type: "shared", id, ok: false, message: errorMessage(error) });
+    }
+  }
+
+  private async unshare(id: number, context: string): Promise<void> {
+    try {
+      await this.events.onUnshare(context);
+      this.respond({ type: "unshared", id, ok: true, context });
+    } catch (error) {
+      this.respond({ type: "unshared", id, ok: false, message: errorMessage(error) });
+    }
+  }
+
+  private async activate(id: number, context: string): Promise<void> {
+    try {
+      await this.events.onActivate(context);
+      this.respond({ type: "activated", id, ok: true, context });
+    } catch (error) {
+      this.respond({ type: "activated", id, ok: false, message: errorMessage(error) });
+    }
+  }
+
+  /** A side-panel failure must never take down the connection or another in-flight request. */
+  private respond(message: DaemonToExtension): void {
+    writeLine(this.socket, message);
   }
 
   private settle(id: number, outcome: () => void): void {
@@ -123,4 +183,9 @@ export class ExtensionConnection {
 
 function timeoutError(action: ExtensionAction): AtcError {
   return new AtcError("TIMEOUT", `browser extension did not finish "${action}" in ${EXTENSION_COMMAND_TIMEOUT_MS} ms`);
+}
+
+function errorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return message === "" ? "browser extension request failed" : message.slice(0, 1024);
 }
