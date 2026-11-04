@@ -397,6 +397,12 @@ describe("multi-tab side panel end to end", () => {
     const pricing = bindings.find((entry) => entry.title === "Pricing");
     await eventually(() => atc("current"), (r) => r.json.context === pricing?.context);
 
+    const pricingRawId = Number(String(pricing?.tabId).split(":").at(-1));
+    await panel.evaluate(async (tabId) => { await chrome.tabs.move(tabId, { index: 0 }); }, pricingRawId);
+    const moved = await eventually(() => atc("bindings"), (r) => Array.isArray(r.json.bindings) && (r.json.bindings as Json[]).length === 2);
+    expect((moved.json.bindings as Json[]).map((entry) => entry.title).sort()).toEqual(["Fixture App", "Pricing"]);
+    expect((moved.json.bindings as Json[]).find((entry) => entry.title === "Pricing")?.context).toBe(pricing?.context);
+
     await second.close();
     const remaining = await eventually(() => atc("bindings"), (r) => Array.isArray(r.json.bindings) && (r.json.bindings as Json[]).length === 1);
     expect((remaining.json.bindings as Json[])[0]).toMatchObject({ title: "Fixture App" });
