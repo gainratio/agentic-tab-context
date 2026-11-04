@@ -22,6 +22,8 @@ This is the full contract. For an introduction, see the [README](../README.md).
 | `UNSUPPORTED_BROWSER` | That browser can't be opened (not installed, or `safari`, which can't be automated with your profile) |
 | `UNSUPPORTED_ACTION` | Not possible for this kind of tab (e.g. screenshot of a macOS tab without the extension) |
 | `CONTEXT_NOT_FOUND` / `CONTEXT_CLOSED` / `NO_CURRENT_CONTEXT` | No such context, it was closed (or its tab was), or none is current |
+| `TAB_NOT_SHARED` | The tab has not been shared from the extension; open the ATC side panel and share it, or use a managed tab |
+| `ELEMENT_HIDDEN` / `ELEMENT_DISABLED` | The target exists but cannot be acted on |
 | `TARGET_NOT_FOUND` / `AMBIGUOUS_TARGET` | Zero, or several, tabs or elements matched. `AMBIGUOUS_TARGET` includes `matched` (and `candidates` for tabs) |
 | `TAB_MOVED` | Reserved for adapters that detect an uncertain tab identity. Safari binding is unsupported |
 | `NAVIGATION_FAILED` / `ACTION_FAILED` / `TIMEOUT` | The browser reported a failure or didn't finish in time |
@@ -50,6 +52,7 @@ Every page command accepts `--context C` (`-c C`). Short flags: `-q` query, `-b`
 
 ### Selection rules
 
+- Extension tabs must be shared from the ATC side panel before `bind`; managed tabs opened by `atc open` do not need a share. `TAB_NOT_SHARED` means the agent skipped that step.
 - `bind` picks the only match. Otherwise it picks a unique exact URL/title match, then the unique active tab (the focused window's selected tab). Otherwise it fails with `AMBIGUOUS_TARGET` and the candidates.
 - `click`, `type` and `select` need exactly one locator: `--role R [--name N]`, `--label L`, `--text T`, `--placeholder P`, `--testid ID` or `--selector CSS`. Add `--nth N` (0-based) to choose among several. Matching is exact and counts only visible elements.
 

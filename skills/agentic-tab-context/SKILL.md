@@ -11,16 +11,18 @@ description: >
 
 `atc` lets you work in the user's existing browser tab: their logins, their page, no new windows.
 
-## Rule 1: bind to the open tab first. Never open a new browser first.
+## Rule 1: use a tab the user shared. Never bind an unshared extension tab.
 
 ```sh
-atc bind "localhost:3000"     # match by URL or title text
-atc bind --active             # the tab the user is looking at right now
-atc tabs                      # see every open tab, then: atc bind --tab <tabId>
+atc bindings                  # contexts the user has shared; start here
+atc use <ctx>                 # choose the active shared tab
+atc tabs                      # discover open tabs (does NOT grant access)
 ```
 
-- `AMBIGUOUS_TARGET` means several tabs matched. Show the user the `candidates` (title + URL), or pick by `--tab <tabId>` when it's obvious from context. Never guess.
-- `TARGET_NOT_FOUND` means no tab matched. Ask the user to open the page, or run `atc tabs` to see what is open.
+- If `bindings` is empty, ask the user to open the Agentic Tab Context side panel and share the tab. Do not try `atc bind` on an extension tab first.
+- `TAB_NOT_SHARED` means exactly that. Ask for a share; do not retry with another selector.
+- `AMBIGUOUS_TARGET` means several tabs matched. Show the user the `candidates` (title + URL), or pick by `--tab <tabId>` when it is obvious from context. Never guess.
+- Managed tabs opened by `atc open` are not extension tabs and can be bound directly.
 - Only if the user wants a separate window: `atc open chromium --use` (also `chrome`, `brave`, `edge`, `firefox`, `webkit`).
 
 ## Rule 2: inspect before you act

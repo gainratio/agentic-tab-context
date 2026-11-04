@@ -67,7 +67,7 @@ beforeEach(() => {
   service = new DaemonService({
     registry,
     paths,
-    env: {},
+    env: { ATC_ALLOW_AGENT_BIND: "1" },
     now: () => new Date("2026-01-01T00:00:00.000Z"),
     extensionDriver: extension,
     macosDriver: macos,
@@ -86,6 +86,18 @@ async function openManaged(): Promise<string> {
 }
 
 describe("sensitive-tab enforcement", () => {
+  it("refuses an unshared extension tab by default", async () => {
+    const strict = new DaemonService({
+      registry,
+      paths: resolvePaths({ ATC_HOME: home }),
+      env: {},
+      extensionDriver: extension,
+      driverFactory: () => managed,
+    });
+    expect(await strict.handle({ method: "bind", params: { tab: SAFE.tabId } })).toMatchObject({ ok: false, error: "TAB_NOT_SHARED" });
+    expect(extension.bound).toEqual([]);
+  });
+
   it("binds safe tabs through the agent path, unchanged", async () => {
     const bound = await service.handle({ method: "bind", params: { tab: SAFE.tabId } });
     expect(bound).toMatchObject({ ok: true, source: "extension", tabId: SAFE.tabId, current: true });

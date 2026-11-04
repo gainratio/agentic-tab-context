@@ -4,7 +4,7 @@ This tracks the findings in [ATC-SECURITY-REVIEW.md](ATC-SECURITY-REVIEW.md). It
 
 | Finding | Status | What exists now | Still missing |
 |---|---|---|---|
-| S-01 user-only share gate | Partial | The side panel is the user-initiated share path; the agent can still `atc bind` a non-sensitive tab directly (preserved for compatibility). | A consent store that makes every share user-owned, not just sensitive ones. |
+| S-01 user-only share gate | Implemented for extension tabs | The side panel is the share path; unshared extension tabs return `TAB_NOT_SHARED`. Managed tabs opened by `atc open` are separate. `ATC_ALLOW_AGENT_BIND=1` is a test/backward escape hatch. | A consent store for managed tabs and finer-grained grants. |
 | S-02 sensitive deny/classification | Implemented | `src/daemon/sensitive.ts`; CLI/agent bind returns `ACTION_BLOCKED_SENSITIVE`; side panel locks sensitive rows and requires confirmation. | A user-maintained domain list. |
 | S-03 secret redaction beyond passwords | Partial | Token-like URL params, console/network text, bindings, and `state.json` are redacted; password fields remain redacted. | Complete field-level classification (OTP, card, auth headers, custom labels). |
 | S-04 screenshots unredacted | Partial | `atc screenshot --redact` masks password/one-time-code/card fields before capture and removes masks after; pixel-tested. | Default-on capture, canvas/video/cross-origin iframe masks, and a defined unsupported guarantee. |

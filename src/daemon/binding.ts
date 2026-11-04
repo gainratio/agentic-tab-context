@@ -21,6 +21,8 @@ export interface BinderDeps {
   extensionBridge?: ExtensionBridge;
   extensionDriver?: BrowserDriver;
   macosDriver?: BrowserDriver;
+  /** Test/backward escape hatch; normal extension use requires a user share. */
+  env?: NodeJS.ProcessEnv;
 }
 
 export class TabBinder {
@@ -41,6 +43,7 @@ export class TabBinder {
     const options = parseBindOptions(params);
     const chosen = selectTabToBind(await this.discover(), options);
     assertNotSensitive(chosen);
+    assertSharedOrManaged(this.deps, chosen);
     return this.bindSerialized(chosen, options.use ?? true, true);
   }
 
@@ -129,4 +132,11 @@ function hostOf(url: string): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+function assertSharedOrManaged(deps: BinderDeps, tab: LiveTab): void {
+  if (tab.source !== "extension") return;
+  if (deps.registry.findOpenByTabId(tab.tabId) !== undefined) return;
+  if (deps.env?.ATC_ALLOW_AGENT_BIND === "1") return;
+  throw new AtcError("TAB_NOT_SHARED", "This tab has not been shared. Open the ATC side panel and choose Share first.", { tabId: tab.tabId });
 }

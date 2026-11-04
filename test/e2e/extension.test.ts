@@ -47,7 +47,7 @@ const tabsOf = (result: CliResult): Json[] => (result.json.tabs as Json[] | unde
 beforeAll(async () => {
   home = mkdtempSync(join(tmpdir(), "atc-x-"));
   userDataDir = mkdtempSync(join(tmpdir(), "atc-xp-"));
-  atc = cli({ ATC_HOME: home });
+  atc = cli({ ATC_HOME: home, ATC_ALLOW_AGENT_BIND: "1" });
   fixtures = await startFixtureServer();
   registerHost();
   await atc("tabs");
@@ -398,7 +398,10 @@ describe("multi-tab side panel end to end", () => {
     await eventually(() => atc("current"), (r) => r.json.context === pricing?.context);
 
     const pricingRawId = Number(String(pricing?.tabId).split(":").at(-1));
-    await panel.evaluate(async (tabId) => { await chrome.tabs.move(tabId, { index: 0 }); }, pricingRawId);
+    await panel.evaluate(async (tabId) => {
+      const browserChrome = (globalThis as unknown as { chrome: { tabs: { move(id: number, options: { index: number }): Promise<unknown> } } }).chrome;
+      await browserChrome.tabs.move(tabId, { index: 0 });
+    }, pricingRawId);
     const moved = await eventually(() => atc("bindings"), (r) => Array.isArray(r.json.bindings) && (r.json.bindings as Json[]).length === 2);
     expect((moved.json.bindings as Json[]).map((entry) => entry.title).sort()).toEqual(["Fixture App", "Pricing"]);
     expect((moved.json.bindings as Json[]).find((entry) => entry.title === "Pricing")?.context).toBe(pricing?.context);

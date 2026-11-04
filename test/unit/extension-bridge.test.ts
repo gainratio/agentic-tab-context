@@ -88,7 +88,7 @@ let host: FakeHost;
 function daemon(): { service: DaemonService; registry: ContextRegistry } {
   const paths = resolvePaths({ ATC_HOME: dir });
   const registry = new ContextRegistry({ statePath: paths.state });
-  const service = new DaemonService({ registry, paths, env: {}, extensionBridge: bridge, extensionDriver: driver, driverFactory: () => driver });
+  const service = new DaemonService({ registry, paths, env: { ATC_ALLOW_AGENT_BIND: "1" }, extensionBridge: bridge, extensionDriver: driver, driverFactory: () => driver });
   return { service, registry };
 }
 
