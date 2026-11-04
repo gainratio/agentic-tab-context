@@ -19,13 +19,13 @@ The extension now ships a real multi-tab side panel: search all tabs, share/unsh
 
 `atc bindings` lists every open context; `atc use <ctx>` switches the active one. See the [command reference](docs/SPEC.md#commands).
 
-## Everyday use: just ask
+## Everyday use: share, then ask
 
 1. **Open your website** in the browser you normally use. Log in yourself if needed.
-2. **Ask your assistant about the page.** For example: “On my open Example app settings page, why does Save do nothing?” Include the site name or address when you have several tabs open.
-3. **The assistant finds the tab and checks it.** It uses the open tabs' titles, addresses, and active-tab information to choose the page. If the target is still unclear, it asks which tab you mean.
+2. **Share the tab** from the Agentic Tab Context side panel. Select one or more tabs and choose **Share selected**. Sensitive sites stay locked until you explicitly confirm.
+3. **Ask your assistant about the page.** It starts from `atc bindings`, the tabs you shared, and can switch the active target or unshare a tab with you.
 
-You do not need to click the extension for each request or type terminal commands yourself. The assistant uses `atc` to read the page, interact with it, take screenshots, and check errors.
+The assistant cannot bind an unshared extension tab; it gets `TAB_NOT_SHARED` and asks you to share. Managed tabs opened with `atc open` are separate and do not need this step.
 
 ## Optional: point to one exact tab
 
@@ -73,7 +73,7 @@ Follow the activation steps for [Claude Code](#claude-code), [Codex](#codex), or
 
 > "Look at my browser. The checkout page shows an error after I click Pay. What's wrong?"
 
-The assistant discovers the page automatically. The [toolbar popup](#optional-point-to-one-exact-tab) is an optional way to choose a particular tab; open it from the toolbar rather than opening `popup.html` as a file.
+The assistant starts from the tabs you shared. The [toolbar popup](#optional-point-to-one-exact-tab) is an optional way to share one particular tab; open it from the toolbar rather than opening `popup.html` as a file.
 
 ## Connect your assistant
 

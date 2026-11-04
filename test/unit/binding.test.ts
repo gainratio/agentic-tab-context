@@ -108,7 +108,7 @@ describe("binding through the daemon", () => {
     const extension = new FakeLiveDriver(TABS.filter((tab) => tab.source === "extension"));
     const tab = TABS[0];
     if (tab === undefined) throw new Error("extension fixture is missing");
-    service = new DaemonService({ registry, paths, env: {}, extensionDriver: extension, driverFactory: () => managed });
+    service = new DaemonService({ registry, paths, env: { ATC_ALLOW_AGENT_BIND: "1" }, extensionDriver: extension, driverFactory: () => managed });
     const opened = await service.handle({ method: "open", params: { browser: "chrome" } });
     await service.handle({ method: "goto", params: { url: tab.url } });
     const bound = await service.handle({ method: "bind", params: { tab: tab.tabId } });

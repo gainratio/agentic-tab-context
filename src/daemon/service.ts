@@ -51,7 +51,7 @@ export class DaemonService {
     this.env = deps.env ?? process.env;
     this.now = deps.now ?? (() => new Date());
     this.binder = new TabBinder({
-      ...deps, now: this.now, drivers: this.drivers, driverFor: (browser) => this.driverFor(browser), attach: (id, driver, session) => this.attach(id, driver, session),
+      ...deps, env: this.env, now: this.now, drivers: this.drivers, driverFor: (browser) => this.driverFor(browser), attach: (id, driver, session) => this.attach(id, driver, session),
     });
     this.handlers = { ...this.contextHandlers(), ...new PageCommands({ registry: this.registry, paths: deps.paths, now: this.now, resolve: (p) => this.resolve(p) }).handlers() };
   }

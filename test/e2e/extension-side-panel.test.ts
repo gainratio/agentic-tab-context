@@ -150,10 +150,16 @@ describe("side panel through the real daemon", () => {
     expect(await host.next()).toEqual({ type: "unshared", id: 10, ok: true, context });
   });
 
-  it("binds a safe tab from the agent path normally", async () => {
-    const binding = atc("bind", "--tab", SAFE_TAB);
+  it("refuses an unshared safe tab and allows it after a user share", async () => {
+    const refused = await atc("bind", "--tab", SAFE_TAB);
+    expect(refused.json).toMatchObject({ ok: false, error: "TAB_NOT_SHARED" });
+
+    host.send({ type: "share", id: 700, tabId: 8 });
     expect(await host.answer({ ok: true })).toMatchObject({ type: "command", tabId: 8, action: "watch" });
-    const bound = await binding;
-    expect(bound.json).toMatchObject({ ok: true, tabId: SAFE_TAB, source: "extension", current: true });
+    const shared = await host.next();
+    expect(shared).toMatchObject({ type: "shared", id: 700, ok: true });
+
+    const bound = await atc("bind", "--tab", SAFE_TAB);
+    expect(bound.json).toMatchObject({ ok: true, tabId: SAFE_TAB, source: "extension", reused: true });
   });
 });
