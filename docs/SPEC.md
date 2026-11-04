@@ -79,6 +79,7 @@ Every page command accepts `--context C` (`-c C`). Short flags: `-q` query, `-b`
 | `extension.sock` | Native host ↔ service socket (mode `0600`) |
 | `native-host` | Launcher the browser runs for native messaging |
 | `state.json` | Contexts and the current context |
+| `auth-token` | Per-install IPC token (mode `0600`); the CLI and native host read it automatically |
 | `profiles/<name>/` | Logins for `atc open` windows. Treat as sensitive |
 | `screenshots/`, `daemon.log` | Default screenshot folder; service log |
 

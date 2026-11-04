@@ -1,6 +1,7 @@
 /** The closed set of error codes atc can return. Never add free-form codes. */
 export const ERROR_CODES = [
   "INVALID_ARGUMENT",
+  "UNAUTHORIZED",
   "UNSUPPORTED_BROWSER",
   "UNSUPPORTED_ACTION",
   "CONTEXT_NOT_FOUND",

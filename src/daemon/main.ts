@@ -2,6 +2,7 @@
  * Daemon entrypoint: `node dist/daemon/main.js`. Started on demand by the CLI.
  */
 import { appendFileSync, mkdirSync } from "node:fs";
+import { ensureToken } from "../contracts/auth.js";
 import { resolvePaths } from "../contracts/paths.js";
 import type { Paths } from "../contracts/protocol.js";
 import type { BindingView, BrowserName } from "../contracts/types.js";
@@ -113,8 +114,9 @@ function stopper(service: DaemonService, bridge: ExtensionBridge, server: Runnin
 }
 
 async function serve(paths: Paths, service: DaemonService, bridge: ExtensionBridge, log: LogFn): Promise<void> {
-  await bridge.start(paths.extensionSocket);
-  const server = await startServer(service, paths, { onRequest: (entry) => log("request", { ...entry }) });
+  const token = ensureToken(paths);
+  await bridge.start(paths.extensionSocket, token);
+  const server = await startServer(service, paths, { onRequest: (entry) => log("request", { ...entry }), authToken: token });
   const stop = stopper(service, bridge, server, log);
   service.onShutdown(() => void stop("shutdown"));
   handleSignals(stop, log);

@@ -31,14 +31,17 @@ export class ExtensionBridge {
   private unshareHandler: (context: string) => Promise<void> = () => Promise.reject(new Error("daemon is not ready"));
   private activateHandler: (context: string) => Promise<void> = () => Promise.reject(new Error("daemon is not ready"));
   private tabsListener: (key: string, tabs: readonly LiveTab[]) => void = () => undefined;
+  private authToken: string | undefined;
 
-  async start(socketPath: string): Promise<void> {
+  async start(socketPath: string, authToken?: string): Promise<void> {
     this.startedAt = Date.now();
+    this.authToken = authToken;
     this.server = await listenOwnerOnly(socketPath, (socket) => {
       const connection = new ExtensionConnection(socket, {
         onIdentified: (conn) => this.identify(conn),
         onTabs: (conn) => this.tabsChanged(conn),
         onPin: (tabId) => this.pinHandler(tabId),
+        authToken: () => this.authToken,
         onBindings: () => this.bindingsHandler(),
         onShare: (tabId) => this.shareHandler(tabId),
         onUnshare: (context) => this.unshareHandler(context),

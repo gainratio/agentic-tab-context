@@ -12,7 +12,7 @@ This tracks the findings in [ATC-SECURITY-REVIEW.md](ATC-SECURITY-REVIEW.md). It
 | S-06 page-world log integrity | Open | Isolated-world inspect/actions; console/network capture is still page-world. | CDP or browser-supported trusted capture. |
 | S-07 wrong-tab actions | Partial | Multiple contexts are explicit; `--each` is opt-in and returns per-tab results; `--context`/bindings address a tab. | Fail on unqualified actions when more than one context is open. |
 | S-09 arbitrary file upload | Open | Upload still accepts a CLI path. | User-picker/allowlist and per-upload confirmation. |
-| S-10 local IPC authentication | Open | Owner-only Unix sockets and native-host extension allowlist. | Per-install token, client approval, peer identity. |
+| S-10 local IPC authentication | Implemented (token) | Per-install `auth-token` (0600); CLI sends it; native host injects it into hello; both sockets reject mismatches with `UNAUTHORIZED`. | A user-approval flow for new clients and peer-identity checks. |
 | S-11 extension permission creep | Open | `<all_urls>` + `tabs` + `scripting`; `sidePanel` added. | Optional per-origin host permissions, revoke on unshare. |
 | S-12 cross-task contamination | Partial | Contexts can be closed individually; side panel can unshare all visibly. | Workspace IDs/TTL and per-workspace audit. |
 | S-13 confirmation/audit | Partial | Sensitive share confirmation; destructive approval is not generalized. | Risk classes and confirmation for submit/send/delete/pay/auth. |
