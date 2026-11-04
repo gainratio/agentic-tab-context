@@ -72,7 +72,16 @@ describe("page agent", () => {
     expect(await run(actOp("click", del))).toMatchObject({ ok: false, error: "AMBIGUOUS_TARGET", matched: 2 });
     expect(await run(actOp("click", { ...del, nth: 1 }))).toEqual({ ok: true, matched: 1 });
     expect(await run(actOp("click", { ...del, nth: 5 }))).toMatchObject({ ok: false, error: "TARGET_NOT_FOUND", matched: 2 });
-    expect(await run(actOp("click", { kind: "text", text: "Hidden Only" }))).toMatchObject({ error: "TARGET_NOT_FOUND" });
+    expect(await run(actOp("click", { kind: "text", text: "Hidden Only" }))).toMatchObject({ error: "ELEMENT_HIDDEN" });
+    await page.evaluate(() => {
+      const button = document.createElement("button");
+      button.textContent = "Disabled Action";
+      button.disabled = true;
+      button.id = "disabled-action";
+      document.body.append(button);
+    });
+    expect(await run(actOp("click", { kind: "role", role: "button", name: "Disabled Action" }))).toMatchObject({ error: "ELEMENT_DISABLED" });
+    await page.locator("#disabled-action").evaluate((element) => element.remove());
     expect(await run(actOp("select", { kind: "label", label: "Environment" }, "Nope"))).toMatchObject({ error: "TARGET_NOT_FOUND" });
   });
 
