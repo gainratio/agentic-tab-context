@@ -6,6 +6,16 @@ Keep your website open and ask Claude Code, Codex or Antigravity for help. Agent
 
 First time here? Complete the [one-time installation](#one-time-installation), including the steps for your assistant.
 
+## Design work in progress
+
+The next ATC UX adds a visible workspace of shared tabs, a chat-side tab picker, and verified action results:
+
+- [UX and reliability spec](docs/ATC-UX-SPEC.md)
+- [Interactive side-panel prototype](prototype/index.html)
+- [Security and privacy review](docs/ATC-SECURITY-REVIEW.md)
+
+The first backend foundation is available as `atc bindings`, a read-only list of every open context. See the [command reference](docs/SPEC.md#commands).
+
 ## Everyday use: just ask
 
 1. **Open your website** in the browser you normally use. Log in yourself if needed.

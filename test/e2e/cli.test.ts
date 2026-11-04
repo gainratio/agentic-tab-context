@@ -29,6 +29,12 @@ afterAll(async () => {
 describe("atc end to end (managed window)", () => {
   let ctx = "";
 
+  it("returns ok with an empty binding list before any context exists", async () => {
+    const listed = await atc("bindings");
+    expect(listed.code).toBe(0);
+    expect(listed.json).toEqual({ ok: true, current: null, bindings: [] });
+  });
+
   it("opens a sticky context and makes it current", async () => {
     const opened = await atc("open", "chromium", "--use");
     expect(opened.code).toBe(0);
@@ -80,6 +86,28 @@ describe("atc end to end (managed window)", () => {
     expect((await atc("bind", "--query", "Fixture App", "--browser", "chromium")).json).toMatchObject({ ok: true, context: ctx, reused: true });
   });
 
+  it("lists the daemon's open bindings with query and browser filters", async () => {
+    const listed = await atc("bindings");
+    expect(listed.code).toBe(0);
+    expect(listed.json).toMatchObject({ ok: true, current: ctx });
+    const bindings = listed.json.bindings as Json[];
+    expect(bindings).toHaveLength(1);
+    expect(bindings[0]).toMatchObject({
+      context: ctx,
+      browser: "chromium",
+      source: "managed",
+      url: `${fixtures.baseUrl}/app.html`,
+      title: "Fixture App",
+      current: true,
+    });
+    expect(String(bindings[0]?.tabId)).toMatch(/^managed:chromium:/);
+
+    expect((await atc("bindings", "--query", "FIXTURE APP")).json.bindings).toHaveLength(1);
+    expect((await atc("bindings", "--query", "app.html")).json.bindings).toHaveLength(1);
+    expect((await atc("bindings", "--query", "no-such-page")).json).toEqual({ ok: true, current: ctx, bindings: [] });
+    expect((await atc("bindings", "--browser", "chrome")).json).toEqual({ ok: true, current: ctx, bindings: [] });
+  });
+
   it("explains next steps in doctor", async () => {
     const report = await atc("doctor");
     expect(report.json).toMatchObject({ ok: true, contexts: { current: ctx } });
@@ -96,5 +124,6 @@ describe("atc end to end (managed window)", () => {
     expect((await atc("close", ctx)).json).toMatchObject({ ok: true, context: ctx });
     expect((await atc("current")).json).toMatchObject({ ok: false, error: "NO_CURRENT_CONTEXT" });
     expect((await atc("goto", "--context", ctx, "/app.html")).json).toMatchObject({ ok: false, error: "CONTEXT_CLOSED" });
+    expect((await atc("bindings")).json).toEqual({ ok: true, current: null, bindings: [] });
   });
 });
