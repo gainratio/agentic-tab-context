@@ -28,7 +28,6 @@ FOREIGN_REPOSITORIES = (
 )
 VALID_SHA = "a" * 40
 ROOT = Path(__file__).parents[2]
-PYTHON_GATE = "uv run --frozen --extra quality poe gate"
 
 
 def _required_ci_step(steps: list[dict[str, object]], **selector: object) -> int:
@@ -40,25 +39,24 @@ def _required_ci_step(steps: list[dict[str, object]], **selector: object) -> int
     return matches[0]
 
 
-def test_should_require_the_frozen_python_module_gate_in_ci() -> None:
-    workflow = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())
-    job = workflow["jobs"]["check"]
+def test_should_require_thin_dagger_ingress_workflow() -> None:
+    workflow = yaml.safe_load((ROOT / ".github/workflows/dagger.yml").read_text())
+    job = workflow["jobs"]["dagger"]
     assert "if" not in job
     assert not job.get("continue-on-error", False)
     steps = job["steps"]
-    generate = _required_ci_step(steps, run="dagger develop")
-    gate = _required_ci_step(steps, run=PYTHON_GATE)
-    assert steps[gate]["working-directory"] == ".dagger"
-    assert generate < gate
-    dagger_install = _required_ci_step(
+    checkout = _required_ci_step(
+        steps, uses="actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
+    )
+    dagger_step = _required_ci_step(
         steps, uses="dagger/dagger-for-github@27b130bf0f79a7f6fbbbe0fbca6760dc9bb40a77"
     )
-    uv_install = _required_ci_step(
-        steps, uses="astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9"
-    )
-    assert max(dagger_install, uv_install) < generate
-    assert steps[dagger_install]["with"]["version"] == "0.21.8"
-    assert steps[uv_install]["with"] == {"version": "0.13.5", "python-version": "3.13.14"}
+    assert [checkout, dagger_step] == [0, 1]
+    assert len(steps) == len((checkout, dagger_step))
+    assert steps[dagger_step]["with"] == {
+        "version": "0.21.8",
+        "call": "ci --commit-sha=${{ github.sha }} --repository=${{ github.repository }}",
+    }
 
 
 def test_should_keep_every_python_module_quality_check_in_the_gate() -> None:
