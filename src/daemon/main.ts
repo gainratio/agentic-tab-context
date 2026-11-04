@@ -4,7 +4,7 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { resolvePaths } from "../contracts/paths.js";
 import type { Paths } from "../contracts/protocol.js";
-import type { BrowserName } from "../contracts/types.js";
+import type { BindingView, BrowserName } from "../contracts/types.js";
 import { ExtensionBridge } from "../drivers/extension/bridge.js";
 import { ExtensionDriver } from "../drivers/extension/driver.js";
 import { createDriver } from "../drivers/index.js";
@@ -43,15 +43,50 @@ function buildService(paths: Paths, bridge: ExtensionBridge): DaemonService {
     extensionDriver,
     macosDriver: new MacosTabDriver(),
   });
-  bridge.onPinTab((tabId) => bindFromPopup(service, tabId));
+  wireSidePanel(service, bridge);
   return service;
 }
 
-/** The extension popup's "use this tab" button binds that tab and makes it current. */
-async function bindFromPopup(service: DaemonService, tabId: string): Promise<string> {
-  const res = await service.handle({ method: "bind", params: { tab: tabId, use: true } });
+/** Register the side-panel and popup callbacks on the extension bridge. */
+function wireSidePanel(service: DaemonService, bridge: ExtensionBridge): void {
+  bridge.onPinTab((tabId) => bindFromPopup(service, tabId));
+  bridge.onBindings(() => extensionBindings(service));
+  bridge.onShare((tabId) => service.shareFromExtension(tabId));
+  bridge.onUnshare((context) => closeFromExtension(service, context));
+  bridge.onActivate((context) => activateFromExtension(service, context));
+}
+
+/** The side panel's read-only workspace view; never discovers, binds, or acts on a tab. */
+async function extensionBindings(service: DaemonService): Promise<{ current: string | null; bindings: BindingView[] }> {
+  const res = await service.handle({ method: "bindings", params: {} });
   if (!res.ok) throw new Error(res.message);
-  return String(res.context);
+  return {
+    current: typeof res.current === "string" ? res.current : null,
+    bindings: Array.isArray(res.bindings) ? (res.bindings as BindingView[]) : [],
+  };
+}
+
+/** The side panel's unshare closes the context only; the browser tab stays open. */
+async function closeFromExtension(service: DaemonService, context: string): Promise<void> {
+  const res = await service.handle({ method: "close", params: { context } });
+  if (!res.ok) throw new Error(res.message);
+}
+
+/** The side panel's activate switches the current context without binding or navigating. */
+async function activateFromExtension(service: DaemonService, context: string): Promise<void> {
+  const res = await service.handle({ method: "use", params: { context } });
+  if (!res.ok) throw new Error(res.message);
+}
+
+/**
+ * The extension popup's "use this tab" button is user-initiated: share it
+ * (which permits sensitive origins) and then make it the active context.
+ */
+async function bindFromPopup(service: DaemonService, tabId: string): Promise<string> {
+  const context = await service.shareFromExtension(tabId);
+  const used = await service.handle({ method: "use", params: { context } });
+  if (!used.ok) throw new Error(used.message);
+  return context;
 }
 
 function handleSignals(stop: (reason: string) => Promise<void>, log: LogFn): void {

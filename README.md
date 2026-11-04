@@ -6,15 +6,17 @@ Keep your website open and ask Claude Code, Codex or Antigravity for help. Agent
 
 First time here? Complete the [one-time installation](#one-time-installation), including the steps for your assistant.
 
-## Design work in progress
+## Shared tabs workspace
 
-The next ATC UX adds a visible workspace of shared tabs, a chat-side tab picker, and verified action results:
+The extension now ships a real multi-tab side panel: search all tabs, share/unshare without closing them, set the active target, lock sensitive sites, and see live removal when a tab closes. The daemon, side panel, and CLI share one context registry.
 
+- [Side-panel prototype](prototype/index.html) — interaction reference
 - [UX and reliability spec](docs/ATC-UX-SPEC.md)
-- [Interactive side-panel prototype](prototype/index.html)
 - [Security and privacy review](docs/ATC-SECURITY-REVIEW.md)
+- [Extension ↔ daemon contract](docs/ATC-EXTENSION-CONTRACT.md)
+- [Workspace implementation plan](docs/ATC-WORKSPACE-PLAN.md)
 
-The first backend foundation is available as `atc bindings`, a read-only list of every open context. See the [command reference](docs/SPEC.md#commands).
+`atc bindings` lists every open context; `atc use <ctx>` switches the active one. See the [command reference](docs/SPEC.md#commands).
 
 ## Everyday use: just ask
 

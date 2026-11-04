@@ -50,14 +50,9 @@ export class DaemonService {
     this.env = deps.env ?? process.env;
     this.now = deps.now ?? (() => new Date());
     this.binder = new TabBinder({
-      ...deps,
-      now: this.now,
-      drivers: this.drivers,
-      driverFor: (browser) => this.driverFor(browser),
-      attach: (id, driver, session) => this.attach(id, driver, session),
+      ...deps, now: this.now, drivers: this.drivers, driverFor: (browser) => this.driverFor(browser), attach: (id, driver, session) => this.attach(id, driver, session),
     });
-    const pages = new PageCommands({ registry: this.registry, paths: deps.paths, now: this.now, resolve: (p) => this.resolve(p) });
-    this.handlers = { ...this.contextHandlers(), ...pages.handlers() };
+    this.handlers = { ...this.contextHandlers(), ...new PageCommands({ registry: this.registry, paths: deps.paths, now: this.now, resolve: (p) => this.resolve(p) }).handlers() };
   }
 
   async handle(req: Request): Promise<Response> {
@@ -69,6 +64,13 @@ export class DaemonService {
     } catch (err) {
       return redact(toErrorResponse(err), secret);
     }
+  }
+
+  /** User-initiated share: no active change, and the sensitive-tab gate is bypassed. */
+  async shareFromExtension(tabId: string): Promise<string> {
+    const res = await this.binder.shareFromExtension(tabId);
+    if (typeof res.context !== "string") throw new AtcError("INTERNAL", "share did not return a context");
+    return res.context;
   }
 
   route(req: Request): RoutedRequest {
@@ -194,5 +196,4 @@ export class DaemonService {
     this.drivers.set(browser, driver);
     return driver;
   }
-
 }

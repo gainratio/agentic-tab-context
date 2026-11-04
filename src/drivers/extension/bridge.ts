@@ -4,7 +4,7 @@
  * and the browser only launches the host for our own extension ID.
  */
 import { AtcError } from "../../contracts/errors.js";
-import { type ExtensionAction, HOST_RECONNECT_MS } from "../../contracts/extension.js";
+import { type ExtensionAction, type ExtensionBindings, HOST_RECONNECT_MS } from "../../contracts/extension.js";
 import type { LiveTab } from "../../contracts/types.js";
 import { type RunningServer, listenOwnerOnly } from "../../transport/unix-server.js";
 import { ExtensionConnection } from "./connection.js";
@@ -17,6 +17,8 @@ export interface ConnectedExtension {
   key: string;
   browser: string;
   tabs: number;
+  protocol: number;
+  version: string;
 }
 
 export class ExtensionBridge {
@@ -24,6 +26,10 @@ export class ExtensionBridge {
   private startedAt = 0;
   private readonly connections = new Map<string, ExtensionConnection>();
   private pinHandler: (tabId: string) => Promise<string> = () => Promise.reject(new Error("daemon is not ready"));
+  private bindingsHandler: () => Promise<ExtensionBindings> = () => Promise.reject(new Error("daemon is not ready"));
+  private shareHandler: (tabId: string) => Promise<string> = () => Promise.reject(new Error("daemon is not ready"));
+  private unshareHandler: (context: string) => Promise<void> = () => Promise.reject(new Error("daemon is not ready"));
+  private activateHandler: (context: string) => Promise<void> = () => Promise.reject(new Error("daemon is not ready"));
   private tabsListener: (key: string, tabs: readonly LiveTab[]) => void = () => undefined;
 
   async start(socketPath: string): Promise<void> {
@@ -33,6 +39,10 @@ export class ExtensionBridge {
         onIdentified: (conn) => this.identify(conn),
         onTabs: (conn) => this.tabsChanged(conn),
         onPin: (tabId) => this.pinHandler(tabId),
+        onBindings: () => this.bindingsHandler(),
+        onShare: (tabId) => this.shareHandler(tabId),
+        onUnshare: (context) => this.unshareHandler(context),
+        onActivate: (context) => this.activateHandler(context),
       });
       socket.on("close", () => this.forget(connection));
     });
@@ -47,12 +57,32 @@ export class ExtensionBridge {
     this.pinHandler = handler;
   }
 
+  /** Side-panel `bindings` request: return the workspace snapshot from the daemon. */
+  onBindings(handler: () => Promise<ExtensionBindings>): void {
+    this.bindingsHandler = handler;
+  }
+
+  /** Side-panel `share` request: user-initiated, so sensitive tabs are allowed and current is unchanged. */
+  onShare(handler: (tabId: string) => Promise<string>): void {
+    this.shareHandler = handler;
+  }
+
+  /** Side-panel `unshare` request: close the context, never the browser tab. */
+  onUnshare(handler: (context: string) => Promise<void>): void {
+    this.unshareHandler = handler;
+  }
+
+  /** Side-panel `activate` request: make an existing context current. */
+  onActivate(handler: (context: string) => Promise<void>): void {
+    this.activateHandler = handler;
+  }
+
   onTabsChanged(listener: (key: string, tabs: readonly LiveTab[]) => void): void {
     this.tabsListener = listener;
   }
 
   connected(): ConnectedExtension[] {
-    return [...this.connections.values()].map((c) => ({ key: c.key, browser: c.browser, tabs: c.tabs.length }));
+    return [...this.connections.values()].map((c) => ({ key: c.key, browser: c.browser, tabs: c.tabs.length, protocol: c.protocol, version: c.version }));
   }
 
   listTabs(): LiveTab[] {

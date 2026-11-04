@@ -95,8 +95,12 @@ export interface PageState {
   aria: string;
 }
 
+export type ActionEffect = "url_changed" | "title_changed" | "no_visible_change" | "unknown";
+
 export interface ActionResult {
   matched: number; // always 1 on success
+  /** Best-effort observed effect for drivers that can compare before/after state. */
+  effect?: ActionEffect;
 }
 
 export interface ScreenshotResult {

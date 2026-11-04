@@ -21,6 +21,15 @@ function isId(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
 
+/** Side-panel requests and browser tab ids are positive integers, never 0. */
+function isPositiveId(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+}
+
+function isContext(value: unknown): value is string {
+  return typeof value === "string" && value.trim() !== "";
+}
+
 function parseTab(raw: unknown): ExtensionTab | undefined {
   if (!isRaw(raw) || !isId(raw.id)) return undefined;
   return {
@@ -35,7 +44,15 @@ function parseHello(raw: Raw): ExtensionToDaemon | undefined {
   const browser = raw.browser;
   const known = (EXTENSION_BROWSERS as readonly unknown[]).includes(browser);
   if (!known || typeof raw.instance !== "string" || !INSTANCE_PATTERN.test(raw.instance)) return undefined;
-  return { type: "hello", browser: browser as ExtensionBrowser, instance: raw.instance };
+  const protocol = typeof raw.protocol === "number" && Number.isSafeInteger(raw.protocol) && raw.protocol > 0 ? raw.protocol : undefined;
+  const version = typeof raw.version === "string" && raw.version.length <= 64 ? raw.version : undefined;
+  return {
+    type: "hello",
+    browser: browser as ExtensionBrowser,
+    instance: raw.instance,
+    ...(protocol === undefined ? {} : { protocol }),
+    ...(version === undefined ? {} : { version }),
+  };
 }
 
 function parseTabs(raw: Raw): ExtensionToDaemon | undefined {
@@ -57,7 +74,23 @@ function parseResult(raw: Raw): ExtensionToDaemon | undefined {
 }
 
 function parsePin(raw: Raw): ExtensionToDaemon | undefined {
-  return isId(raw.id) && isId(raw.tabId) ? { type: "pin", id: raw.id, tabId: raw.tabId } : undefined;
+  return isPositiveId(raw.id) && isPositiveId(raw.tabId) ? { type: "pin", id: raw.id, tabId: raw.tabId } : undefined;
+}
+
+function parseBindings(raw: Raw): ExtensionToDaemon | undefined {
+  return isPositiveId(raw.id) ? { type: "bindings", id: raw.id } : undefined;
+}
+
+function parseShare(raw: Raw): ExtensionToDaemon | undefined {
+  return isPositiveId(raw.id) && isPositiveId(raw.tabId) ? { type: "share", id: raw.id, tabId: raw.tabId } : undefined;
+}
+
+function parseUnshare(raw: Raw): ExtensionToDaemon | undefined {
+  return isPositiveId(raw.id) && isContext(raw.context) ? { type: "unshare", id: raw.id, context: raw.context } : undefined;
+}
+
+function parseActivate(raw: Raw): ExtensionToDaemon | undefined {
+  return isPositiveId(raw.id) && isContext(raw.context) ? { type: "activate", id: raw.id, context: raw.context } : undefined;
 }
 
 const PARSERS: Readonly<Record<string, (raw: Raw) => ExtensionToDaemon | undefined>> = {
@@ -65,6 +98,10 @@ const PARSERS: Readonly<Record<string, (raw: Raw) => ExtensionToDaemon | undefin
   tabs: parseTabs,
   result: parseResult,
   pin: parsePin,
+  bindings: parseBindings,
+  share: parseShare,
+  unshare: parseUnshare,
+  activate: parseActivate,
 };
 
 export function parseExtensionMessage(line: string): ExtensionToDaemon | undefined {

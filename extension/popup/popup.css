@@ -120,6 +120,28 @@ body {
   outline-offset: 3px;
 }
 
+.secondary-btn {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.secondary-btn:hover {
+  border-color: #64748b;
+  background: #263449;
+}
+
+.secondary-btn:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 3px;
+}
+
 .feedback {
   font-size: 11.5px;
   padding: 8px;

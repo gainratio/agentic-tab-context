@@ -25,12 +25,16 @@
     ],
     "type": "module"
   },
+  "side_panel": {
+    "default_path": "sidepanel/index.html"
+  },
   "permissions": [
     "tabs",
     "scripting",
     "storage",
     "alarms",
-    "nativeMessaging"
+    "nativeMessaging",
+    "sidePanel"
   ],
   "host_permissions": [
     "<all_urls>"

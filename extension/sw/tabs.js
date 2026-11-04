@@ -6,21 +6,30 @@ import { send } from "./native.js";
 
 const PAGE_URL = /^(https?|file):/;
 
+/** Every tab the daemon can receive, plus the window used to compute "active". */
+export async function queryPageTabs() {
+  const [tabs, focusedWindowId] = await Promise.all([chrome.tabs.query({}), lastFocusedWindowId()]);
+  return {
+    focusedWindowId,
+    tabs: tabs.filter((tab) => typeof tab.id === "number" && PAGE_URL.test(tab.url || "")),
+  };
+}
+
 export async function pushTabs() {
-  const [tabs, focused] = await Promise.all([chrome.tabs.query({}), lastFocusedWindowId()]);
-  const visible = tabs.filter((tab) => typeof tab.id === "number" && PAGE_URL.test(tab.url || ""));
+  const { tabs, focusedWindowId } = await queryPageTabs();
   send({
     type: "tabs",
-    tabs: visible.map((tab) => ({
+    tabs: tabs.map((tab) => ({
       id: tab.id,
       url: tab.url || "",
       title: tab.title || "",
-      active: Boolean(tab.active) && tab.windowId === focused,
+      active: Boolean(tab.active) && tab.windowId === focusedWindowId,
     })),
   });
+  return tabs;
 }
 
-async function lastFocusedWindowId() {
+export async function lastFocusedWindowId() {
   try {
     return (await chrome.windows.getLastFocused()).id;
   } catch {

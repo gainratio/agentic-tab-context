@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AtcError } from "../../src/contracts/errors.js";
 import { EXTENSION_NAVIGATION_TIMEOUT_MS } from "../../src/contracts/extension.js";
 import { resolvePaths } from "../../src/contracts/paths.js";
+import type { BindingView } from "../../src/contracts/types.js";
 import { ContextRegistry } from "../../src/daemon/registry.js";
 import { DaemonService } from "../../src/daemon/service.js";
 import { ExtensionBridge } from "../../src/drivers/extension/bridge.js";
@@ -91,6 +92,27 @@ function daemon(): { service: DaemonService; registry: ContextRegistry } {
   return { service, registry };
 }
 
+/** The same wiring `daemon/main.ts` installs, for socket-level side-panel tests. */
+function wireSidePanel(service: DaemonService): void {
+  bridge.onBindings(async () => {
+    const res = await service.handle({ method: "bindings", params: {} });
+    if (!res.ok) throw new Error(res.message);
+    return {
+      current: typeof res.current === "string" ? res.current : null,
+      bindings: (res.bindings ?? []) as BindingView[],
+    };
+  });
+  bridge.onShare((tabId) => service.shareFromExtension(tabId));
+  bridge.onUnshare(async (context) => {
+    const res = await service.handle({ method: "close", params: { context } });
+    if (!res.ok) throw new Error(res.message);
+  });
+  bridge.onActivate(async (context) => {
+    const res = await service.handle({ method: "use", params: { context } });
+    if (!res.ok) throw new Error(res.message);
+  });
+}
+
 async function connectBrowser(tabs: Json[] = [{ id: 7, url: "http://localhost:3000/app", title: "My App", active: true }]): Promise<void> {
   host = await FakeHost.connect(socketPath);
   host.send({ type: "hello", browser: "chromium", instance: INSTANCE });
@@ -129,7 +151,7 @@ describe("ExtensionBridge", () => {
     expect(bridge.listTabs()).toEqual([
       { tabId: TAB, browser: "chromium", source: "extension", url: "http://localhost:3000/app", title: "My App", active: true },
     ]);
-    expect(bridge.connected()).toEqual([{ key: `chromium-${INSTANCE}`, browser: "chromium", tabs: 1 }]);
+    expect(bridge.connected()).toEqual([{ key: `chromium-${INSTANCE}`, browser: "chromium", tabs: 1, protocol: 1, version: "" }]);
   });
 
   it("binds a tab, starts console/network capture, and drives it with the navigation budget", async () => {
@@ -149,10 +171,19 @@ describe("ExtensionBridge", () => {
     await host.answer({ ok: true });
     const session = await binding;
     const click = driver.click(session, { kind: "role", role: "button", name: "Delete" });
-    await host.answer({ ok: false, error: "AMBIGUOUS_TARGET", message: "2 match", matched: 2 });
+    const clickCommand = await host.next();
+    expect(clickCommand).toMatchObject({ type: "command", tabId: 7, action: "page" });
+    // A page action that matched but failed is a successful command with a failed result payload.
+    host.send({
+      type: "result",
+      id: clickCommand.id,
+      ok: true,
+      result: { ok: false, error: "AMBIGUOUS_TARGET", message: "2 match", matched: 2 },
+    });
     await expect(click).rejects.toMatchObject({ code: "AMBIGUOUS_TARGET", details: { matched: 2 } });
     const reload = driver.reload(session);
-    await host.answer(undefined, false, { error: "NOT_A_REAL_CODE", message: "boom" });
+    const reloadCommand = await host.next();
+    host.send({ type: "result", id: reloadCommand.id, ok: false, error: "NOT_A_REAL_CODE", message: "boom" });
     await expect(reload).rejects.toMatchObject({ code: "ACTION_FAILED", message: "boom" });
   });
 
@@ -259,6 +290,139 @@ describe("ExtensionBridge", () => {
     await connectBrowser();
     host.send({ type: "pin", id: 3, tabId: 7 });
     expect(await host.next()).toEqual({ type: "pinned", id: 3, ok: true, context: "ctx_beef" });
+  });
+});
+
+describe("side panel over the extension socket", () => {
+  it("serves bindings, share, activate, and unshare with matching request ids", async () => {
+    await connectBrowser();
+    const { service, registry } = daemon();
+    wireSidePanel(service);
+
+    host.send({ type: "bindings", id: 11 });
+    expect(await host.next()).toEqual({ type: "bindings", id: 11, ok: true, current: null, bindings: [] });
+
+    host.send({ type: "share", id: 12, tabId: 7 });
+    expect(await host.answer({ ok: true })).toMatchObject({ type: "command", tabId: 7, action: "watch" });
+    const shared = await host.next();
+    expect(shared).toMatchObject({ type: "shared", id: 12, ok: true });
+    const context = String(shared.context);
+    expect(context).toMatch(/^ctx_[0-9a-f]{4}$/);
+
+    host.send({ type: "bindings", id: 13 });
+    expect(await host.next()).toEqual({
+      type: "bindings",
+      id: 13,
+      ok: true,
+      current: null,
+      bindings: [
+        {
+          context,
+          tabId: TAB,
+          browser: "chromium",
+          source: "extension",
+          url: "http://localhost:3000/app",
+          title: "My App",
+          current: false,
+        },
+      ],
+    });
+    expect(registry.current).toBeNull();
+
+    host.send({ type: "activate", id: 14, context });
+    expect(await host.next()).toEqual({ type: "activated", id: 14, ok: true, context });
+    expect(registry.current).toBe(context);
+
+    host.send({ type: "unshare", id: 15, context });
+    expect(await host.answer({ ok: true })).toMatchObject({ type: "command", tabId: 7, action: "unwatch" });
+    expect(await host.next()).toEqual({ type: "unshared", id: 15, ok: true, context });
+
+    host.send({ type: "bindings", id: 16 });
+    expect(await host.next()).toEqual({ type: "bindings", id: 16, ok: true, current: null, bindings: [] });
+  });
+
+  it("reports side-panel failures as ok:false with the request id and keeps serving", async () => {
+    await connectBrowser();
+    const { service } = daemon();
+    wireSidePanel(service);
+
+    host.send({ type: "share", id: 21, tabId: 99 });
+    expect(await host.next()).toMatchObject({ type: "shared", id: 21, ok: false, message: expect.stringContaining("no longer open") });
+
+    host.send({ type: "activate", id: 22, context: "ctx_dead" });
+    expect(await host.next()).toMatchObject({
+      type: "activated",
+      id: 22,
+      ok: false,
+      message: expect.stringContaining("ctx_dead"),
+    });
+
+    host.send({ type: "unshare", id: 23, context: "ctx_dead" });
+    expect(await host.next()).toMatchObject({
+      type: "unshared",
+      id: 23,
+      ok: false,
+      message: expect.stringContaining("ctx_dead"),
+    });
+
+    host.send({ type: "bindings", id: 24 });
+    expect(await host.next()).toEqual({ type: "bindings", id: 24, ok: true, current: null, bindings: [] });
+  });
+
+  it("turns a bindings callback failure into ok:false and stays connected", async () => {
+    await connectBrowser();
+    bridge.onBindings(() => Promise.reject(new Error("snapshot failed")));
+    host.send({ type: "bindings", id: 31 });
+    expect(await host.next()).toEqual({
+      type: "bindings",
+      id: 31,
+      ok: false,
+      current: null,
+      bindings: [],
+      message: "snapshot failed",
+    });
+    bridge.onBindings(() => Promise.resolve({ current: null, bindings: [] }));
+    host.send({ type: "bindings", id: 32 });
+    expect(await host.next()).toEqual({ type: "bindings", id: 32, ok: true, current: null, bindings: [] });
+  });
+
+  it("drops malformed side-panel requests and passes browser-scoped tab ids to onShare", async () => {
+    await connectBrowser();
+    const shared: string[] = [];
+    bridge.onShare((tabId) => {
+      shared.push(tabId);
+      return Promise.resolve("ctx_beef");
+    });
+    host.send({ type: "share", id: 0, tabId: 7 });
+    host.send({ type: "share", id: 4, tabId: 0 });
+    host.send({ type: "unshare", id: 5, context: "" });
+    host.send({ type: "activate", id: 6, context: "   " });
+    host.send({ type: "bindings", id: 0 });
+    host.send({ type: "share", id: 41, tabId: 7 });
+    expect(await host.next()).toEqual({ type: "shared", id: 41, ok: true, context: "ctx_beef" });
+    expect(shared).toEqual([TAB]);
+  });
+
+  it("correlates concurrent replies by id even when one callback is slower", async () => {
+    await connectBrowser();
+    let calls = 0;
+    bridge.onShare(async () => {
+      calls += 1;
+      if (calls === 1) {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+        return "ctx_slow";
+      }
+      return "ctx_fast";
+    });
+    host.send({ type: "share", id: 51, tabId: 7 });
+    host.send({ type: "share", id: 52, tabId: 7 });
+    const replies = [await host.next(), await host.next()];
+    expect(replies).toEqual(
+      expect.arrayContaining([
+        { type: "shared", id: 51, ok: true, context: "ctx_slow" },
+        { type: "shared", id: 52, ok: true, context: "ctx_fast" },
+      ]),
+    );
   });
 });
 

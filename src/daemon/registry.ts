@@ -4,6 +4,7 @@
 import { randomBytes } from "node:crypto";
 import { AtcError } from "../contracts/errors.js";
 import type { BrowserName, BrowserSession, TabContext, TabSource } from "../contracts/types.js";
+import { redactUrl } from "./redaction.js";
 import { ID_PATTERN, compareContexts, loadContexts, writeStateFile } from "./registry-store.js";
 
 /** Returns `size` random bytes. Injectable so tests can force id collisions. */
@@ -148,6 +149,10 @@ export class ContextRegistry {
   }
 
   private persist(): void {
-    writeStateFile(this.statePath, this.snapshot());
+    const snapshot = this.snapshot();
+    writeStateFile(this.statePath, {
+      ...snapshot,
+      contexts: snapshot.contexts.map((ctx) => (ctx.url === undefined ? ctx : { ...ctx, url: redactUrl(ctx.url) })),
+    });
   }
 }

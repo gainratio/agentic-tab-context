@@ -12,7 +12,7 @@ import { NATIVE_HOST_NAME } from "../../src/contracts/extension.js";
 import { resolvePaths } from "../../src/contracts/paths.js";
 import { resolveExecutable } from "../../src/drivers/playwright/executables.js";
 import { EXTENSION_DIR, extensionIdFromKey, extensionManifest, hostManifest, writeLauncher } from "../../src/native/install.js";
-import { type CliResult, type Json, cli, eventually } from "../helpers/cli.js";
+import { ROOT, type CliResult, type Json, cli, eventually } from "../helpers/cli.js";
 import { type FixtureServer, startFixtureServer } from "../helpers/fixture-server.js";
 
 let home: string;
@@ -91,7 +91,9 @@ describe("browser extension end to end", () => {
     expect((await atc("inspect")).json.aria).toContain('- heading "Fixture App"');
     expect((await atc("type", "--label", "Product Name", "--value", "Blue Shirt")).json).toMatchObject({ ok: true, matched: 1 });
     expect((await atc("select", "--label", "Environment", "--value", "Stage")).json).toMatchObject({ ok: true });
-    expect((await atc("click", "--role", "button", "--name", "Save")).json).toMatchObject({ ok: true, matched: 1 });
+    const saved = await atc("click", "--role", "button", "--name", "Save");
+    expect(saved.json).toMatchObject({ ok: true, matched: 1 });
+    expect(["no_visible_change", "url_changed", "title_changed", "unknown"]).toContain(saved.json.effect);
     expect(await page.textContent("#status")).toBe("Saved: Blue Shirt");
     expect((await atc("click", "--role", "button", "--name", "Delete")).json).toMatchObject({ ok: false, error: "AMBIGUOUS_TARGET", matched: 2 });
   });
@@ -263,5 +265,114 @@ describe("browser extension end to end", () => {
     const current = await eventually(() => atc("current"), (r) => r.json.ok === false);
     expect(current.json).toMatchObject({ ok: false, error: "NO_CURRENT_CONTEXT" });
     expect((await atc("inspect", "--context", ctx)).json).toMatchObject({ ok: false, error: "CONTEXT_CLOSED" });
+  });
+});
+
+/**
+ * The real side panel, inside the real extension, driving the real daemon over
+ * native messaging: share -> bindings -> activate -> unshare. This is the
+ * integration the mocked sidepanel DOM test cannot prove.
+ */
+describe("side panel end to end", () => {
+  it("shares, activates, and unshares a live tab through the real panel", async () => {
+    const fixture = await context.newPage();
+    await fixture.goto(`${fixtures.baseUrl}/pricing.html?sidepanel`);
+    const listed = await eventually(() => atc("bindings"), (r) => Array.isArray(r.json.bindings));
+    for (const binding of (listed.json.bindings as Json[] | undefined) ?? []) {
+      await atc("close", "--context", String(binding.context));
+    }
+
+    const extensionId = extensionIdFromKey(extensionManifest().key);
+    const panel = await context.newPage();
+    await panel.goto(`chrome-extension://${extensionId}/sidepanel/index.html`);
+    await panel.locator("#tab-list [data-tab-id]").first().waitFor({ state: "visible", timeout: 20_000 });
+    const row = panel.locator("#tab-list [data-tab-id]").filter({ hasText: "Pricing" }).first();
+    await row.locator("[data-select-id]").check();
+    await panel.locator("#share-selected").click();
+    await panel.locator("#inline-share").click();
+
+    const shared = await eventually(() => atc("bindings"), (r) => Array.isArray(r.json.bindings) && (r.json.bindings as Json[]).some((binding) => String(binding.title) === "Pricing"));
+    const binding = (shared.json.bindings as Json[]).find((entry) => String(entry.title) === "Pricing");
+    expect(binding).toMatchObject({ source: "extension", current: false });
+
+    await row.locator("[data-row-main]").click();
+    const activated = await eventually(() => atc("current"), (r) => r.json.context === binding?.context);
+    expect(activated.json).toMatchObject({ context: binding?.context });
+
+    await row.locator("button[data-unshare-tab]").click();
+    const unshared = await eventually(() => atc("bindings"), (r) => Array.isArray(r.json.bindings) && !(r.json.bindings as Json[]).some((entry) => entry.context === binding?.context));
+    expect((unshared.json.bindings as Json[]).some((entry) => entry.context === binding?.context)).toBe(false);
+
+    await row.locator("[data-select-id]").check();
+    await panel.locator("#share-selected").click();
+    await panel.locator("#inline-share").click();
+    await eventually(() => atc("bindings"), (r) => Array.isArray(r.json.bindings) && (r.json.bindings as Json[]).length === 1);
+
+    await fixture.close();
+    const closed = await eventually(() => atc("bindings"), (r) => Array.isArray(r.json.bindings) && (r.json.bindings as Json[]).length === 0);
+    expect(closed.json.bindings).toEqual([]);
+    await eventually(() => panel.locator("#tab-list [data-tab-id]").filter({ hasText: "Pricing" }).count(), (count) => count === 0);
+    await panel.close();
+  });
+});
+
+describe("sensitive origins end to end", () => {
+  it("refuses an agent bind to a local file tab", async () => {
+    const filePage = await context.newPage();
+    try {
+      await filePage.goto(`file://${join(ROOT, "test/fixtures/app.html")}`);
+      const listed = await eventually(() => atc("tabs", "--query", "Fixture App"), (r) => tabsOf(r).some((tab) => String(tab.url).startsWith("file:")));
+      const tab = tabsOf(listed).find((entry) => String(entry.url).startsWith("file:"));
+      expect(tab).toBeDefined();
+      const blocked = await atc("bind", "--tab", String(tab?.tabId));
+      expect(blocked.json).toMatchObject({ ok: false, error: "ACTION_BLOCKED_SENSITIVE" });
+      expect(String(blocked.json.message)).not.toContain("app.html");
+    } finally {
+      await filePage.close();
+    }
+  });
+});
+
+describe("multi-tab side panel end to end", () => {
+  it("shares two tabs, activates one, and removes only the closed tab", async () => {
+    const first = await context.newPage();
+    const second = await context.newPage();
+    await first.goto(`${fixtures.baseUrl}/app.html?multi=first`);
+    await second.goto(`${fixtures.baseUrl}/pricing.html?multi=second`);
+    const listed = await eventually(() => atc("bindings"), (r) => Array.isArray(r.json.bindings));
+    for (const binding of (listed.json.bindings as Json[] | undefined) ?? []) {
+      await atc("close", "--context", String(binding.context));
+    }
+
+    const extensionId = extensionIdFromKey(extensionManifest().key);
+    for (const open of context.pages()) {
+      if (open !== first && open !== second) await open.close();
+    }
+    const panel = await context.newPage();
+    await panel.goto(`chrome-extension://${extensionId}/sidepanel/index.html`);
+    await panel.locator("#tab-list [data-tab-id]").first().waitFor({ state: "visible", timeout: 20_000 });
+    const selectable = panel.locator("#tab-list [data-select-id]");
+    await eventually(() => selectable.count(), (count) => count >= 2);
+    const count = await selectable.count();
+    for (let index = 0; index < count; index += 1) await selectable.nth(index).check();
+    await panel.locator("#share-selected").click();
+    await panel.locator("#share-confirm").click();
+
+    const shared = await eventually(() => atc("bindings"), (r) => Array.isArray(r.json.bindings) && (r.json.bindings as Json[]).length === 2);
+    const bindings = shared.json.bindings as Json[];
+    expect(bindings.map((entry) => entry.title).sort()).toEqual(["Fixture App", "Pricing"]);
+
+    const pricingRow = panel.locator("#tab-list [data-tab-id]").filter({ hasText: "Pricing" }).first();
+    await pricingRow.locator("[data-row-main]").click();
+    const pricing = bindings.find((entry) => entry.title === "Pricing");
+    await eventually(() => atc("current"), (r) => r.json.context === pricing?.context);
+
+    await second.close();
+    const remaining = await eventually(() => atc("bindings"), (r) => Array.isArray(r.json.bindings) && (r.json.bindings as Json[]).length === 1);
+    expect((remaining.json.bindings as Json[])[0]).toMatchObject({ title: "Fixture App" });
+
+    await first.close();
+    await eventually(() => atc("bindings"), (r) => Array.isArray(r.json.bindings) && (r.json.bindings as Json[]).length === 0);
+    await panel.close();
   });
 });

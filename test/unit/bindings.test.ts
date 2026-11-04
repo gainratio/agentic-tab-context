@@ -146,6 +146,14 @@ describe("bindings", () => {
     expect(await contexts("safari")).toEqual([]);
   });
 
+  it("redacts token-like URL parameters in the listed binding", async () => {
+    registry.updateLocation(ids.extension, { url: "https://example.com/callback?token=super-secret&page=2", title: "Callback" });
+    const listed = await list();
+    const binding = listed.bindings.find((entry) => entry.context === ids.extension);
+    expect(binding?.url).toContain("page=2");
+    expect(binding?.url).not.toContain("super-secret");
+  });
+
   it("filters by browser, combines filters, and keeps current when the filter excludes it", async () => {
     expect((await list({ browser: "chrome" })).bindings.map((binding) => binding.context)).toEqual([ids.extension]);
     expect((await list({ browser: "safari" })).bindings.map((binding) => binding.context)).toEqual([ids.macos]);
