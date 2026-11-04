@@ -102,14 +102,14 @@ function buildPress(parsed: Parsed): Request {
   }
   return {
     method: "press",
-    params: { ...contextFlag(parsed), key: raw === "Space" ? " " : raw },
+    params: { ...contextFlag(parsed), ...(parsed.booleans.has("each") ? { each: true } : {}), key: raw === "Space" ? " " : raw },
   };
 }
 
 function buildFill(method: "type" | "select"): (parsed: Parsed) => Request {
   return (parsed) => {
     const target = parseTarget(parsed);
-    return { method, params: { ...contextFlag(parsed), target, value: requiredValue(parsed) } };
+    return { method, params: { ...contextFlag(parsed), ...(parsed.booleans.has("each") ? { each: true } : {}), target, value: requiredValue(parsed) } };
   };
 }
 
@@ -142,12 +142,12 @@ export const COMMANDS: Readonly<Record<string, CommandSpec>> = {
   network: { positionals: [], flags: [...PAGE, "since"], build: buildLog("network") },
   click: {
     positionals: [],
-    flags: [...PAGE, ...TARGET_FLAGS],
-    build: (p) => ({ method: "click", params: { ...contextFlag(p), target: parseTarget(p) } }),
+    flags: [...PAGE, ...TARGET_FLAGS, "each"],
+    build: (p) => ({ method: "click", params: { ...contextFlag(p), ...(p.booleans.has("each") ? { each: true } : {}), target: parseTarget(p) } }),
   },
-  type: { positionals: [], flags: [...PAGE, ...TARGET_FLAGS, "value"], build: buildFill("type") },
-  select: { positionals: [], flags: [...PAGE, ...TARGET_FLAGS, "value"], build: buildFill("select") },
-  press: { positionals: ["key"], flags: [...PAGE], build: buildPress },
+  type: { positionals: [], flags: [...PAGE, ...TARGET_FLAGS, "value", "each"], build: buildFill("type") },
+  select: { positionals: [], flags: [...PAGE, ...TARGET_FLAGS, "value", "each"], build: buildFill("select") },
+  press: { positionals: ["key"], flags: [...PAGE, "each"], build: buildPress },
   upload: {
     positionals: ["file"],
     flags: [...PAGE, ...TARGET_FLAGS],

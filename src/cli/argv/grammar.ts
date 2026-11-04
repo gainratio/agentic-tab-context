@@ -42,6 +42,7 @@ export const FLAG_KINDS = {
   title: "string",
   tab: "string",
   active: "boolean",
+  each: "boolean",
 } as const satisfies Record<string, FlagKind>;
 
 export type FlagName = keyof typeof FLAG_KINDS;

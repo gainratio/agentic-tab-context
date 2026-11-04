@@ -17,8 +17,10 @@ export interface DoctorInput {
   platform?: NodeJS.Platform;
 }
 
-function nextSteps(input: DoctorInput, extensionConnected: boolean): string[] {
+function nextSteps(input: DoctorInput, extensions: readonly { protocol?: number }[]): string[] {
   const steps: string[] = [];
+  const extensionConnected = extensions.length > 0;
+  if (extensions.some((extension) => (extension.protocol ?? 1) < 2)) steps.push("Reload the Agentic Tab Context extension: it is older than this atc daemon (protocol mismatch).");
   if (!extensionConnected) {
     steps.push(`Install the browser extension: run \`atc setup\`, then load ${EXTENSION_DIR} via chrome://extensions > Developer mode > Load unpacked.`);
   }
@@ -40,6 +42,6 @@ export function doctorReport(input: DoctorInput): OkResponse {
     liveTabs: { extension: count("extension"), macos: count("macos"), managed: count("managed") },
     extension: { connected: extensions },
     managedBrowsers: detectInstalledBrowsers(input.env.ATC_CHROMIUM_PATH),
-    nextSteps: nextSteps(input, extensions.length > 0),
+    nextSteps: nextSteps(input, extensions),
   };
 }

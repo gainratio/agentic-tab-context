@@ -9,6 +9,7 @@ import type { ExtensionBridge } from "../drivers/extension/bridge.js";
 import { TabBinder } from "./binding.js";
 import { bindingsResponse } from "./bindings.js";
 import { doctorReport } from "./doctor.js";
+import { eachResponse, isEachRequest } from "./each.js";
 import { type Handler, PageCommands, type Resolved, refreshLocation } from "./page-commands.js";
 import { type Params, isRecord, optionalBoolean, optionalString, profileParam, requireBrowser, requireString } from "./params.js";
 import type { ContextRegistry } from "./registry.js";
@@ -57,6 +58,7 @@ export class DaemonService {
 
   async handle(req: Request): Promise<Response> {
     const raw: unknown = req;
+    if (isEachRequest(raw)) return eachResponse(this.registry, raw, (request) => this.handle(request));
     const secret = typedValueOf(raw);
     try {
       const { method, params } = parseRequest(raw, this.handlers);
@@ -77,6 +79,7 @@ export class DaemonService {
     const raw: unknown = req;
     if (!isRecord(raw) || typeof raw.method !== "string" || !CONTEXT_METHODS.has(raw.method)) return { key: null, request: req };
     if (raw.params !== undefined && !isRecord(raw.params)) return { key: null, request: req };
+    if (raw.params !== undefined && raw.params.each === true) return { key: null, request: req };
     const params = isRecord(raw.params) ? raw.params : {};
     const explicit = params.context;
     if (typeof explicit === "string") return { key: explicit, request: req };
@@ -85,15 +88,12 @@ export class DaemonService {
     const pinned: unknown = { ...raw, params: { ...params, context: current } };
     return { key: current, request: pinned as Request };
   }
-
   onShutdown(listener: () => void): void {
     this.shutdownListeners.push(listener);
   }
-
   async closeAll(): Promise<void> {
     await Promise.allSettled(this.registry.openSessions().map(({ id }) => this.closeContext(id)));
   }
-
   private contextHandlers(): Pick<Record<Method, Handler>, "open" | "tabs" | "bind" | "bindings" | "list" | "use" | "current" | "close" | "doctor" | "ping" | "shutdown"> {
     return {
       open: (p) => this.open(p),
@@ -126,7 +126,6 @@ export class DaemonService {
     if (stillOpen && (makeCurrent || this.registry.current === null)) this.registry.setCurrent(ctx.id);
     return { ok: true, context: ctx.id, browser, profile, current: this.registry.current === ctx.id };
   }
-
   private async doctor(): Promise<OkResponse> {
     const { paths, extensionBridge } = this.deps;
     const tabs = await this.binder.discover();

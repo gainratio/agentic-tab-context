@@ -64,6 +64,8 @@ const HAPPY: ReadonlyArray<readonly [string, string[], unknown]> = [
   ["console --since 0", ["console", "--since=0"], { method: "console", params: { since: 0 } }],
   ["network --since", ["network", "--since", "3", "-c", CTX], { method: "network", params: { context: CTX, since: 3 } }],
   ["click role", ["click", "--role", "button"], { method: "click", params: { target: { kind: "role", role: "button" } } }],
+  ["click each", ["click", "--role", "button", "--each"], { method: "click", params: { each: true, target: { kind: "role", role: "button" } } }],
+  ["press each", ["press", "Enter", "--each"], { method: "press", params: { each: true, key: "Enter" } }],
   [
     "click role+name+nth",
     ["click", "--role", "button", "--name", "Delete", "--nth", "1"],
