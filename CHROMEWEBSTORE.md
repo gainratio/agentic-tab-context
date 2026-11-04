@@ -58,6 +58,7 @@ English
 | `nativeMessaging` | permissions | The only channel to the local atc program on the same computer. No network connection is used. |
 | `storage` | permissions | Keeps a random per-profile identifier locally and watched-tab identifiers for the current browser session. Watched tabs do not persist across browser restarts. |
 | `alarms` | permissions | Retries the connection to the local atc program every 30 seconds if it isn't installed or running yet. |
+| `sidePanel` | permissions | Hosts the shared-tabs panel where the user chooses, searches, activates, and removes tabs. |
 | `<all_urls>` | host_permissions | Developers work on local servers (localhost), staging and production sites on any domain; the user chooses which tab to connect. |
 
 ## Privacy and data use
@@ -81,6 +82,7 @@ https://github.com/gainratio/agentic-tab-context/blob/main/PRIVACY.md (works onc
 
 | Version | Date | Changes | Status |
 |---|---|---|---|
+| 0.5.0 | 2026-11-04 | Multi-tab side panel, shared-tab workspace, sensitive-tab gate, action effects, protocol handshake, URL/log redaction | **Ready to submit** |
 | 0.4.1 | 2026-10-26 | Removes `eval` from the extension so the store build contains no remote-code execution; `press`, `upload`, and `--within` remain | **Ready to submit** |
 | 0.4.0 | 2026-10-25 | `press`, `upload`, `eval`, and `--within` scoped locators; normalized accessible-name fallback; page agent v3 | Superseded |
 | 0.3.0 | 2026-10-22 | Native messaging replaces the localhost port; isolated-world page access; screenshots restore the user's tab | Draft |

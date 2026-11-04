@@ -39,7 +39,7 @@ This is the full contract. For an introduction, see the [README](../README.md).
 | `atc close [ctx]` | Close a context. For a live tab this only disconnects; your tab stays open |
 | `atc goto <url>` / `back` / `forward` / `reload` | `{ok, context, url, title}`. Relative URLs resolve against the current page |
 | `atc inspect` | `{ok, context, url, title, aria}`, a YAML-style outline of visible content |
-| `atc click / type / select <target> [--value V]` | `{ok, context, matched: 1}` |
+| `atc click / type / select / press / upload ... [--each]` | `{ok, context, matched: 1, effect}` for one tab; `--each` runs every open context and returns `{ok, results:[{context, ok, matched?, effect?, error?}]}` |
 | `atc screenshot [--out F] [--full-page]` | `{ok, context, path, bytes}`. Live extension tabs support viewport capture only; `--full-page` returns `UNSUPPORTED_ACTION` |
 | `atc console / network [--since N]` | `{ok, context, entries, next}`. Pass `--since <next>` to get only newer entries |
 | `atc doctor` | Connected extensions, live tab counts, managed browsers, and `nextSteps` |
