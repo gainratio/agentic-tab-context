@@ -20,10 +20,10 @@ export type Request =
   | { method: "inspect"; params: { context?: string } }
   | { method: "screenshot"; params: { context?: string; out?: string; fullPage?: boolean } }
   | { method: "console" | "network"; params: { context?: string; since?: number } }
-  | { method: "click"; params: { context?: string; target: Target } }
-  | { method: "type" | "select"; params: { context?: string; target: Target; value: string } }
-  | { method: "press"; params: { context?: string; key: string } }
-  | { method: "upload"; params: { context?: string; target: Target; file: string } }
+  | { method: "click"; params: { context?: string; each?: boolean; target: Target } }
+  | { method: "type" | "select"; params: { context?: string; each?: boolean; target: Target; value: string } }
+  | { method: "press"; params: { context?: string; each?: boolean; key: string } }
+  | { method: "upload"; params: { context?: string; each?: boolean; target: Target; file: string } }
   | { method: "doctor"; params: Record<string, never> }
   | { method: "ping"; params: Record<string, never> }
   | { method: "shutdown"; params: Record<string, never> };
