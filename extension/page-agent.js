@@ -118,8 +118,10 @@ globalThis.__atcAgent =
           return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
         },
         pick(target, label) {
-          const matches = this.candidates(target).filter((el) => this.visible(el));
+          const all = this.candidates(target);
+          const matches = all.filter((el) => this.visible(el));
           const count = matches.length;
+          if (count === 0 && all.length > 0) return { error: "ELEMENT_HIDDEN", message: `${all.length} matching element(s) are hidden`, matched: all.length };
           if (count === 0) return { error: "TARGET_NOT_FOUND", message: `no visible element matches ${label}`, matched: 0 };
           if (target.nth === undefined && count > 1) {
             return { error: "AMBIGUOUS_TARGET", message: `${count} visible elements match ${label}; pass --nth N (0-based)`, matched: count };
@@ -132,10 +134,14 @@ globalThis.__atcAgent =
           const picked = this.pick(op.target, op.label);
           if (!picked.element) return { ok: false, ...picked };
           const el = picked.element;
+          if (this.disabled(el)) return { ok: false, error: "ELEMENT_DISABLED", message: `${op.label} is disabled`, matched: 1 };
           if (op.action === "click") el.click();
           if (op.action === "type") this.fill(el, op.value);
           if (op.action === "select") return this.choose(el, op.value, op.label);
           return { ok: true, matched: 1 };
+        },
+        disabled(el) {
+          return el.matches(":disabled") || el.getAttribute("aria-disabled") === "true";
         },
         press(op) {
           return globalThis.__atcActions.press(this, op);
