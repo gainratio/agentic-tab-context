@@ -14,13 +14,16 @@ function workerHarness() {
   const results: Record<string, unknown>[] = [];
   let unwatchGate = Promise.resolve();
   let handler!: (message: Record<string, unknown>) => Promise<void>;
-  const event = { addListener() {} };
+  const listeners = new Map<string, (value?: unknown) => void>();
+  let pushes = 0;
+  const event = (name: string) => ({ addListener: (fn: (value?: unknown) => void) => listeners.set(name, fn) });
   const context = vm.createContext({
     chrome: {
       storage: { session: { get: async () => ({ ...data }), set: async (value: Record<string, unknown>) => Object.assign(data, value) } },
-      alarms: { create: async () => undefined, onAlarm: event },
-      runtime: { onInstalled: event, onStartup: event, onMessage: event },
-      tabs: { onUpdated: event, onActivated: event, onRemoved: event }, windows: { onFocusChanged: event },
+      alarms: { create: async () => undefined, onAlarm: event("onAlarm") },
+      runtime: { onInstalled: event("onInstalled"), onStartup: event("onStartup"), onMessage: event("onMessage") },
+      tabs: { onUpdated: event("onUpdated"), onCreated: event("onCreated"), onRemoved: event("onRemoved"), onMoved: event("onMoved"), onReplaced: event("onReplaced"), onActivated: event("onActivated") },
+      windows: { onFocusChanged: event("onFocusChanged") },
       scripting: { executeScript: async (script: { args?: { op: string }[]; target: { tabId: number } }) => {
         const operation = script.args?.[0]?.op;
         if (operation === "watch") capturing.add(script.target.tabId);
@@ -29,7 +32,7 @@ function workerHarness() {
       } },
     },
     setMessageHandler: (fn: typeof handler) => { handler = fn; },
-    connect: async () => undefined, isConnected: () => true, pushTabs: async () => undefined,
+    connect: async () => undefined, isConnected: () => true, pushTabs: async () => { pushes += 1; },
     send: (message: Record<string, unknown>) => results.push(message),
   });
   vm.runInContext(source("sw/page.js"), context);
@@ -40,6 +43,8 @@ function workerHarness() {
   if (existsSync(join(import.meta.dirname, "../../extension/sw/lifecycle.js"))) vm.runInContext(source("sw/lifecycle.js"), context);
   vm.runInContext(`${source("service-worker.js")}\nglobalThis.reinject = reinjectWatch;`, context);
   return { message: (message: Record<string, unknown>) => handler(message), data, capturing, results,
+    fire: (name: string) => listeners.get(name)?.(),
+    pushes: () => pushes,
     reinject: context.reinject as (id: number, change: { status: string }) => Promise<void>,
     blockUnwatch: (gate: Promise<void>) => { unwatchGate = gate; } };
 }
@@ -121,5 +126,17 @@ describe("extension capture after connection loss", () => {
     release();
     await Promise.all([lost, reconnected, binding]);
     expect([...h.capturing]).toEqual([8]);
+  });
+});
+
+describe("extension tab lifecycle events", () => {
+  it("refreshes tabs after create, remove, move, and replace", async () => {
+    const h = workerHarness();
+    for (const name of ["onCreated", "onRemoved", "onMoved", "onReplaced"]) {
+      h.fire(name);
+      await Promise.resolve();
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(h.pushes()).toBeGreaterThanOrEqual(1);
   });
 });
