@@ -18,7 +18,7 @@ export type Request =
   | { method: "goto"; params: { context?: string; url: string } }
   | { method: "back" | "forward" | "reload"; params: { context?: string } }
   | { method: "inspect"; params: { context?: string } }
-  | { method: "screenshot"; params: { context?: string; out?: string; fullPage?: boolean } }
+  | { method: "screenshot"; params: { context?: string; out?: string; fullPage?: boolean; redact?: boolean } }
   | { method: "console" | "network"; params: { context?: string; since?: number } }
   | { method: "click"; params: { context?: string; each?: boolean; target: Target } }
   | { method: "type" | "select"; params: { context?: string; each?: boolean; target: Target; value: string } }

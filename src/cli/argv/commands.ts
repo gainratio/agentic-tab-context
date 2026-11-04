@@ -73,10 +73,11 @@ function buildGoto(parsed: Parsed): Request {
 }
 
 function buildScreenshot(parsed: Parsed): Request {
-  const params: { context?: string; out?: string; fullPage?: boolean } = contextFlag(parsed);
+  const params: { context?: string; out?: string; fullPage?: boolean; redact?: boolean } = contextFlag(parsed);
   const out = nonEmpty(parsed, "out");
   if (out !== undefined) params.out = resolve(out);
   if (parsed.booleans.has("full-page")) params.fullPage = true;
+  if (parsed.booleans.has("redact")) params.redact = true;
   return { method: "screenshot", params };
 }
 
@@ -137,7 +138,7 @@ export const COMMANDS: Readonly<Record<string, CommandSpec>> = {
   forward: { positionals: [], flags: PAGE, build: buildHistory("forward") },
   reload: { positionals: [], flags: PAGE, build: buildHistory("reload") },
   inspect: { positionals: [], flags: PAGE, build: (p) => ({ method: "inspect", params: contextFlag(p) }) },
-  screenshot: { positionals: [], flags: [...PAGE, "out", "full-page"], build: buildScreenshot },
+  screenshot: { positionals: [], flags: [...PAGE, "out", "full-page", "redact"], build: buildScreenshot },
   console: { positionals: [], flags: [...PAGE, "since"], build: buildLog("console") },
   network: { positionals: [], flags: [...PAGE, "since"], build: buildLog("network") },
   click: {

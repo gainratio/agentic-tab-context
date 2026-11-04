@@ -96,7 +96,7 @@ export class PageCommands {
     if (out !== undefined && !isAbsolute(out)) throw new AtcError("INVALID_ARGUMENT", "out must be an absolute path");
     const path = out ?? join(this.deps.paths.screenshots, `${ctx.id}-${fileTimestamp(this.deps.now())}.png`);
     await mkdir(dirname(path), { recursive: true });
-    const result = await driver.screenshot(session, path, optionalBoolean(params, "fullPage") ?? false);
+    const result = await driver.screenshot(session, path, optionalBoolean(params, "fullPage") ?? false, optionalBoolean(params, "redact") ?? false);
     return { ok: true, context: ctx.id, path: result.path, bytes: result.bytes };
   }
 
