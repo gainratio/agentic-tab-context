@@ -6,6 +6,7 @@ import type { LiveTab } from "../contracts/types.js";
 import type { ExtensionBridge } from "../drivers/extension/bridge.js";
 import { detectInstalledBrowsers } from "../drivers/playwright/executables.js";
 import { EXTENSION_DIR } from "../native/install.js";
+import { DAEMON_PROTOCOL_VERSION } from "../contracts/version.js";
 
 export interface DoctorInput {
   paths: Paths;
@@ -37,7 +38,7 @@ export function doctorReport(input: DoctorInput): OkResponse {
   const count = (source: LiveTab["source"]): number => input.tabs.filter((tab) => tab.source === source).length;
   return {
     ok: true,
-    daemon: { pid: process.pid, home: input.paths.home },
+    daemon: { pid: process.pid, home: input.paths.home, protocol: DAEMON_PROTOCOL_VERSION },
     contexts: { open: input.openContexts, current: input.current },
     liveTabs: { extension: count("extension"), macos: count("macos"), managed: count("managed") },
     extension: { connected: extensions },

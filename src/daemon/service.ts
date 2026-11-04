@@ -9,6 +9,7 @@ import type { ExtensionBridge } from "../drivers/extension/bridge.js";
 import { TabBinder } from "./binding.js";
 import { bindingsResponse } from "./bindings.js";
 import { doctorReport } from "./doctor.js";
+import { DAEMON_PROTOCOL_VERSION } from "../contracts/version.js";
 import { eachResponse, isEachRequest } from "./each.js";
 import { type Handler, PageCommands, type Resolved, refreshLocation } from "./page-commands.js";
 import { type Params, isRecord, optionalBoolean, optionalString, profileParam, requireBrowser, requireString } from "./params.js";
@@ -105,7 +106,7 @@ export class DaemonService {
       current: () => this.currentContext(),
       close: (p) => this.close(p),
       doctor: () => this.doctor(),
-      ping: () => Promise.resolve({ ok: true, pid: process.pid }),
+      ping: () => Promise.resolve({ ok: true, pid: process.pid, protocol: DAEMON_PROTOCOL_VERSION }),
       shutdown: () => this.shutdown(),
     };
   }
