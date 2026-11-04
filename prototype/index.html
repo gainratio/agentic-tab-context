@@ -1,0 +1,3896 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <meta
+      name="description"
+      content="Interactive prototype of the Agentic Tab Context browser side panel. All tab data is simulated locally."
+    />
+    <title>Agentic Tab Context — Side panel prototype</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f2f2ef;
+        --surface: #ffffff;
+        --surface-subtle: #f8f8f6;
+        --surface-hover: #f5f5f2;
+        --border: #e5e5e0;
+        --border-strong: #d5d5cf;
+        --text: #1c1c1a;
+        --text-secondary: #52524d;
+        --text-muted: #71716b;
+        --blue: #2563eb;
+        --blue-hover: #1d4ed8;
+        --blue-soft: #eff5ff;
+        --blue-border: #cfe0ff;
+        --amber: #b45309;
+        --amber-strong: #92400e;
+        --amber-soft: #fffbeb;
+        --amber-border: #f3ddb0;
+        --red: #b91c1c;
+        --red-soft: #fef2f2;
+        --red-border: #f2cccc;
+        --focus: #2563eb;
+        --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+        --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+        --page-width: 1240px;
+        --panel-width: 400px;
+        --shadow-window: 0 1px 2px rgba(28, 28, 26, 0.04), 0 24px 60px -42px rgba(28, 28, 26, 0.4);
+        --shadow-sheet: 0 30px 80px -36px rgba(28, 28, 26, 0.5);
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      [hidden] {
+        display: none !important;
+      }
+
+      html {
+        -webkit-text-size-adjust: 100%;
+      }
+
+      body {
+        margin: 0;
+        min-width: 320px;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font-sans);
+        font-size: 13px;
+        line-height: 1.45;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+      }
+
+      h1,
+      h2,
+      h3,
+      h4,
+      p,
+      ul,
+      ol,
+      dl,
+      dd,
+      figure {
+        margin: 0;
+      }
+
+      ul,
+      ol {
+        padding: 0;
+        list-style: none;
+      }
+
+      button {
+        padding: 0;
+        border: 0;
+        background: none;
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+      }
+
+      input {
+        font: inherit;
+      }
+
+      code,
+      kbd,
+      .mono {
+        font-family: var(--font-mono);
+      }
+
+      svg.icon {
+        display: inline-block;
+        flex: none;
+        width: 16px;
+        height: 16px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      ::selection {
+        background: #dbe8ff;
+      }
+
+      :where(button, input, [tabindex]):focus-visible {
+        outline: 2px solid var(--focus);
+        outline-offset: 2px;
+      }
+
+      .sr-only {
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        padding: 0 !important;
+        margin: -1px !important;
+        overflow: hidden !important;
+        clip: rect(0, 0, 0, 0) !important;
+        white-space: nowrap !important;
+        border: 0 !important;
+      }
+
+      .skip-link {
+        position: absolute;
+        z-index: 100;
+        top: 10px;
+        left: 10px;
+        padding: 8px 12px;
+        border-radius: 7px;
+        background: var(--text);
+        color: #fff;
+        font-size: 12px;
+        font-weight: 600;
+        text-decoration: none;
+        transform: translateY(-160%);
+      }
+
+      .skip-link:focus {
+        transform: translateY(0);
+        outline: 2px solid var(--blue);
+        outline-offset: 2px;
+      }
+
+      /* ---------- Page shell ---------- */
+
+      .page {
+        width: min(var(--page-width), 100%);
+        margin: 0 auto;
+        padding: 26px 28px 20px;
+      }
+
+      .page-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 22px;
+        margin-bottom: 18px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        min-width: 0;
+      }
+
+      .brand-mark {
+        display: grid;
+        flex: none;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        background: var(--blue);
+        color: #fff;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+      }
+
+      .brand-mark .icon {
+        width: 19px;
+        height: 19px;
+        stroke-width: 1.7;
+      }
+
+      .brand-line {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .brand-name {
+        font-size: 13.5px;
+        font-weight: 650;
+        letter-spacing: -0.008em;
+        line-height: 1.2;
+      }
+
+      .proto-pill {
+        display: inline-flex;
+        align-items: center;
+        height: 19px;
+        padding: 0 6px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: #fafaf8;
+        color: var(--text-muted);
+        font-size: 9.5px;
+        font-weight: 650;
+        letter-spacing: 0.055em;
+        text-transform: uppercase;
+        line-height: 1;
+      }
+
+      .brand-sub {
+        margin-top: 3px;
+        color: var(--text-muted);
+        font-size: 11.5px;
+        line-height: 1.4;
+      }
+
+      .page-actions {
+        display: flex;
+        flex: none;
+        align-items: center;
+        gap: 14px;
+      }
+
+      .sim-note {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--text-muted);
+        font-size: 11px;
+      }
+
+      .sim-note .icon {
+        width: 13px;
+        height: 13px;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        height: 32px;
+        padding: 0 12px;
+        border: 1px solid transparent;
+        border-radius: 7px;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1;
+        white-space: nowrap;
+        transition:
+          background-color 120ms ease,
+          border-color 120ms ease,
+          color 120ms ease;
+      }
+
+      .btn .icon {
+        width: 14px;
+        height: 14px;
+      }
+
+      .btn:disabled {
+        opacity: 0.45;
+      }
+
+      .btn-primary {
+        border-color: var(--blue);
+        background: var(--blue);
+        color: #fff;
+      }
+
+      .btn-primary:hover:not(:disabled) {
+        border-color: var(--blue-hover);
+        background: var(--blue-hover);
+      }
+
+      .btn-secondary {
+        border-color: var(--border-strong);
+        background: var(--surface);
+        color: var(--text-secondary);
+      }
+
+      .btn-secondary:hover:not(:disabled) {
+        border-color: #c2c2bb;
+        background: var(--surface-subtle);
+        color: var(--text);
+      }
+
+      .btn-quiet {
+        background: transparent;
+        color: var(--text-muted);
+      }
+
+      .btn-quiet:hover:not(:disabled) {
+        background: var(--surface-hover);
+        color: var(--text);
+      }
+
+      .btn-reset {
+        height: 29px;
+        padding: 0 9px;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        background: rgba(255, 255, 255, 0.66);
+        color: var(--text-secondary);
+        font-size: 11.25px;
+        font-weight: 550;
+        transition:
+          background-color 120ms ease,
+          border-color 120ms ease;
+      }
+
+      .btn-reset:hover {
+        border-color: var(--border-strong);
+        background: var(--surface);
+      }
+
+      .btn-sm {
+        height: 29px;
+        padding: 0 10px;
+        border-radius: 6px;
+        font-size: 11.25px;
+      }
+
+      .btn-sm .icon {
+        width: 13px;
+        height: 13px;
+      }
+
+      .btn-amber {
+        border-color: var(--amber-strong);
+        background: var(--amber-strong);
+        color: #fff;
+      }
+
+      .btn-amber:hover:not(:disabled) {
+        border-color: #7c2d12;
+        background: #7c2d12;
+      }
+
+      /* ---------- Main window ---------- */
+
+      .workspace {
+        display: grid;
+        grid-template-areas: "chat panel";
+        grid-template-columns: minmax(0, 1fr) var(--panel-width);
+        height: clamp(640px, calc(100vh - 165px), 880px);
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 15px;
+        background: var(--surface);
+        box-shadow: var(--shadow-window);
+      }
+
+      .page-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 11px;
+        color: var(--text-muted);
+        font-size: 10.5px;
+        line-height: 1.4;
+      }
+
+      .page-footer p {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      .page-footer .icon {
+        width: 11px;
+        height: 11px;
+      }
+
+      /* ---------- Chat side ---------- */
+
+      .chat {
+        grid-area: chat;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        min-height: 0;
+        border-right: 1px solid var(--border);
+        background: var(--surface-subtle);
+      }
+
+      .chat-header {
+        display: flex;
+        flex: none;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 13px 20px;
+        border-bottom: 1px solid var(--border);
+        background: var(--surface-subtle);
+      }
+
+      .assistant {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        min-width: 0;
+      }
+
+      .assistant-avatar {
+        display: grid;
+        flex: none;
+        place-items: center;
+        width: 30px;
+        height: 30px;
+        border: 1px solid var(--blue-border);
+        border-radius: 9px;
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .assistant-avatar .icon {
+        width: 16px;
+        height: 16px;
+        stroke-width: 1.7;
+      }
+
+      .assistant h2 {
+        font-size: 12.75px;
+        font-weight: 650;
+        line-height: 1.3;
+      }
+
+      .assistant p {
+        margin-top: 1px;
+        color: var(--text-muted);
+        font-size: 10.75px;
+        line-height: 1.35;
+      }
+
+      .demo-pill {
+        display: inline-flex;
+        flex: none;
+        align-items: center;
+        height: 20px;
+        padding: 0 7px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: var(--surface);
+        color: var(--text-muted);
+        font-size: 9.5px;
+        font-weight: 650;
+        letter-spacing: 0.05em;
+        line-height: 1;
+        text-transform: uppercase;
+      }
+
+      .chat-context {
+        flex: none;
+        padding: 11px 20px 12px;
+        border-bottom: 1px solid var(--border);
+        background: var(--surface);
+      }
+
+      .context-head {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        margin-bottom: 7px;
+      }
+
+      .context-head h3 {
+        color: var(--text-secondary);
+        font-size: 10.75px;
+        font-weight: 650;
+        letter-spacing: 0.015em;
+      }
+
+      .context-count {
+        color: var(--text-muted);
+        font-size: 10.25px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .context-count::before {
+        content: "·";
+        margin-right: 6px;
+      }
+
+      .chips {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 5px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+        max-width: 100%;
+        min-height: 26px;
+        padding: 2px 2px 2px 8px;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        background: var(--surface-subtle);
+        color: var(--text-secondary);
+        font-size: 11.25px;
+      }
+
+      .chip .favicon {
+        width: 7px;
+        height: 7px;
+      }
+
+      .chip .icon {
+        width: 11px;
+        height: 11px;
+      }
+
+      .chip.is-sensitive {
+        border-color: var(--amber-border);
+        background: var(--amber-soft);
+        color: var(--amber-strong);
+      }
+
+      .chip.is-sensitive .favicon {
+        display: none;
+      }
+
+      .chip-label {
+        max-width: 190px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 550;
+      }
+
+      .chip-remove {
+        display: grid;
+        flex: none;
+        place-items: center;
+        width: 21px;
+        height: 21px;
+        border-radius: 5px;
+        color: var(--text-muted);
+        transition:
+          background-color 120ms ease,
+          color 120ms ease;
+      }
+
+      .chip-remove:hover {
+        background: rgba(28, 28, 26, 0.06);
+        color: var(--text);
+      }
+
+      .chip.is-sensitive .chip-remove {
+        color: var(--amber-strong);
+      }
+
+      .chip-remove .icon {
+        width: 11px;
+        height: 11px;
+      }
+
+      .context-empty {
+        padding: 7px 9px;
+        border: 1px dashed var(--border-strong);
+        border-radius: 7px;
+        background: var(--surface-subtle);
+        color: var(--text-muted);
+        font-size: 11px;
+        line-height: 1.45;
+      }
+
+      .chat-scroll {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 15px 20px 21px;
+        scrollbar-color: #d8d8d1 transparent;
+        scrollbar-width: thin;
+      }
+
+      .chat-scroll::-webkit-scrollbar,
+      .list-region::-webkit-scrollbar {
+        width: 10px;
+      }
+
+      .chat-scroll::-webkit-scrollbar-thumb,
+      .list-region::-webkit-scrollbar-thumb {
+        border: 3px solid transparent;
+        border-radius: 999px;
+        background: #d8d8d1;
+        background-clip: padding-box;
+      }
+
+      .chat-scroll::-webkit-scrollbar-track,
+      .list-region::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .chat-note {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 10px;
+        color: var(--text-muted);
+        font-size: 10.75px;
+        line-height: 1.4;
+      }
+
+      .chat-note .icon {
+        width: 12px;
+        height: 12px;
+      }
+
+      .chat-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .chat-card {
+        width: 100%;
+        max-width: 660px;
+        padding: 13px 14px;
+        border: 1px solid var(--border);
+        border-radius: 11px;
+        background: var(--surface);
+        box-shadow: 0 1px 1px rgba(28, 28, 26, 0.025);
+      }
+
+      .card-eyebrow {
+        margin-bottom: 4px;
+        color: var(--text-muted);
+        font-size: 9.75px;
+        font-weight: 650;
+        letter-spacing: 0.05em;
+        line-height: 1.4;
+        text-transform: uppercase;
+      }
+
+      .card-title {
+        font-size: 14px;
+        font-weight: 650;
+        letter-spacing: -0.012em;
+        line-height: 1.3;
+      }
+
+      .card-copy {
+        margin-top: 3px;
+        color: var(--text-secondary);
+        font-size: 11.75px;
+        line-height: 1.5;
+      }
+
+      .candidates {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+        margin: 9px 0 8px;
+        padding: 0;
+        border: 0;
+      }
+
+      .candidate {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        min-width: 0;
+        min-height: 35px;
+        padding: 5px 8px;
+        border: 1px solid transparent;
+        border-radius: 7px;
+        cursor: pointer;
+        transition:
+          background-color 120ms ease,
+          border-color 120ms ease;
+      }
+
+      .candidate:hover {
+        background: var(--surface-subtle);
+      }
+
+      .candidate.is-selected {
+        border-color: var(--blue-border);
+        background: var(--blue-soft);
+      }
+
+      .candidate:focus-within {
+        outline: 2px solid var(--focus);
+        outline-offset: 1px;
+      }
+
+      .candidate input[type="radio"] {
+        flex: none;
+        width: 14px;
+        height: 14px;
+        margin: 0;
+        accent-color: var(--blue);
+      }
+
+      .candidate-text {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: 1px;
+        min-width: 0;
+      }
+
+      .candidate-title {
+        overflow: hidden;
+        color: var(--text);
+        font-size: 12px;
+        font-weight: 550;
+        line-height: 1.35;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .candidate-meta {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+        color: var(--text-muted);
+        font-size: 10.5px;
+        line-height: 1.35;
+      }
+
+      .candidate-note {
+        display: inline-flex;
+        align-items: center;
+        height: 16px;
+        padding: 0 4px;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        background: var(--surface);
+        color: var(--text-muted);
+        font-size: 9px;
+        font-weight: 650;
+        letter-spacing: 0.02em;
+        line-height: 1;
+        white-space: nowrap;
+      }
+
+      .candidate-note.is-blue {
+        border-color: var(--blue-border);
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .picker-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding-top: 8px;
+        border-top: 1px solid #f0f0eb;
+      }
+
+      .picker-hint {
+        color: var(--text-muted);
+        font-size: 10.5px;
+        line-height: 1.4;
+      }
+
+      .picker-confirmed {
+        display: flex;
+        align-items: flex-start;
+        gap: 9px;
+        margin-top: 10px;
+        padding: 10px;
+        border: 1px solid var(--blue-border);
+        border-radius: 8px;
+        background: var(--blue-soft);
+      }
+
+      .confirm-mark {
+        display: grid;
+        flex: none;
+        place-items: center;
+        width: 20px;
+        height: 20px;
+        border-radius: 999px;
+        background: var(--blue);
+        color: #fff;
+      }
+
+      .confirm-mark .icon {
+        width: 12px;
+        height: 12px;
+        stroke-width: 2.2;
+      }
+
+      .confirm-copy {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .confirm-title {
+        color: var(--text);
+        font-size: 11.75px;
+        font-weight: 600;
+        line-height: 1.4;
+      }
+
+      .confirm-sub {
+        margin-top: 1px;
+        color: var(--text-secondary);
+        font-size: 10.5px;
+        line-height: 1.45;
+      }
+
+      .confirm-actions {
+        flex: none;
+        margin-left: auto;
+      }
+
+      .empty-candidates {
+        margin-top: 11px;
+        padding: 10px;
+        border: 1px dashed var(--border-strong);
+        border-radius: 7px;
+        color: var(--text-muted);
+        font-size: 11px;
+      }
+
+      .action-head {
+        display: flex;
+        align-items: flex-start;
+        gap: 9px;
+      }
+
+      .action-symbol {
+        display: grid;
+        flex: none;
+        place-items: center;
+        width: 24px;
+        height: 24px;
+        border: 1px solid var(--blue-border);
+        border-radius: 7px;
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .action-symbol .icon {
+        width: 13px;
+        height: 13px;
+        stroke-width: 2;
+      }
+
+      .action-symbol.is-error {
+        border-color: var(--red-border);
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      .action-titles {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .action-title {
+        font-size: 13px;
+        font-weight: 650;
+        letter-spacing: -0.008em;
+        line-height: 1.35;
+      }
+
+      .status-pill {
+        display: inline-flex;
+        flex: none;
+        align-items: center;
+        height: 19px;
+        margin-left: auto;
+        padding: 0 6px;
+        border: 1px solid transparent;
+        border-radius: 5px;
+        font-size: 9.5px;
+        font-weight: 650;
+        letter-spacing: 0.02em;
+        line-height: 1;
+        white-space: nowrap;
+      }
+
+      .status-pill.is-ok {
+        border-color: var(--blue-border);
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .status-pill.is-error {
+        padding: 0 5px;
+        border-color: var(--red-border);
+        background: var(--red-soft);
+        color: var(--red);
+        font-family: var(--font-mono);
+        font-size: 9px;
+        letter-spacing: 0;
+      }
+
+      .action-copy {
+        margin-top: 7px;
+        color: var(--text-secondary);
+        font-size: 11.75px;
+        line-height: 1.5;
+      }
+
+      .action-copy strong {
+        color: var(--text);
+        font-weight: 600;
+      }
+
+      .url-effect {
+        margin-top: 8px;
+        padding: 7px 9px;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        background: #fbfbf9;
+      }
+
+      .url-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 4px;
+      }
+
+      .effect-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        color: var(--text-secondary);
+        font-size: 10.5px;
+        font-weight: 650;
+      }
+
+      .effect-label::before {
+        content: "";
+        width: 5px;
+        height: 5px;
+        border-radius: 999px;
+        background: var(--blue);
+      }
+
+      .url-duration {
+        color: var(--text-muted);
+        font-size: 10px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .url-values {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        flex-wrap: wrap;
+        color: var(--text-secondary);
+        font-family: var(--font-mono);
+        font-size: 10px;
+        line-height: 1.5;
+      }
+
+      .url-values code {
+        overflow-wrap: anywhere;
+      }
+
+      .url-values .icon {
+        width: 11px;
+        height: 11px;
+        color: var(--text-muted);
+      }
+
+      .action-facts {
+        display: grid;
+        grid-template-columns: 1.25fr 1fr 0.55fr;
+        gap: 10px;
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid #f0f0eb;
+      }
+
+      .action-facts dt {
+        color: var(--text-muted);
+        font-size: 9.25px;
+        font-weight: 650;
+        letter-spacing: 0.045em;
+        line-height: 1.4;
+        text-transform: uppercase;
+      }
+
+      .action-facts dd {
+        margin-top: 2px;
+        overflow-wrap: anywhere;
+        color: var(--text-secondary);
+        font-size: 10.75px;
+        line-height: 1.4;
+      }
+
+      .action-facts code {
+        font-size: 10px;
+      }
+
+      .action-buttons {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-top: 9px;
+      }
+
+      .failure-status {
+        margin-top: 9px;
+        padding: 7px 8px;
+        border-radius: 6px;
+        background: var(--surface-subtle);
+        color: var(--text-secondary);
+        font-size: 10.75px;
+        line-height: 1.45;
+      }
+
+      .failure-status.is-error {
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      .diagnostics {
+        margin-top: 9px;
+        padding: 9px;
+        border: 1px dashed var(--border-strong);
+        border-radius: 7px;
+        background: #fcfcfa;
+        color: var(--text-secondary);
+        font-size: 10.75px;
+      }
+
+      .diagnostics h4 {
+        margin-bottom: 6px;
+        color: var(--text-muted);
+        font-size: 9.25px;
+        font-weight: 650;
+        letter-spacing: 0.045em;
+        text-transform: uppercase;
+      }
+
+      .diagnostics dl {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 3px 8px;
+      }
+
+      .diagnostics dt {
+        color: var(--text-muted);
+        font-weight: 550;
+      }
+
+      .diagnostics dd {
+        overflow-wrap: anywhere;
+      }
+
+      .diagnostics p {
+        margin-top: 7px;
+        color: var(--text-muted);
+        font-size: 10.5px;
+        line-height: 1.45;
+      }
+
+      .chat-footnote {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        margin-top: 13px;
+        color: var(--text-muted);
+        font-size: 10.25px;
+        line-height: 1.4;
+      }
+
+      .chat-footnote .icon {
+        width: 11px;
+        height: 11px;
+      }
+
+      /* ---------- Side panel ---------- */
+
+      .panel {
+        grid-area: panel;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        min-height: 0;
+        background: var(--surface);
+      }
+
+      .panel-header {
+        flex: none;
+        padding: 16px 18px 12px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .panel-title-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .panel-title-row h1 {
+        overflow: hidden;
+        font-size: 14.5px;
+        font-weight: 650;
+        letter-spacing: -0.015em;
+        line-height: 1.3;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .count-pill {
+        display: inline-grid;
+        flex: none;
+        place-items: center;
+        min-width: 21px;
+        height: 20px;
+        padding: 0 6px;
+        border: 1px solid var(--blue-border);
+        border-radius: 999px;
+        background: var(--blue-soft);
+        color: var(--blue);
+        font-size: 10.75px;
+        font-weight: 650;
+        font-variant-numeric: tabular-nums;
+        line-height: 1;
+      }
+
+      .panel-sub {
+        max-width: 48ch;
+        margin-top: 4px;
+        color: var(--text-muted);
+        font-size: 11.25px;
+        line-height: 1.45;
+      }
+
+      .panel-tools {
+        flex: none;
+        padding: 11px 18px 11px;
+        border-bottom: 1px solid var(--border);
+        background: var(--surface);
+      }
+
+      .search-wrap {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        height: 34px;
+        padding: 0 8px 0 10px;
+        border: 1px solid var(--border-strong);
+        border-radius: 8px;
+        background: var(--surface);
+        transition:
+          border-color 120ms ease,
+          box-shadow 120ms ease;
+      }
+
+      .search-wrap:focus-within {
+        border-color: #9db9ee;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+      }
+
+      .search-wrap > .icon {
+        flex: none;
+        width: 14px;
+        height: 14px;
+        color: var(--text-muted);
+      }
+
+      .search-wrap input {
+        flex: 1;
+        min-width: 0;
+        height: 100%;
+        padding: 0;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: var(--text);
+        font-size: 12.25px;
+      }
+
+      .search-wrap input::placeholder {
+        color: #8a8a83;
+        opacity: 1;
+      }
+
+      .search-wrap input::-webkit-search-cancel-button {
+        display: none;
+      }
+
+      .search-clear {
+        display: grid;
+        flex: none;
+        place-items: center;
+        width: 21px;
+        height: 21px;
+        border-radius: 4px;
+        color: var(--text-muted);
+      }
+
+      .search-clear:hover {
+        background: var(--surface-hover);
+        color: var(--text);
+      }
+
+      .search-clear .icon {
+        width: 11px;
+        height: 11px;
+      }
+
+      .search-kbd {
+        display: inline-flex;
+        flex: none;
+        align-items: center;
+        height: 19px;
+        padding: 0 5px;
+        border: 1px solid var(--border);
+        border-bottom-color: var(--border-strong);
+        border-radius: 4px;
+        background: var(--surface-subtle);
+        color: var(--text-muted);
+        font-size: 9.25px;
+        font-weight: 550;
+        letter-spacing: 0.02em;
+        line-height: 1;
+      }
+
+      .search-wrap.has-query .search-kbd {
+        display: none;
+      }
+
+      .filters {
+        display: flex;
+        gap: 5px;
+        margin-top: 9px;
+        padding-bottom: 1px;
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+
+      .filters::-webkit-scrollbar {
+        display: none;
+      }
+
+      .filter {
+        display: inline-flex;
+        flex: none;
+        align-items: center;
+        gap: 3px;
+        height: 27px;
+        padding: 0 9px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: var(--surface);
+        color: var(--text-secondary);
+        font-size: 11px;
+        font-weight: 500;
+        line-height: 1;
+        transition:
+          background-color 120ms ease,
+          border-color 120ms ease,
+          color 120ms ease;
+      }
+
+      .filter:hover {
+        background: var(--surface-subtle);
+      }
+
+      .filter.is-active {
+        border-color: var(--blue-border);
+        background: var(--blue-soft);
+        color: var(--blue);
+        font-weight: 600;
+      }
+
+      .filter-count {
+        color: var(--text-muted);
+        font-size: 9.5px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .filter.is-active .filter-count {
+        color: #3f62b0;
+      }
+
+      .list-top {
+        display: flex;
+        flex: none;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 9px 18px 5px;
+      }
+
+      .list-top h2 {
+        color: var(--text-muted);
+        font-size: 9.75px;
+        font-weight: 650;
+        letter-spacing: 0.055em;
+        line-height: 1.4;
+        text-transform: uppercase;
+      }
+
+      .results-count {
+        color: var(--text-muted);
+        font-size: 10px;
+        font-variant-numeric: tabular-nums;
+        line-height: 1.4;
+      }
+
+      .list-region {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 0 9px 8px;
+        scrollbar-color: #d8d8d1 transparent;
+        scrollbar-width: thin;
+      }
+
+      .shared-empty {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        margin: 2px 5px 8px;
+        padding: 9px 10px;
+        border: 1px dashed var(--border-strong);
+        border-radius: 8px;
+        background: #fbfbf9;
+      }
+
+      .shared-empty .empty-icon {
+        display: grid;
+        flex: none;
+        place-items: center;
+        width: 22px;
+        height: 22px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--surface);
+        color: var(--text-muted);
+      }
+
+      .shared-empty .empty-icon .icon {
+        width: 12px;
+        height: 12px;
+      }
+
+      .shared-empty strong {
+        display: block;
+        color: var(--text-secondary);
+        font-size: 11px;
+        font-weight: 650;
+        line-height: 1.35;
+      }
+
+      .shared-empty p {
+        margin-top: 1px;
+        color: var(--text-muted);
+        font-size: 10.5px;
+        line-height: 1.45;
+      }
+
+      .tab-list {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .tab-row {
+        position: relative;
+        display: flex;
+        align-items: flex-start;
+        gap: 9px;
+        padding: 8px 7px 8px 8px;
+        border-bottom: 1px solid #f1f1ed;
+        border-radius: 7px;
+        opacity: 1;
+        transform: translateX(0);
+        transition:
+          background-color 120ms ease,
+          opacity 160ms ease,
+          transform 160ms ease;
+      }
+
+      .tab-row:last-child {
+        border-bottom-color: transparent;
+      }
+
+      .tab-row:hover {
+        background: var(--surface-subtle);
+      }
+
+      .tab-row.is-active {
+        background: #f6f9ff;
+        box-shadow: inset 2px 0 0 var(--blue);
+      }
+
+      .tab-row.is-active:hover {
+        background: #f1f6ff;
+      }
+
+      .tab-row.is-removing {
+        opacity: 0;
+        transform: translateX(7px);
+        pointer-events: none;
+      }
+
+      .check-cell {
+        display: flex;
+        flex: none;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 18px;
+        margin-top: 1px;
+      }
+
+      .select-box {
+        display: grid;
+        flex: none;
+        place-content: center;
+        width: 15px;
+        height: 15px;
+        margin: 0;
+        border: 1px solid #cacac3;
+        border-radius: 4px;
+        background: var(--surface);
+        appearance: none;
+        transition:
+          background-color 120ms ease,
+          border-color 120ms ease;
+      }
+
+      .select-box:hover:not(:disabled) {
+        border-color: #afafA6;
+      }
+
+      .select-box:checked {
+        border-color: var(--blue);
+        background: var(--blue);
+      }
+
+      .select-box:checked::after {
+        content: "";
+        width: 7px;
+        height: 4px;
+        border-bottom: 1.8px solid #fff;
+        border-left: 1.8px solid #fff;
+        transform: translateY(-1px) rotate(-45deg);
+      }
+
+      .select-box:checked:disabled {
+        border-color: var(--blue-border);
+        background: #bcd2f7;
+      }
+
+      .select-box:disabled {
+        background: #f3f3ef;
+        border-color: #e1e1db;
+      }
+
+      .lock-cell {
+        display: grid;
+        flex: none;
+        place-items: center;
+        width: 16px;
+        height: 18px;
+        margin-top: 1px;
+        color: var(--amber);
+      }
+
+      .lock-cell .icon {
+        width: 13px;
+        height: 13px;
+      }
+
+      .tab-main {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        flex: 1;
+        min-width: 0;
+        padding: 0;
+        border-radius: 5px;
+        text-align: left;
+      }
+
+      .favicon {
+        display: inline-block;
+        flex: none;
+        width: 13px;
+        height: 13px;
+        margin-top: 3px;
+        border-radius: 999px;
+        background: var(--dot, #71716b);
+        box-shadow: inset 0 0 0 1px rgba(28, 28, 26, 0.08);
+      }
+
+      .tab-body {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+      }
+
+      .tab-title {
+        display: block;
+        overflow: hidden;
+        color: var(--text);
+        font-size: 12.25px;
+        font-weight: 550;
+        letter-spacing: -0.003em;
+        line-height: 1.35;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .tab-meta {
+        display: flex;
+        align-items: center;
+        gap: 4px 6px;
+        flex-wrap: wrap;
+        min-height: 17px;
+      }
+
+      .tab-host {
+        color: var(--text-muted);
+        font-size: 10.5px;
+        line-height: 1.4;
+      }
+
+      .badges {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        flex-wrap: wrap;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        height: 17px;
+        padding: 0 4px;
+        border: 1px solid transparent;
+        border-radius: 4px;
+        font-size: 9.25px;
+        font-weight: 600;
+        letter-spacing: 0.005em;
+        line-height: 1;
+        white-space: nowrap;
+      }
+
+      .badge .icon {
+        width: 9px;
+        height: 9px;
+        stroke-width: 2;
+      }
+
+      .badge-shared {
+        border-color: var(--blue-border);
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .badge-shared.is-amber {
+        border-color: var(--amber-border);
+        background: var(--amber-soft);
+        color: var(--amber-strong);
+      }
+
+      .badge-active {
+        border-color: var(--blue);
+        background: var(--blue);
+        color: #fff;
+      }
+
+      .badge-active .badge-dot {
+        width: 4px;
+        height: 4px;
+        border-radius: 999px;
+        background: #fff;
+      }
+
+      .badge-access {
+        border-color: var(--border);
+        background: var(--surface-subtle);
+        color: var(--text-secondary);
+      }
+
+      .badge-sensitive {
+        border-color: var(--amber-border);
+        background: var(--amber-soft);
+        color: var(--amber-strong);
+      }
+
+      .badge-unsupported {
+        border-color: var(--border);
+        background: #f4f4f1;
+        color: var(--text-muted);
+      }
+
+      .row-actions {
+        display: flex;
+        flex: none;
+        align-items: center;
+        align-self: flex-start;
+        gap: 1px;
+      }
+
+      .unlock-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        height: 25px;
+        padding: 0 5px;
+        border: 1px solid var(--amber-border);
+        border-radius: 5px;
+        background: var(--amber-soft);
+        color: var(--amber-strong);
+        font-size: 9.75px;
+        font-weight: 600;
+        line-height: 1;
+        transition:
+          background-color 120ms ease,
+          border-color 120ms ease;
+      }
+
+      .unlock-btn:hover {
+        border-color: #e9ca8e;
+        background: #fef3d5;
+      }
+
+      .unlock-btn .icon {
+        width: 10px;
+        height: 10px;
+      }
+
+      .close-btn {
+        display: grid;
+        flex: none;
+        place-items: center;
+        width: 24px;
+        height: 25px;
+        border-radius: 5px;
+        color: #8a8a83;
+        transition:
+          background-color 120ms ease,
+          color 120ms ease;
+      }
+
+      .close-btn:hover {
+        background: #efefeb;
+        color: var(--text);
+      }
+
+      .close-btn .icon {
+        width: 12px;
+        height: 12px;
+      }
+
+      .empty-state {
+        margin: 7px 5px 4px;
+        padding: 24px 16px;
+        border: 1px dashed var(--border-strong);
+        border-radius: 10px;
+        background: #fdfdfc;
+        text-align: center;
+      }
+
+      .empty-state .empty-symbol {
+        display: grid;
+        place-items: center;
+        width: 32px;
+        height: 32px;
+        margin: 0 auto 8px;
+        border: 1px solid var(--border);
+        border-radius: 9px;
+        background: var(--surface);
+        color: var(--text-muted);
+      }
+
+      .empty-state .empty-symbol .icon {
+        width: 15px;
+        height: 15px;
+      }
+
+      .empty-state h3 {
+        color: var(--text-secondary);
+        font-size: 12px;
+        font-weight: 650;
+        line-height: 1.4;
+      }
+
+      .empty-state p {
+        max-width: 28ch;
+        margin: 3px auto 0;
+        color: var(--text-muted);
+        font-size: 10.75px;
+        line-height: 1.45;
+      }
+
+      .empty-state .btn {
+        margin-top: 10px;
+      }
+
+      .panel-footer {
+        display: flex;
+        flex: none;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 11px 13px 12px;
+        border-top: 1px solid var(--border);
+        background: var(--surface);
+      }
+
+      .selection-status {
+        min-width: 0;
+        color: var(--text-muted);
+        font-size: 11px;
+        line-height: 1.4;
+      }
+
+      .selection-status.has-selection {
+        color: var(--blue);
+        font-weight: 600;
+      }
+
+      .panel-footer .btn {
+        flex: none;
+      }
+
+      /* ---------- Dialogs / sheets ---------- */
+
+      dialog.sheet {
+        width: min(430px, calc(100vw - 32px));
+        max-width: none;
+        max-height: calc(100vh - 48px);
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: var(--text);
+        overflow: visible;
+      }
+
+      dialog.sheet::backdrop {
+        background: rgba(26, 26, 22, 0.32);
+      }
+
+      .sheet-inner {
+        display: flex;
+        flex-direction: column;
+        max-height: calc(100vh - 48px);
+        overflow: auto;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--surface);
+        box-shadow: var(--shadow-sheet);
+      }
+
+      .sheet[open] .sheet-inner {
+        animation: sheet-in 170ms ease-out;
+      }
+
+      @keyframes sheet-in {
+        from {
+          opacity: 0;
+          transform: translateY(7px) scale(0.988);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+
+      .sheet-grabber {
+        display: none;
+        flex: none;
+        width: 34px;
+        height: 4px;
+        margin: 8px auto 0;
+        border-radius: 999px;
+        background: #deded8;
+      }
+
+      .sheet-header {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 16px 18px 0;
+      }
+
+      .sheet-heading {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .sheet-title {
+        font-size: 15px;
+        font-weight: 650;
+        letter-spacing: -0.012em;
+        line-height: 1.3;
+      }
+
+      .sheet-copy {
+        margin-top: 4px;
+        color: var(--text-secondary);
+        font-size: 11.5px;
+        line-height: 1.5;
+      }
+
+      .sheet-close {
+        display: grid;
+        flex: none;
+        place-items: center;
+        width: 25px;
+        height: 25px;
+        margin-top: -2px;
+        border-radius: 5px;
+        color: var(--text-muted);
+      }
+
+      .sheet-close:hover {
+        background: var(--surface-hover);
+        color: var(--text);
+      }
+
+      .sheet-close .icon {
+        width: 12px;
+        height: 12px;
+      }
+
+      .share-list {
+        max-height: 226px;
+        margin: 12px 18px 0;
+        overflow-y: auto;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+      }
+
+      .share-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-bottom: 1px solid #f1f1ed;
+      }
+
+      .share-item:last-child {
+        border-bottom: 0;
+      }
+
+      .share-item-copy {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: 1px;
+        min-width: 0;
+      }
+
+      .share-item-title {
+        overflow: hidden;
+        color: var(--text);
+        font-size: 11.5px;
+        font-weight: 550;
+        line-height: 1.35;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .share-item-host {
+        color: var(--text-muted);
+        font-size: 10.25px;
+        line-height: 1.35;
+      }
+
+      .share-item-note {
+        display: inline-flex;
+        flex: none;
+        align-items: center;
+        height: 17px;
+        padding: 0 4px;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        color: var(--text-muted);
+        font-size: 9px;
+        font-weight: 600;
+        line-height: 1;
+        white-space: nowrap;
+      }
+
+      .share-item-note.is-amber {
+        border-color: var(--amber-border);
+        background: var(--amber-soft);
+        color: var(--amber-strong);
+      }
+
+      .share-domains {
+        display: flex;
+        gap: 5px;
+        padding: 8px 19px 0;
+        color: var(--text-muted);
+        font-size: 10.25px;
+        line-height: 1.45;
+      }
+
+      .share-domains strong {
+        flex: none;
+        color: var(--text-secondary);
+        font-weight: 600;
+      }
+
+      .share-domains span {
+        overflow-wrap: anywhere;
+      }
+
+      .share-warning {
+        display: flex;
+        gap: 7px;
+        margin: 12px 18px 0;
+        padding: 9px 10px;
+        border: 1px solid var(--amber-border);
+        border-radius: 7px;
+        background: var(--amber-soft);
+        color: var(--amber-strong);
+        font-size: 10.5px;
+        line-height: 1.48;
+      }
+
+      .share-warning > .icon {
+        flex: none;
+        width: 14px;
+        height: 14px;
+        margin-top: 1px;
+        color: var(--amber);
+      }
+
+      .share-warning strong {
+        font-weight: 650;
+      }
+
+      .unlock-target {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 12px 18px 0;
+        padding: 9px 10px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: #fbfbf9;
+      }
+
+      .unlock-target .favicon {
+        width: 10px;
+        height: 10px;
+        margin-top: 0;
+      }
+
+      .unlock-target .unlock-target-copy {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: 1px;
+        min-width: 0;
+      }
+
+      .unlock-target-title {
+        overflow: hidden;
+        color: var(--text);
+        font-size: 11.5px;
+        font-weight: 550;
+        line-height: 1.35;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .unlock-target-host {
+        color: var(--text-muted);
+        font-size: 10.25px;
+      }
+
+      .sheet-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 13px;
+        padding: 13px 18px 15px;
+        border-top: 1px solid var(--border);
+        background: var(--surface);
+      }
+
+      .sheet-actions .btn {
+        height: 32px;
+      }
+
+      /* ---------- Toast ---------- */
+
+      .toast-region {
+        position: fixed;
+        z-index: 20;
+        right: 16px;
+        bottom: 18px;
+        left: 16px;
+        display: flex;
+        justify-content: center;
+        pointer-events: none;
+      }
+
+      .toast {
+        max-width: min(420px, calc(100vw - 32px));
+        padding: 9px 12px;
+        border: 1px solid #3e3e39;
+        border-radius: 8px;
+        background: #272723;
+        color: #f7f7f4;
+        box-shadow: 0 10px 28px -14px rgba(20, 20, 18, 0.5);
+        font-size: 11.5px;
+        line-height: 1.45;
+        opacity: 0;
+        transform: translateY(5px);
+        visibility: hidden;
+        transition:
+          opacity 150ms ease,
+          transform 150ms ease,
+          visibility 150ms ease;
+      }
+
+      .toast.is-visible {
+        opacity: 1;
+        transform: translateY(0);
+        visibility: visible;
+      }
+
+      /* ---------- Responsive ---------- */
+
+      @media (max-width: 1060px) {
+        .page {
+          padding: 21px 20px 17px;
+        }
+
+        .workspace {
+          grid-template-columns: minmax(0, 1fr) 370px;
+          height: clamp(620px, calc(100vh - 152px), 880px);
+        }
+
+        .panel-title-row h1 {
+          font-size: 14px;
+        }
+
+        .chat-scroll {
+          padding-right: 16px;
+          padding-left: 16px;
+        }
+      }
+
+      @media (max-width: 980px) {
+        :root {
+          --panel-width: auto;
+        }
+
+        .page {
+          width: min(760px, 100%);
+          padding: 18px 16px 16px;
+        }
+
+        .page-header {
+          flex-wrap: wrap;
+          gap: 10px;
+          margin-bottom: 13px;
+        }
+
+        .page-actions {
+          width: 100%;
+          justify-content: space-between;
+        }
+
+        .workspace {
+          display: flex;
+          flex-direction: column;
+          height: auto;
+          min-height: 0;
+          border-radius: 14px;
+        }
+
+        .panel {
+          flex: none;
+          border-bottom: 1px solid var(--border);
+        }
+
+        .panel-footer {
+          padding-bottom: 13px;
+        }
+
+        .list-region {
+          flex: none;
+          overflow: visible;
+          padding-bottom: 10px;
+        }
+
+        .chat {
+          flex: none;
+          border-right: 0;
+        }
+
+        .chat-scroll {
+          flex: none;
+          overflow: visible;
+        }
+
+        .chat-card {
+          max-width: none;
+        }
+
+        .chat-context {
+          padding-right: 16px;
+          padding-left: 16px;
+        }
+
+        .chat-header {
+          padding-right: 16px;
+          padding-left: 16px;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .page {
+          padding: 10px 10px 15px;
+        }
+
+        .page-header {
+          margin-bottom: 11px;
+        }
+
+        .brand-mark {
+          width: 31px;
+          height: 31px;
+          border-radius: 9px;
+        }
+
+        .brand-name {
+          font-size: 13px;
+        }
+
+        .brand-sub {
+          font-size: 10.75px;
+        }
+
+        .page-actions {
+          gap: 8px;
+        }
+
+        .sim-note {
+          font-size: 10.25px;
+        }
+
+        .workspace {
+          border-radius: 12px;
+        }
+
+        .chat-header {
+          padding: 11px 14px;
+        }
+
+        .chat-context {
+          padding: 10px 14px 11px;
+        }
+
+        .chat-scroll {
+          padding: 13px 11px 18px;
+        }
+
+        .chat-card {
+          padding: 13px;
+          border-radius: 10px;
+        }
+
+        .panel-header {
+          padding: 14px 14px 11px;
+        }
+
+        .panel-title-row h1 {
+          font-size: 14px;
+        }
+
+        .panel-sub {
+          font-size: 11px;
+        }
+
+        .panel-tools {
+          padding: 10px 14px;
+        }
+
+        .list-top {
+          padding: 9px 14px 6px;
+        }
+
+        .list-region {
+          padding: 0 5px 7px;
+        }
+
+        .tab-row {
+          gap: 7px;
+          padding: 8px 6px 8px 7px;
+        }
+
+        .panel-footer {
+          padding: 10px 11px 11px;
+        }
+
+        .selection-status {
+          font-size: 10.75px;
+        }
+
+        .panel-footer .btn {
+          height: 31px;
+          padding: 0 10px;
+          font-size: 11.5px;
+        }
+
+        .page-footer {
+          font-size: 10px;
+        }
+
+        .sheet-grabber {
+          display: block;
+        }
+
+        dialog.sheet {
+          width: 100%;
+          max-height: calc(100vh - 12px);
+          margin: auto auto 0;
+        }
+
+        .sheet-inner {
+          max-height: calc(100vh - 12px);
+          border-radius: 16px 16px 0 0;
+        }
+
+        .sheet-header {
+          padding: 12px 16px 0;
+        }
+
+        .share-list,
+        .unlock-target {
+          margin-right: 16px;
+          margin-left: 16px;
+        }
+
+        .share-domains {
+          padding-right: 17px;
+          padding-left: 17px;
+        }
+
+        .share-warning {
+          margin-right: 16px;
+          margin-left: 16px;
+        }
+
+        .sheet-actions {
+          padding: 12px 16px max(14px, env(safe-area-inset-bottom));
+        }
+
+        .toast-region {
+          bottom: calc(10px + env(safe-area-inset-bottom));
+        }
+
+        .toast {
+          max-width: 100%;
+          font-size: 11px;
+        }
+      }
+
+      @media (max-width: 430px) {
+        .search-kbd {
+          display: none;
+        }
+
+        .page-actions .sim-note {
+          display: none;
+        }
+
+        .chat-note {
+          align-items: flex-start;
+        }
+
+        .action-facts {
+          grid-template-columns: 1fr 1fr;
+        }
+
+        .action-facts > div:last-child {
+          grid-column: 1 / -1;
+        }
+
+        .url-values {
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 2px;
+        }
+
+        .url-values .icon {
+          transform: rotate(90deg);
+        }
+
+        .chip-label {
+          max-width: 150px;
+        }
+
+        .sheet-actions {
+          flex-wrap: wrap;
+        }
+
+        .sheet-actions .btn {
+          flex: 1;
+        }
+
+        .page-footer {
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 3px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          scroll-behavior: auto !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#panel">Skip to shared tabs</a>
+
+    <svg width="0" height="0" aria-hidden="true" focusable="false" style="position: absolute">
+      <defs>
+        <symbol id="i-panel" viewBox="0 0 24 24">
+          <rect x="3" y="4" width="18" height="16" rx="3" />
+          <path d="M15 4v16" />
+        </symbol>
+        <symbol id="i-search" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="6.5" />
+          <path d="m16 16 4.5 4.5" />
+        </symbol>
+        <symbol id="i-x" viewBox="0 0 24 24">
+          <path d="m6 6 12 12M18 6 6 18" />
+        </symbol>
+        <symbol id="i-check" viewBox="0 0 24 24">
+          <path d="m5 12.5 4.5 4.5L19 7.5" />
+        </symbol>
+        <symbol id="i-lock" viewBox="0 0 24 24">
+          <rect x="5" y="10" width="14" height="10" rx="2" />
+          <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+        </symbol>
+        <symbol id="i-key" viewBox="0 0 24 24">
+          <circle cx="8" cy="16" r="3.5" />
+          <path d="m10.6 13.4 8.2-8.2M15.5 8.5 18 11M13 11l2.2 2.2" />
+        </symbol>
+        <symbol id="i-warning" viewBox="0 0 24 24">
+          <path d="M12 4.5 21 20H3L12 4.5Z" />
+          <path d="M12 10v4M12 17.2v.3" />
+        </symbol>
+        <symbol id="i-info" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 11v5M12 8v.2" />
+        </symbol>
+        <symbol id="i-sparkle" viewBox="0 0 24 24">
+          <path d="M12 3.5c.7 4.4 3.1 6.8 7.5 7.5-4.4.7-6.8 3.1-7.5 7.5-.7-4.4-3.1-6.8-7.5-7.5 4.4-.7 6.8-3.1 7.5-7.5Z" />
+        </symbol>
+        <symbol id="i-share" viewBox="0 0 24 24">
+          <path d="M12 3v12M7 8l5-5 5 5" />
+          <path d="M5 14v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5" />
+        </symbol>
+        <symbol id="i-arrow-right" viewBox="0 0 24 24">
+          <path d="M4 12h16M14 6l6 6-6 6" />
+        </symbol>
+        <symbol id="i-chevron-down" viewBox="0 0 24 24">
+          <path d="m6 9 6 6 6-6" />
+        </symbol>
+        <symbol id="i-code" viewBox="0 0 24 24">
+          <path d="m8 8-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14" />
+        </symbol>
+        <symbol id="i-retry" viewBox="0 0 24 24">
+          <path d="M20 11a8 8 0 1 0-2.3 6.7" />
+          <path d="M20 4v7h-7" />
+        </symbol>
+        <symbol id="i-pointer" viewBox="0 0 24 24">
+          <path d="M5 3v16l4.6-4.6L14 21l2.5-1.1-4.4-6.3H19L5 3Z" />
+        </symbol>
+      </defs>
+    </svg>
+
+    <div class="page">
+      <header class="page-header">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">
+            <svg class="icon"><use href="#i-panel"></use></svg>
+          </span>
+          <div>
+            <div class="brand-line">
+              <p class="brand-name">Agentic Tab Context</p>
+              <span class="proto-pill">Interactive prototype</span>
+            </div>
+            <p class="brand-sub">A browser side panel for sharing tabs with your assistant.</p>
+          </div>
+        </div>
+        <div class="page-actions">
+          <span class="sim-note">
+            <svg class="icon" aria-hidden="true"><use href="#i-info"></use></svg>
+            Simulated tabs. No browser access.
+          </span>
+          <button class="btn-reset" id="reset-demo" type="button">Reset demo</button>
+        </div>
+      </header>
+
+      <main class="workspace" aria-label="Agentic Tab Context prototype workspace">
+        <aside class="panel" id="panel" aria-labelledby="panel-title">
+          <header class="panel-header">
+            <div class="panel-title-row">
+              <h1 id="panel-title">Shared with assistant</h1>
+              <span class="count-pill">
+                <span id="shared-count" aria-hidden="true">2</span>
+                <span class="sr-only" id="shared-count-sr">2 tabs shared</span>
+              </span>
+            </div>
+            <p class="panel-sub" id="shared-summary">
+              Only tabs you share are visible to your assistant.
+            </p>
+          </header>
+
+          <div class="panel-tools">
+            <div class="search-wrap" role="search">
+              <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+              <label class="sr-only" for="tab-search">Search tabs by title, hostname, or URL</label>
+              <input
+                id="tab-search"
+                type="search"
+                placeholder="Search tabs"
+                autocomplete="off"
+                spellcheck="false"
+                aria-keyshortcuts="Meta+K Control+K"
+                aria-describedby="search-hint"
+              />
+              <button
+                class="search-clear"
+                id="clear-search"
+                type="button"
+                aria-label="Clear search"
+                hidden
+              >
+                <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+              </button>
+              <kbd class="search-kbd" id="search-kbd" aria-hidden="true">⌘K</kbd>
+            </div>
+            <p class="sr-only" id="search-hint">
+              Press Command K or Control K from anywhere in the prototype to focus search.
+            </p>
+            <div class="filters" role="group" aria-label="Filter tabs">
+              <button
+                type="button"
+                class="filter is-active"
+                data-filter="all"
+                aria-pressed="true"
+              >
+                All <span class="filter-count" data-count-for="all">10</span>
+              </button>
+              <button type="button" class="filter" data-filter="shared" aria-pressed="false">
+                Shared <span class="filter-count" data-count-for="shared">2</span>
+              </button>
+              <button type="button" class="filter" data-filter="sensitive" aria-pressed="false">
+                Sensitive <span class="filter-count" data-count-for="sensitive">4</span>
+              </button>
+              <button
+                type="button"
+                class="filter"
+                data-filter="window"
+                aria-pressed="false"
+                title="Tabs in the current browser window (simulated)"
+              >
+                This window <span class="filter-count" data-count-for="window">7</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="list-top">
+            <h2 id="tabs-heading">Open tabs</h2>
+            <p class="results-count" id="results-count" role="status" aria-live="polite">10 tabs</p>
+          </div>
+
+          <div class="list-region" id="list-region">
+            <div class="shared-empty" id="shared-empty" hidden>
+              <span class="empty-icon" aria-hidden="true">
+                <svg class="icon"><use href="#i-share"></use></svg>
+              </span>
+              <div>
+                <strong>Nothing shared yet</strong>
+                <p>Check an unshared tab below, then choose Share selected.</p>
+              </div>
+            </div>
+            <ul class="tab-list" id="tab-list" aria-labelledby="tabs-heading"></ul>
+            <div class="empty-state" id="list-empty" hidden></div>
+          </div>
+
+          <footer class="panel-footer">
+            <p class="selection-status" id="selection-status" aria-live="polite">
+              Select tabs to share
+            </p>
+            <button class="btn btn-primary" id="share-selected" type="button" disabled>
+              Share selected
+            </button>
+          </footer>
+        </aside>
+
+        <section class="chat" aria-labelledby="chat-heading">
+          <header class="chat-header">
+            <div class="assistant">
+              <span class="assistant-avatar" aria-hidden="true">
+                <svg class="icon"><use href="#i-sparkle"></use></svg>
+              </span>
+              <div>
+                <h2 id="chat-heading">Assistant</h2>
+                <p>Chat preview · tab context in action</p>
+              </div>
+            </div>
+            <span class="demo-pill">Demo</span>
+          </header>
+
+          <div class="chat-context" aria-labelledby="context-label">
+            <div class="context-head">
+              <h3 id="context-label">Shared context</h3>
+              <span class="context-count" id="context-count">2 tabs</span>
+            </div>
+            <ul class="chips" id="context-chips" aria-label="Tabs shared in this chat"></ul>
+            <p class="context-empty" id="context-empty" hidden>
+              Nothing shared yet. Select tabs in the side panel to give your assistant context.
+            </p>
+          </div>
+
+          <div class="chat-scroll">
+            <p class="chat-note">
+              <svg class="icon" aria-hidden="true"><use href="#i-info"></use></svg>
+              Chat-side components from the ATC spec. They share state with the side panel.
+            </p>
+
+            <div class="chat-stack">
+              <section class="chat-card" aria-labelledby="picker-title">
+                <p class="card-eyebrow">Assistant · needs a target</p>
+                <h3 class="card-title" id="picker-title">Which tab should I use?</h3>
+                <p class="card-copy" id="picker-desc">
+                  Three open tabs could match your request. Pick one before I act.
+                </p>
+                <div id="picker-body"></div>
+                <p class="sr-only" id="picker-status"></p>
+              </section>
+
+              <section class="chat-card" aria-labelledby="success-title">
+                <div class="action-head">
+                  <span class="action-symbol" aria-hidden="true">
+                    <svg class="icon"><use href="#i-check"></use></svg>
+                  </span>
+                  <div class="action-titles">
+                    <p class="card-eyebrow">Click · Stripe API docs</p>
+                    <h3 class="action-title" id="success-title">Payment link created</h3>
+                  </div>
+                  <span class="status-pill is-ok">Completed</span>
+                </div>
+                <p class="action-copy">
+                  Clicked <strong>Create test payment</strong> on
+                  <strong>docs.stripe.com</strong>.
+                </p>
+                <div class="url-effect">
+                  <div class="url-head">
+                    <span class="effect-label">URL changed</span>
+                    <span class="url-duration">412 ms</span>
+                  </div>
+                  <div class="url-values">
+                    <code>docs.stripe.com/api/checkout/sessions</code>
+                    <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg>
+                    <code>dashboard.stripe.com/test/payments</code>
+                  </div>
+                </div>
+              </section>
+
+              <section class="chat-card" id="failure-card" aria-labelledby="failure-title">
+                <div class="action-head">
+                  <span class="action-symbol is-error" aria-hidden="true">
+                    <svg class="icon"><use href="#i-warning"></use></svg>
+                  </span>
+                  <div class="action-titles">
+                    <p class="card-eyebrow">Click · Q4 roadmap</p>
+                    <h3 class="action-title" id="failure-title">Click didn’t change the page</h3>
+                  </div>
+                  <span class="status-pill is-error">ACTION_NO_EFFECT</span>
+                </div>
+                <p class="action-copy">
+                  The assistant clicked <strong>Save changes</strong> on
+                  <strong>linear.app</strong>, but the page didn’t change within 2 seconds.
+                </p>
+                <dl class="action-facts">
+                  <div>
+                    <dt>Tab</dt>
+                    <dd>Q4 roadmap – Planning</dd>
+                  </div>
+                  <div>
+                    <dt>Matched element</dt>
+                    <dd><code>button[type=submit]</code></dd>
+                  </div>
+                  <div>
+                    <dt>Waited</dt>
+                    <dd>2.0 s</dd>
+                  </div>
+                </dl>
+                <div class="action-buttons">
+                  <button class="btn btn-primary btn-sm" id="retry-action" type="button">
+                    <svg class="icon" aria-hidden="true"><use href="#i-retry"></use></svg>
+                    Retry
+                  </button>
+                  <button
+                    class="btn btn-secondary btn-sm"
+                    id="inspect-action"
+                    type="button"
+                    aria-expanded="false"
+                    aria-controls="failure-details"
+                  >
+                    <svg class="icon" aria-hidden="true"><use href="#i-code"></use></svg>
+                    Inspect
+                  </button>
+                  <button class="btn btn-quiet btn-sm" id="takeover-action" type="button">
+                    <svg class="icon" aria-hidden="true"><use href="#i-pointer"></use></svg>
+                    Take over
+                  </button>
+                </div>
+                <div class="diagnostics" id="failure-details" hidden>
+                  <h4>What the assistant saw</h4>
+                  <dl>
+                    <dt>Element</dt>
+                    <dd><code>button.primary[type=submit]</code> · visible, enabled</dd>
+                    <dt>Last network</dt>
+                    <dd><code>PATCH /api/roadmap</code> → 500 in 1.2 s</dd>
+                    <dt>Effect</dt>
+                    <dd>No DOM or URL change detected</dd>
+                  </dl>
+                  <p>Try again after fixing the form, or take over and complete it yourself.</p>
+                </div>
+                <p class="failure-status" id="failure-status" role="status" aria-live="polite" hidden></p>
+              </section>
+            </div>
+
+            <p class="chat-footnote">
+              <svg class="icon" aria-hidden="true"><use href="#i-info"></use></svg>
+              Prototype only — no messages are sent and no browser APIs are called.
+            </p>
+          </div>
+        </section>
+      </main>
+
+      <footer class="page-footer">
+        <p>
+          <svg class="icon" aria-hidden="true"><use href="#i-info"></use></svg>
+          State is simulated locally and resets when you reload.
+        </p>
+        <p>ATC UX prototype · Phase 1–3 flows</p>
+      </footer>
+    </div>
+
+    <dialog
+      class="sheet"
+      id="share-dialog"
+      aria-labelledby="share-title"
+      aria-describedby="share-desc"
+      tabindex="-1"
+    >
+      <div class="sheet-inner">
+        <div class="sheet-grabber" aria-hidden="true"></div>
+        <header class="sheet-header">
+          <div class="sheet-heading">
+            <h2 class="sheet-title" id="share-title">Share tabs?</h2>
+            <p class="sheet-copy" id="share-desc">
+              Your assistant will be able to read and act on these tabs until you remove them.
+            </p>
+          </div>
+          <button
+            class="sheet-close"
+            type="button"
+            data-close-dialog="share-dialog"
+            aria-label="Close share confirmation"
+          >
+            <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+          </button>
+        </header>
+        <ul class="share-list" id="share-list" aria-label="Tabs to share"></ul>
+        <p class="share-domains" id="share-domains"></p>
+        <div class="share-warning">
+          <svg class="icon" aria-hidden="true"><use href="#i-warning"></use></svg>
+          <p>
+            <strong>Some tabs are always excluded.</strong> Mail, banking, health, and password
+            managers are never shared automatically.
+            <span id="share-warning-extra"></span>
+          </p>
+        </div>
+        <footer class="sheet-actions">
+          <button class="btn btn-secondary" type="button" data-close-dialog="share-dialog">
+            Cancel
+          </button>
+          <button class="btn btn-primary" id="share-confirm" type="button">Share tabs</button>
+        </footer>
+      </div>
+    </dialog>
+
+    <dialog
+      class="sheet"
+      id="unlock-dialog"
+      aria-labelledby="unlock-title"
+      aria-describedby="unlock-desc"
+      tabindex="-1"
+    >
+      <div class="sheet-inner">
+        <div class="sheet-grabber" aria-hidden="true"></div>
+        <header class="sheet-header">
+          <div class="sheet-heading">
+            <h2 class="sheet-title" id="unlock-title">Share this sensitive tab?</h2>
+            <p class="sheet-copy" id="unlock-desc">
+              This tab is locked because it may contain sensitive information. Sharing it gives
+              your assistant access until you remove it.
+            </p>
+          </div>
+          <button
+            class="sheet-close"
+            type="button"
+            data-close-dialog="unlock-dialog"
+            aria-label="Close sensitive tab confirmation"
+          >
+            <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+          </button>
+        </header>
+        <div class="unlock-target" id="unlock-target"></div>
+        <div class="share-warning">
+          <svg class="icon" aria-hidden="true"><use href="#i-warning"></use></svg>
+          <p>
+            <strong>Only continue if you trust this request.</strong> Mail, banking, health, and
+            password managers are excluded by default; unlocking is a deliberate choice.
+          </p>
+        </div>
+        <footer class="sheet-actions">
+          <button class="btn btn-secondary" type="button" data-close-dialog="unlock-dialog">
+            Keep locked
+          </button>
+          <button class="btn btn-amber" id="confirm-unlock" type="button">
+            Unlock and share
+          </button>
+        </footer>
+      </div>
+    </dialog>
+
+    <div class="toast-region">
+      <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+    </div>
+    <p class="sr-only" id="a11y-status" aria-live="polite" aria-atomic="true"></p>
+    <noscript>
+      <p style="padding: 16px; text-align: center">This prototype needs JavaScript enabled.</p>
+    </noscript>
+
+    <script>
+      (() => {
+        "use strict";
+
+        const CURRENT_WINDOW_ID = 1;
+        const PICKER_CANDIDATES = ["stripe-docs", "linear", "figma"];
+
+        const INITIAL_TABS = [
+          {
+            id: "linear",
+            title: "Q4 roadmap – Planning",
+            host: "linear.app",
+            url: "https://linear.app/acme/team/atc/roadmap",
+            windowId: 1,
+            color: "#5b66d6",
+            shared: true,
+          },
+          {
+            id: "github",
+            title: "Fix stale snapshot race · Pull Request #482",
+            host: "github.com",
+            url: "https://github.com/gainratio/agentic-tab-context/pull/482",
+            windowId: 1,
+            color: "#3f3f46",
+            shared: true,
+          },
+          {
+            id: "stripe-docs",
+            title: "Checkout Sessions | Stripe API reference",
+            host: "docs.stripe.com",
+            url: "https://docs.stripe.com/api/checkout/sessions",
+            windowId: 1,
+            color: "#635bff",
+            needsAccess: true,
+          },
+          {
+            id: "figma",
+            title: "ATC side panel – explorations",
+            host: "figma.com",
+            url: "https://www.figma.com/file/atc-side-panel/explorations",
+            windowId: 2,
+            color: "#0d99b8",
+          },
+          {
+            id: "notion",
+            title: "Launch notes — v0.5",
+            host: "notion.so",
+            url: "https://www.notion.so/acme/Launch-notes-v0-5",
+            windowId: 1,
+            color: "#787774",
+          },
+          {
+            id: "gmail",
+            title: "Inbox (4) — harish@acme.com",
+            host: "mail.google.com",
+            url: "https://mail.google.com/mail/u/0/#inbox",
+            windowId: 1,
+            color: "#b45309",
+            sensitive: true,
+          },
+          {
+            id: "chase",
+            title: "Account summary",
+            host: "chase.com",
+            url: "https://secure.chase.com/web/auth/dashboard",
+            windowId: 2,
+            color: "#475569",
+            sensitive: true,
+          },
+          {
+            id: "mychart",
+            title: "Test results — MyChart",
+            host: "mychart.org",
+            url: "https://mychart.org/mychart/test-results",
+            windowId: 1,
+            color: "#0f766e",
+            sensitive: true,
+          },
+          {
+            id: "1password",
+            title: "All items — 1Password",
+            host: "my.1password.com",
+            url: "https://my.1password.com/vaults",
+            windowId: 2,
+            color: "#64748b",
+            sensitive: true,
+          },
+          {
+            id: "webstore",
+            title: "Agentic Tab Context — Chrome Web Store",
+            host: "chromewebstore.google.com",
+            url: "https://chromewebstore.google.com/detail/agentic-tab-context",
+            windowId: 1,
+            color: "#a8a29e",
+            unsupported: true,
+          },
+        ];
+
+        const els = {
+          sharedCount: document.getElementById("shared-count"),
+          sharedCountSr: document.getElementById("shared-count-sr"),
+          sharedSummary: document.getElementById("shared-summary"),
+          contextCount: document.getElementById("context-count"),
+          contextChips: document.getElementById("context-chips"),
+          contextEmpty: document.getElementById("context-empty"),
+          search: document.getElementById("tab-search"),
+          searchWrap: document.querySelector(".search-wrap"),
+          searchClear: document.getElementById("clear-search"),
+          searchKbd: document.getElementById("search-kbd"),
+          filterButtons: Array.from(document.querySelectorAll("[data-filter]")),
+          filterCounts: Array.from(document.querySelectorAll("[data-count-for]")),
+          resultsCount: document.getElementById("results-count"),
+          tabList: document.getElementById("tab-list"),
+          listEmpty: document.getElementById("list-empty"),
+          sharedEmpty: document.getElementById("shared-empty"),
+          selectionStatus: document.getElementById("selection-status"),
+          shareSelected: document.getElementById("share-selected"),
+          pickerTitle: document.getElementById("picker-title"),
+          pickerDesc: document.getElementById("picker-desc"),
+          pickerBody: document.getElementById("picker-body"),
+          pickerStatus: document.getElementById("picker-status"),
+          shareDialog: document.getElementById("share-dialog"),
+          shareTitle: document.getElementById("share-title"),
+          shareDesc: document.getElementById("share-desc"),
+          shareList: document.getElementById("share-list"),
+          shareDomains: document.getElementById("share-domains"),
+          shareWarningExtra: document.getElementById("share-warning-extra"),
+          shareConfirm: document.getElementById("share-confirm"),
+          unlockDialog: document.getElementById("unlock-dialog"),
+          unlockTarget: document.getElementById("unlock-target"),
+          confirmUnlock: document.getElementById("confirm-unlock"),
+          resetDemo: document.getElementById("reset-demo"),
+          toast: document.getElementById("toast"),
+          a11yStatus: document.getElementById("a11y-status"),
+          failureCard: document.getElementById("failure-card"),
+          failureStatus: document.getElementById("failure-status"),
+          failureDetails: document.getElementById("failure-details"),
+          retryAction: document.getElementById("retry-action"),
+          inspectAction: document.getElementById("inspect-action"),
+          takeoverAction: document.getElementById("takeover-action"),
+        };
+
+        const state = {
+          tabs: [],
+          activeId: "github",
+          selected: new Set(),
+          filter: "all",
+          query: "",
+          pendingSensitiveId: null,
+          picker: { selectedId: "stripe-docs", confirmedId: null },
+          failure: { inspecting: false, takenOver: false },
+        };
+
+        let toastTimer = null;
+        let toastHideTimer = null;
+        let closeTimer = null;
+
+        const escapeHtml = (value) =>
+          String(value)
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#39;");
+
+        const pluralize = (count, singular, plural = `${singular}s`) =>
+          count === 1 ? singular : plural;
+
+        const icon = (name, className = "") =>
+          `<svg class="icon${className ? ` ${className}` : ""}" aria-hidden="true"><use href="#i-${name}"></use></svg>`;
+
+        const getTab = (id) => state.tabs.find((tab) => tab.id === id) || null;
+
+        const isSelectable = (tab) =>
+          Boolean(tab) && !tab.shared && !tab.sensitive && !tab.unsupported;
+
+        function tabsForFilter(filter = state.filter) {
+          switch (filter) {
+            case "shared":
+              return state.tabs.filter((tab) => tab.shared);
+            case "sensitive":
+              return state.tabs.filter((tab) => tab.sensitive);
+            case "window":
+              return state.tabs.filter((tab) => tab.windowId === CURRENT_WINDOW_ID);
+            default:
+              return state.tabs;
+          }
+        }
+
+        function visibleTabs() {
+          const query = state.query.trim().toLowerCase();
+          return tabsForFilter().filter((tab) => {
+            if (!query) return true;
+            return [tab.title, tab.host, tab.url].some((value) =>
+              value.toLowerCase().includes(query),
+            );
+          });
+        }
+
+        function setToast(message) {
+          els.toast.textContent = message;
+          els.toast.classList.add("is-visible");
+          window.clearTimeout(toastTimer);
+          window.clearTimeout(toastHideTimer);
+          toastTimer = window.setTimeout(() => {
+            els.toast.classList.remove("is-visible");
+          }, 3000);
+        }
+
+        function setStatus(message) {
+          els.a11yStatus.textContent = "";
+          window.setTimeout(() => {
+            els.a11yStatus.textContent = message;
+          }, 20);
+        }
+
+        function faviconMarkup(tab, extraClass = "") {
+          return `<span class="favicon${extraClass ? ` ${extraClass}` : ""}" style="--dot:${tab.color}" aria-hidden="true"></span>`;
+        }
+
+        function renderShared() {
+          const sharedTabs = state.tabs.filter((tab) => tab.shared);
+          const count = sharedTabs.length;
+
+          els.sharedCount.textContent = String(count);
+          els.sharedCountSr.textContent = `${count} ${pluralize(count, "tab")} shared`;
+          els.contextCount.textContent = `${count} ${pluralize(count, "tab")}`;
+          els.sharedSummary.textContent =
+            count === 0
+              ? "Nothing is shared right now. Choose tabs below to get started."
+              : "Only tabs you share are visible to your assistant.";
+
+          if (count === 0) {
+            els.contextChips.hidden = true;
+            els.contextChips.innerHTML = "";
+            els.contextEmpty.hidden = false;
+          } else {
+            els.contextEmpty.hidden = true;
+            els.contextChips.hidden = false;
+            els.contextChips.innerHTML = sharedTabs
+              .map(
+                (tab) => `
+                  <li>
+                    <span class="chip${tab.sensitive ? " is-sensitive" : ""}">
+                      ${tab.sensitive ? icon("lock") : faviconMarkup(tab)}
+                      <span class="chip-label" title="${escapeHtml(tab.title)}">${escapeHtml(tab.title)}</span>
+                      <button
+                        class="chip-remove"
+                        type="button"
+                        data-remove-chip="${tab.id}"
+                        aria-label="Remove ${escapeHtml(tab.title)} from shared tabs"
+                        title="Remove from shared tabs"
+                      >
+                        ${icon("x")}
+                      </button>
+                    </span>
+                  </li>`,
+              )
+              .join("");
+          }
+
+          els.sharedEmpty.hidden = !(count === 0 && state.filter !== "shared");
+        }
+
+        function renderFilters() {
+          const countFor = {
+            all: state.tabs.length,
+            shared: state.tabs.filter((tab) => tab.shared).length,
+            sensitive: state.tabs.filter((tab) => tab.sensitive).length,
+            window: state.tabs.filter((tab) => tab.windowId === CURRENT_WINDOW_ID).length,
+          };
+
+          for (const button of els.filterButtons) {
+            const filter = button.dataset.filter;
+            const active = filter === state.filter;
+            button.classList.toggle("is-active", active);
+            button.setAttribute("aria-pressed", String(active));
+          }
+
+          for (const countElement of els.filterCounts) {
+            const filter = countElement.dataset.countFor;
+            countElement.textContent = String(countFor[filter] ?? 0);
+          }
+        }
+
+        function badgeMarkup(tab) {
+          const badges = [];
+          if (tab.shared) {
+            const label = tab.sensitive ? "Shared" : "Shared";
+            badges.push(
+              `<span class="badge badge-shared${tab.sensitive ? " is-amber" : ""}">${tab.sensitive ? icon("lock") : icon("check")}${label}</span>`,
+            );
+          }
+          if (tab.id === state.activeId) {
+            badges.push(`<span class="badge badge-active"><span class="badge-dot"></span>Active</span>`);
+          }
+          if (tab.needsAccess && !tab.shared) {
+            badges.push(`<span class="badge badge-access">${icon("key")}Needs access</span>`);
+          }
+          if (tab.sensitive) {
+            badges.push(`<span class="badge badge-sensitive">${icon("lock")}Sensitive</span>`);
+          }
+          if (tab.unsupported) {
+            badges.push(`<span class="badge badge-unsupported">Unsupported</span>`);
+          }
+          return badges.join("");
+        }
+
+        function leadingControl(tab) {
+          if (tab.sensitive) {
+            return `<span class="lock-cell" role="img" aria-label="Locked sensitive tab">${icon("lock")}</span>`;
+          }
+
+          if (tab.unsupported) {
+            return `
+              <span class="check-cell">
+                <input
+                  class="select-box"
+                  type="checkbox"
+                  disabled
+                  aria-label="${escapeHtml(tab.title)} can’t be shared because this page is unsupported"
+                  title="Unsupported pages can’t be shared"
+                />
+              </span>`;
+          }
+
+          if (tab.shared) {
+            return `
+              <span class="check-cell">
+                <input
+                  class="select-box"
+                  type="checkbox"
+                  checked
+                  disabled
+                  aria-label="${escapeHtml(tab.title)} is already shared"
+                  title="Already shared — remove it from Shared context to stop sharing"
+                />
+              </span>`;
+          }
+
+          return `
+            <span class="check-cell">
+              <input
+                class="select-box"
+                type="checkbox"
+                data-select-id="${tab.id}"
+                aria-label="Select ${escapeHtml(tab.title)} from ${escapeHtml(tab.host)} for sharing"
+              />
+            </span>`;
+        }
+
+        function renderTabs() {
+          const tabs = visibleTabs();
+          els.tabList.innerHTML = tabs
+            .map((tab) => {
+              const unlockButton =
+                tab.sensitive && !tab.shared
+                  ? `<button
+                      class="unlock-btn"
+                      type="button"
+                      data-unlock-id="${tab.id}"
+                      aria-label="Unlock ${escapeHtml(tab.title)} to share"
+                      title="Unlock sensitive tab"
+                    >${icon("lock")}Unlock</button>`
+                  : "";
+
+              return `
+                <li
+                  class="tab-row${tab.id === state.activeId ? " is-active" : ""}${tab.sensitive ? " is-locked" : ""}"
+                  data-tab-id="${tab.id}"
+                >
+                  ${leadingControl(tab)}
+                  <button
+                    class="tab-main"
+                    type="button"
+                    data-activate-id="${tab.id}"
+                    aria-current="${tab.id === state.activeId ? "true" : "false"}"
+                    title="Make this the active target"
+                  >
+                    <span class="sr-only">Make active: </span>
+                    ${faviconMarkup(tab)}
+                    <span class="tab-body">
+                      <span class="tab-title" title="${escapeHtml(tab.title)}">${escapeHtml(tab.title)}</span>
+                      <span class="tab-meta">
+                        <span class="tab-host" title="${escapeHtml(tab.url)}">${escapeHtml(tab.host)}</span>
+                        <span class="badges">${badgeMarkup(tab)}</span>
+                      </span>
+                    </span>
+                  </button>
+                  <span class="row-actions">
+                    ${unlockButton}
+                    <button
+                      class="close-btn"
+                      type="button"
+                      data-close-tab="${tab.id}"
+                      aria-label="Close tab: ${escapeHtml(tab.title)}"
+                      title="Close tab"
+                    >${icon("x")}</button>
+                  </span>
+                </li>`;
+            })
+            .join("");
+
+          els.tabList.hidden = tabs.length === 0;
+          renderListEmpty(tabs.length);
+          els.sharedEmpty.hidden = !(state.tabs.filter((tab) => tab.shared).length === 0 && state.filter !== "shared");
+          els.resultsCount.textContent = `${tabs.length} ${pluralize(tabs.length, "tab")}`;
+        }
+
+        function emptyStateContent(tabsLength) {
+          if (state.tabs.length === 0) {
+            return {
+              icon: "panel",
+              title: "No open tabs",
+              copy: "Every tab in this demo was closed. Reset the demo to bring them back.",
+              action: "reset",
+              label: "Reset demo",
+            };
+          }
+
+          if (state.query.trim()) {
+            return {
+              icon: "search",
+              title: `No tabs match “${state.query.trim()}”`,
+              copy: "Try part of a title, hostname, or URL instead.",
+              action: "clear-search",
+              label: "Clear search",
+            };
+          }
+
+          if (state.filter === "shared" && tabsLength === 0) {
+            return {
+              icon: "share",
+              title: "Nothing shared yet",
+              copy: "Select an unshared tab and choose Share selected. Sensitive tabs stay locked.",
+              action: "show-all",
+              label: "Show all tabs",
+            };
+          }
+
+          if (state.filter === "sensitive" && tabsLength === 0) {
+            return {
+              icon: "lock",
+              title: "No sensitive tabs open",
+              copy: "Mail, banking, health, and password manager tabs appear here.",
+              action: "show-all",
+              label: "Show all tabs",
+            };
+          }
+
+          if (state.filter === "window" && tabsLength === 0) {
+            return {
+              icon: "panel",
+              title: "No tabs in this window",
+              copy: "Try All to see tabs from your other windows.",
+              action: "show-all",
+              label: "Show all tabs",
+            };
+          }
+
+          return {
+            icon: "search",
+            title: "No tabs here",
+            copy: "Try another filter or clear the search.",
+            action: "show-all",
+            label: "Show all tabs",
+          };
+        }
+
+        function renderListEmpty(tabsLength) {
+          const empty = tabsLength === 0;
+          els.listEmpty.hidden = !empty;
+          if (!empty) {
+            els.listEmpty.innerHTML = "";
+            return;
+          }
+
+          const content = emptyStateContent(tabsLength);
+          els.listEmpty.innerHTML = `
+            <span class="empty-symbol" aria-hidden="true">${icon(content.icon)}</span>
+            <h3>${escapeHtml(content.title)}</h3>
+            <p>${escapeHtml(content.copy)}</p>
+            <button class="btn btn-secondary btn-sm" type="button" data-empty-action="${content.action}">
+              ${escapeHtml(content.label)}
+            </button>`;
+        }
+
+        function validSelectedTabs() {
+          return state.tabs.filter((tab) => state.selected.has(tab.id) && isSelectable(tab));
+        }
+
+        function renderFooter() {
+          const selected = validSelectedTabs();
+          const count = selected.length;
+          els.shareSelected.disabled = count === 0;
+          els.shareSelected.title =
+            count === 0 ? "Select at least one unshared tab to share" : "Review and share selected tabs";
+
+          if (count > 0) {
+            els.selectionStatus.textContent = `${count} ${pluralize(count, "tab")} selected`;
+            els.selectionStatus.classList.add("has-selection");
+          } else if (!state.tabs.some(isSelectable)) {
+            els.selectionStatus.textContent = "All available tabs are already shared";
+            els.selectionStatus.classList.remove("has-selection");
+          } else {
+            els.selectionStatus.textContent = "Select tabs to share";
+            els.selectionStatus.classList.remove("has-selection");
+          }
+        }
+
+        function renderPicker() {
+          if (state.picker.confirmedId && !getTab(state.picker.confirmedId)) {
+            state.picker.confirmedId = null;
+          }
+
+          const candidates = PICKER_CANDIDATES.map(getTab).filter(Boolean);
+          const confirmed = state.picker.confirmedId ? getTab(state.picker.confirmedId) : null;
+
+          if (confirmed) {
+            els.pickerTitle.textContent = "Tab selected";
+            els.pickerDesc.textContent = "The assistant will use this tab for your next request.";
+            els.pickerBody.innerHTML = `
+              <div class="picker-confirmed">
+                <span class="confirm-mark" aria-hidden="true">${icon("check")}</span>
+                <div class="confirm-copy">
+                  <p class="confirm-title">Using “${escapeHtml(confirmed.title)}”</p>
+                  <p class="confirm-sub">
+                    ${escapeHtml(confirmed.host)} · now the active target and shared with your assistant.
+                  </p>
+                </div>
+                <span class="confirm-actions">
+                  <button class="btn btn-secondary btn-sm" type="button" data-picker-action="change">
+                    Change
+                  </button>
+                </span>
+              </div>`;
+            return;
+          }
+
+          els.pickerTitle.textContent = "Which tab should I use?";
+          els.pickerDesc.textContent =
+            "Three open tabs could match your request. Pick one before I act.";
+
+          if (candidates.length === 0) {
+            els.pickerBody.innerHTML = `
+              <p class="empty-candidates">
+                No candidate tabs are open. Reset the demo or share a tab from the side panel.
+              </p>`;
+            return;
+          }
+
+          if (!candidates.some((tab) => tab.id === state.picker.selectedId)) {
+            state.picker.selectedId = candidates[0].id;
+          }
+
+          const candidateRows = candidates
+            .map((tab) => {
+              const selected = tab.id === state.picker.selectedId;
+              const note = tab.shared
+                ? `<span class="candidate-note is-blue">Shared</span>`
+                : tab.needsAccess
+                  ? `<span class="candidate-note">Needs access</span>`
+                  : "";
+              return `
+                <label class="candidate${selected ? " is-selected" : ""}">
+                  <input
+                    type="radio"
+                    name="candidate-tab"
+                    value="${tab.id}"
+                    ${selected ? "checked" : ""}
+                  />
+                  ${faviconMarkup(tab)}
+                  <span class="candidate-text">
+                    <span class="candidate-title">${escapeHtml(tab.title)}</span>
+                    <span class="candidate-meta">
+                      <span>${escapeHtml(tab.host)}</span>
+                      ${note}
+                    </span>
+                  </span>
+                </label>`;
+            })
+            .join("");
+
+          els.pickerBody.innerHTML = `
+            <form id="picker-form">
+              <fieldset class="candidates">
+                <legend class="sr-only">Candidate tabs for the assistant</legend>
+                ${candidateRows}
+              </fieldset>
+              <div class="picker-footer">
+                <p class="picker-hint">Your assistant will use only the tab you pick.</p>
+                <button class="btn btn-primary btn-sm" type="button" data-picker-action="use">
+                  Use selected
+                </button>
+              </div>
+            </form>`;
+        }
+
+        function renderAll() {
+          for (const id of Array.from(state.selected)) {
+            const tab = getTab(id);
+            if (!tab || !isSelectable(tab)) state.selected.delete(id);
+          }
+          renderShared();
+          renderFilters();
+          renderTabs();
+          renderFooter();
+          renderPicker();
+        }
+
+        function setActiveTab(tabId) {
+          const tab = getTab(tabId);
+          if (!tab) return;
+          state.activeId = tab.id;
+          renderTabs();
+          setStatus(`${tab.title} is now the active target.`);
+          requestAnimationFrame(() => {
+            els.tabList
+              .querySelector(`.tab-main[data-activate-id="${tab.id}"]`)
+              ?.focus({ preventScroll: true });
+          });
+        }
+
+        function usableSelectionIds() {
+          return validSelectedTabs().map((tab) => tab.id);
+        }
+
+        function openShareDialog() {
+          const selected = validSelectedTabs();
+          if (selected.length === 0) {
+            setToast("Select an unshared tab first.");
+            return;
+          }
+
+          const count = selected.length;
+          const domains = [...new Set(selected.map((tab) => tab.host))];
+          const lockedSensitive = state.tabs.filter((tab) => tab.sensitive && !tab.shared).length;
+
+          els.shareTitle.textContent = `Share ${count} ${pluralize(count, "tab")}?`;
+          els.shareDesc.textContent =
+            count === 1
+              ? "Your assistant will be able to read and act on this tab until you remove it."
+              : "Your assistant will be able to read and act on these tabs until you remove them.";
+
+          els.shareList.innerHTML = selected
+            .map((tab) => {
+              const note = tab.needsAccess
+                ? `<span class="share-item-note">Needs access</span>`
+                : "";
+              return `
+                <li class="share-item">
+                  ${faviconMarkup(tab)}
+                  <span class="share-item-copy">
+                    <span class="share-item-title">${escapeHtml(tab.title)}</span>
+                    <span class="share-item-host">${escapeHtml(tab.host)}</span>
+                  </span>
+                  ${note}
+                </li>`;
+            })
+            .join("");
+
+          els.shareDomains.innerHTML = `<strong>Domains:</strong><span>${escapeHtml(domains.join(", "))}</span>`;
+          els.shareWarningExtra.textContent =
+            lockedSensitive > 0
+              ? `${lockedSensitive} sensitive ${pluralize(lockedSensitive, "tab")} ${lockedSensitive === 1 ? "stays" : "stay"} locked.`
+              : "Sensitive tabs require an explicit unlock.";
+          els.shareConfirm.textContent = `Share ${count} ${pluralize(count, "tab")}`;
+
+          openDialog(els.shareDialog);
+        }
+
+        function openUnlockDialog(tabId) {
+          const tab = getTab(tabId);
+          if (!tab || !tab.sensitive || tab.shared) return;
+
+          state.pendingSensitiveId = tab.id;
+          els.unlockTarget.innerHTML = `
+            ${faviconMarkup(tab)}
+            <span class="unlock-target-copy">
+              <span class="unlock-target-title">${escapeHtml(tab.title)}</span>
+              <span class="unlock-target-host">${escapeHtml(tab.host)} · Sensitive</span>
+            </span>
+            <span class="share-item-note is-amber">Locked</span>`;
+          openDialog(els.unlockDialog);
+        }
+
+        function openDialog(dialog) {
+          if (typeof dialog.showModal === "function") {
+            dialog.showModal();
+          } else {
+            dialog.setAttribute("open", "");
+          }
+          requestAnimationFrame(() => dialog.focus());
+        }
+
+        function confirmShare() {
+          const selected = validSelectedTabs();
+          if (selected.length === 0) {
+            els.shareDialog.close();
+            return;
+          }
+
+          const grantedHosts = new Set();
+          for (const tab of selected) {
+            if (tab.needsAccess) grantedHosts.add(tab.host);
+            tab.shared = true;
+            tab.needsAccess = false;
+            state.selected.delete(tab.id);
+          }
+
+          const count = selected.length;
+          const focusId = selected[0].id;
+          els.shareDialog.close();
+          renderAll();
+          const accessNote =
+            grantedHosts.size > 0
+              ? ` Access granted for ${[...grantedHosts].join(", ")}.`
+              : "";
+          setToast(
+            `${count} ${pluralize(count, "tab")} shared with your assistant.${accessNote}`,
+          );
+
+          requestAnimationFrame(() => {
+            const button = els.tabList.querySelector(
+              `.tab-main[data-activate-id="${focusId}"]`,
+            );
+            if (button) button.focus({ preventScroll: true });
+            else els.search.focus();
+          });
+        }
+
+        function confirmUnlock() {
+          const tab = state.pendingSensitiveId ? getTab(state.pendingSensitiveId) : null;
+          if (!tab || !tab.sensitive) {
+            els.unlockDialog.close();
+            state.pendingSensitiveId = null;
+            return;
+          }
+
+          tab.shared = true;
+          tab.needsAccess = false;
+          state.selected.delete(tab.id);
+          els.unlockDialog.close();
+          state.pendingSensitiveId = null;
+          renderAll();
+          setToast(`“${tab.title}” is shared. You unlocked this sensitive tab.`);
+
+          requestAnimationFrame(() => {
+            els.tabList
+              .querySelector(`.tab-main[data-activate-id="${tab.id}"]`)
+              ?.focus({ preventScroll: true });
+          });
+        }
+
+        function unshareTab(tabId, focusId) {
+          const tab = getTab(tabId);
+          if (!tab || !tab.shared) return;
+          tab.shared = false;
+          renderAll();
+          setToast(`Removed “${tab.title}” from shared tabs.`);
+          requestAnimationFrame(() => {
+            if (focusId) {
+              document
+                .querySelector(`[data-remove-chip="${focusId}"]`)
+                ?.focus({ preventScroll: true });
+              return;
+            }
+            const fallbackChip = document.querySelector("[data-remove-chip]");
+            if (fallbackChip) fallbackChip.focus({ preventScroll: true });
+            else els.search.focus();
+          });
+        }
+
+        function closeTab(tabId) {
+          if (closeTimer) return;
+          const tab = getTab(tabId);
+          if (!tab) return;
+          const rows = Array.from(els.tabList.querySelectorAll("[data-tab-id]"));
+          const row = els.tabList.querySelector(`[data-tab-id="${tabId}"]`);
+          if (!row) return;
+
+          const rowIndex = rows.indexOf(row);
+          const focusAfter =
+            rows[rowIndex + 1]?.getAttribute("data-tab-id") ||
+            rows[rowIndex - 1]?.getAttribute("data-tab-id") ||
+            null;
+          const wasShared = Boolean(tab.shared);
+          const duration = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+            ? 0
+            : 160;
+
+          row.classList.add("is-removing");
+          closeTimer = window.setTimeout(() => {
+            closeTimer = null;
+            const index = state.tabs.findIndex((item) => item.id === tabId);
+            if (index === -1) return;
+            state.tabs.splice(index, 1);
+            state.selected.delete(tabId);
+            if (state.activeId === tabId) {
+              const nextActive = state.tabs.find((item) => item.shared) || state.tabs[0];
+              state.activeId = nextActive ? nextActive.id : null;
+            }
+            renderAll();
+            const note = wasShared ? " It was removed from shared tabs." : "";
+            setToast(`Closed “${tab.title}”.${note}`);
+
+            requestAnimationFrame(() => {
+              const nextMain = focusAfter
+                ? els.tabList.querySelector(
+                    `.tab-main[data-activate-id="${focusAfter}"]`,
+                  )
+                : null;
+              if (nextMain) nextMain.focus({ preventScroll: true });
+              else els.search.focus();
+            });
+          }, duration);
+        }
+
+        function clearSearch() {
+          state.query = "";
+          els.search.value = "";
+          els.searchWrap.classList.remove("has-query");
+          els.searchClear.hidden = true;
+          renderTabs();
+          els.search.focus();
+        }
+
+        function setFilter(filter) {
+          if (!["all", "shared", "sensitive", "window"].includes(filter)) return;
+          state.filter = filter;
+          renderFilters();
+          renderTabs();
+          renderShared();
+        }
+
+        function useSelectedCandidate() {
+          const tab = getTab(state.picker.selectedId);
+          if (!tab) {
+            setToast("That candidate tab is no longer open.");
+            return;
+          }
+
+          const wasShared = Boolean(tab.shared);
+          tab.shared = true;
+          tab.needsAccess = false;
+          state.activeId = tab.id;
+          state.selected.delete(tab.id);
+          state.picker.confirmedId = tab.id;
+          renderAll();
+          els.pickerStatus.textContent = `Using ${tab.title}.`;
+          setToast(
+            wasShared
+              ? `Using “${tab.title}” as the active target.`
+              : `“${tab.title}” shared and set as the active target.`,
+          );
+          requestAnimationFrame(() => {
+            els.pickerBody
+              .querySelector('[data-picker-action="change"]')
+              ?.focus({ preventScroll: true });
+          });
+        }
+
+        function setFailureStatus(message, tone = "neutral") {
+          els.failureStatus.hidden = false;
+          els.failureStatus.textContent = message;
+          els.failureStatus.classList.toggle("is-error", tone === "error");
+        }
+
+        function resetFailureDemo() {
+          state.failure.inspecting = false;
+          state.failure.takenOver = false;
+          els.failureDetails.hidden = true;
+          els.inspectAction.setAttribute("aria-expanded", "false");
+          els.failureStatus.hidden = true;
+          els.failureStatus.textContent = "";
+          els.failureStatus.classList.remove("is-error");
+          els.retryAction.disabled = false;
+          els.takeoverAction.disabled = false;
+          els.failureCard.classList.remove("is-taken-over");
+        }
+
+        function resetDemo() {
+          if (els.shareDialog.open) els.shareDialog.close();
+          if (els.unlockDialog.open) els.unlockDialog.close();
+          if (closeTimer) {
+            window.clearTimeout(closeTimer);
+            closeTimer = null;
+          }
+          state.tabs = INITIAL_TABS.map((tab) => ({ ...tab }));
+          state.activeId = "github";
+          state.selected = new Set();
+          state.filter = "all";
+          state.query = "";
+          state.pendingSensitiveId = null;
+          state.picker.selectedId = "stripe-docs";
+          state.picker.confirmedId = null;
+          els.search.value = "";
+          els.searchWrap.classList.remove("has-query");
+          els.searchClear.hidden = true;
+          resetFailureDemo();
+          els.pickerStatus.textContent = "";
+          renderAll();
+          setToast("Demo reset.");
+          requestAnimationFrame(() => els.search.focus());
+        }
+
+        function updateResultsAnnouncement() {
+          const tabs = visibleTabs();
+          els.resultsCount.textContent = `${tabs.length} ${pluralize(tabs.length, "tab")}`;
+        }
+
+        function updateSearchUi() {
+          const hasQuery = state.query.trim().length > 0;
+          els.searchWrap.classList.toggle("has-query", hasQuery);
+          els.searchClear.hidden = !hasQuery;
+        }
+
+        // ---------- Events ----------
+
+        els.search.addEventListener("input", (event) => {
+          state.query = event.target.value;
+          updateSearchUi();
+          renderTabs();
+          updateResultsAnnouncement();
+        });
+
+        els.search.addEventListener("keydown", (event) => {
+          if (event.key === "Escape") {
+            if (els.search.value) {
+              event.preventDefault();
+              clearSearch();
+            } else {
+              els.search.blur();
+            }
+          }
+        });
+
+        els.searchClear.addEventListener("click", clearSearch);
+
+        document.addEventListener("keydown", (event) => {
+          const key = event.key.toLowerCase();
+          if ((event.metaKey || event.ctrlKey) && !event.altKey && key === "k") {
+            event.preventDefault();
+            els.search.focus();
+            els.search.select();
+          }
+        });
+
+        for (const button of els.filterButtons) {
+          button.addEventListener("click", () => setFilter(button.dataset.filter));
+        }
+
+        els.shareSelected.addEventListener("click", openShareDialog);
+        els.shareConfirm.addEventListener("click", confirmShare);
+        els.confirmUnlock.addEventListener("click", confirmUnlock);
+
+        els.unlockDialog.addEventListener("close", () => {
+          state.pendingSensitiveId = null;
+        });
+
+        for (const closer of document.querySelectorAll("[data-close-dialog]")) {
+          closer.addEventListener("click", () => {
+            document.getElementById(closer.dataset.closeDialog)?.close();
+          });
+        }
+
+        for (const dialog of [els.shareDialog, els.unlockDialog]) {
+          dialog.addEventListener("click", (event) => {
+            if (event.target === dialog) dialog.close();
+          });
+        }
+
+        els.tabList.addEventListener("change", (event) => {
+          const checkbox = event.target.closest("[data-select-id]");
+          if (!checkbox) return;
+          const id = checkbox.dataset.selectId;
+          if (checkbox.checked) state.selected.add(id);
+          else state.selected.delete(id);
+          renderFooter();
+        });
+
+        els.tabList.addEventListener("click", (event) => {
+          const closeButton = event.target.closest("[data-close-tab]");
+          if (closeButton) {
+            closeTab(closeButton.dataset.closeTab);
+            return;
+          }
+
+          const unlockButton = event.target.closest("[data-unlock-id]");
+          if (unlockButton) {
+            openUnlockDialog(unlockButton.dataset.unlockId);
+            return;
+          }
+
+          const activateButton = event.target.closest("[data-activate-id]");
+          if (activateButton) {
+            setActiveTab(activateButton.dataset.activateId);
+          }
+        });
+
+        els.listEmpty.addEventListener("click", (event) => {
+          const button = event.target.closest("[data-empty-action]");
+          if (!button) return;
+          switch (button.dataset.emptyAction) {
+            case "clear-search":
+              clearSearch();
+              break;
+            case "show-all":
+              setFilter("all");
+              els.search.focus();
+              break;
+            case "reset":
+              resetDemo();
+              break;
+            default:
+              break;
+          }
+        });
+
+        els.contextChips.addEventListener("click", (event) => {
+          const removeButton = event.target.closest("[data-remove-chip]");
+          if (!removeButton) return;
+          const removeId = removeButton.dataset.removeChip;
+          const chipButtons = Array.from(document.querySelectorAll("[data-remove-chip]"));
+          const index = chipButtons.indexOf(removeButton);
+          const focusId =
+            chipButtons[index + 1]?.dataset.removeChip ||
+            chipButtons[index - 1]?.dataset.removeChip ||
+            null;
+          unshareTab(removeId, focusId);
+        });
+
+        els.pickerBody.addEventListener("change", (event) => {
+          const radio = event.target.closest('input[name="candidate-tab"]');
+          if (!radio) return;
+          state.picker.selectedId = radio.value;
+          for (const candidate of els.pickerBody.querySelectorAll(".candidate")) {
+            candidate.classList.toggle(
+              "is-selected",
+              candidate.querySelector('input[name="candidate-tab"]')?.checked,
+            );
+          }
+        });
+
+        els.pickerBody.addEventListener("click", (event) => {
+          const action = event.target.closest("[data-picker-action]");
+          if (!action) return;
+          if (action.dataset.pickerAction === "use") useSelectedCandidate();
+          if (action.dataset.pickerAction === "change") {
+            state.picker.confirmedId = null;
+            renderPicker();
+            els.pickerStatus.textContent = "Choose another candidate tab.";
+            requestAnimationFrame(() => {
+              els.pickerBody
+                .querySelector('input[name="candidate-tab"][checked], input[name="candidate-tab"]')
+                ?.focus({ preventScroll: true });
+            });
+          }
+        });
+
+        els.inspectAction.addEventListener("click", () => {
+          const isOpen = els.inspectAction.getAttribute("aria-expanded") === "true";
+          els.inspectAction.setAttribute("aria-expanded", String(!isOpen));
+          els.failureDetails.hidden = isOpen;
+          state.failure.inspecting = !isOpen;
+        });
+
+        els.retryAction.addEventListener("click", () => {
+          if (state.failure.takenOver) return;
+          setFailureStatus(
+            "Retry sent. The assistant is watching for a page change before trying anything else.",
+          );
+          els.failureStatus.scrollIntoView({ block: "nearest" });
+        });
+
+        els.takeoverAction.addEventListener("click", () => {
+          state.failure.takenOver = true;
+          els.retryAction.disabled = true;
+          els.takeoverAction.disabled = true;
+          els.failureCard.classList.add("is-taken-over");
+          setFailureStatus("You have control. The assistant won’t retry this action.");
+        });
+
+        els.resetDemo.addEventListener("click", resetDemo);
+
+        // Set the search shortcut hint for the current platform.
+        if (!/Mac|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+          els.searchKbd.textContent = "Ctrl K";
+        }
+
+        state.tabs = INITIAL_TABS.map((tab) => ({ ...tab }));
+        renderAll();
+      })();
+    </script>
+  </body>
+</html>

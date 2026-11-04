@@ -53,6 +53,23 @@ export interface BindOptions {
   use?: boolean;
 }
 
+/** Filter for listing every open context: title/url/hostname text plus browser. */
+export interface BindingFilter {
+  query?: string;
+  browser?: BrowserName;
+}
+
+/** One open context as listed by `atc bindings`. Absent registry metadata is null, never guessed. */
+export interface BindingView {
+  context: string;
+  tabId: string | null;
+  browser: BrowserName;
+  source: TabSource | null;
+  url: string | null;
+  title: string | null;
+  current: boolean;
+}
+
 /** Locator kinds whose value lives in a field named after the kind (label.label, text.text, ...). */
 export const SIMPLE_LOCATOR_KINDS = ["label", "text", "placeholder", "testid", "selector"] as const;
 export type SimpleLocatorKind = (typeof SIMPLE_LOCATOR_KINDS)[number];

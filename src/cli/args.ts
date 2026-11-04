@@ -28,6 +28,7 @@ export function parseArgs(argv: readonly string[]): ParseResult {
 
 export const USAGE: readonly string[] = [
   "atc bind [query] [--query Q] [--url U] [--title T] [--browser B] [--tab ID] [--active] [--use]   bind to an already-open tab",
+  "atc bindings [--query Q] [--browser B]   list every open context in the daemon registry",
   "atc tabs [--browser B] [--query Q]   list all open tabs across Chrome, Safari, Firefox, Brave, Edge, and Extension",
   "atc open <browser> [--profile P] [--headless] [--use]   browser: chromium | chrome | brave | edge | firefox | safari | webkit | extension",
   "atc list",

@@ -4,7 +4,7 @@
 import { resolve } from "node:path";
 import { PROFILE_PATTERN } from "../../contracts/patterns.js";
 import type { Request } from "../../contracts/protocol.js";
-import type { BindOptions, BrowserName } from "../../contracts/types.js";
+import type { BindOptions, BindingFilter, BrowserName } from "../../contracts/types.js";
 import { definedOnly } from "../../daemon/params.js";
 import { type CommandSpec, type FlagName, type Parsed, TARGET_FLAGS, invalid } from "./grammar.js";
 import { checkBrowser, checkContextId, contextFlag, intFlag, nonEmpty, parseTarget, positional, requiredPositional, requiredValue } from "./values.js";
@@ -45,6 +45,17 @@ function buildTabs(parsed: Parsed): Request {
 
 function buildBind(parsed: Parsed): Request {
   return { method: "bind", params: tabFilter(parsed) };
+}
+
+function buildBindings(parsed: Parsed): Request {
+  const browser = nonEmpty(parsed, "browser");
+  return {
+    method: "bindings",
+    params: definedOnly<BindingFilter>({
+      query: nonEmpty(parsed, "query"),
+      browser: browser === undefined ? undefined : checkBrowser(parsed.command, browser),
+    }),
+  };
 }
 
 function buildClose(parsed: Parsed): Request {
@@ -112,6 +123,7 @@ export const COMMANDS: Readonly<Record<string, CommandSpec>> = {
     flags: ["query", "url", "title", "browser", "tab", "active", "use"],
     build: buildBind,
   },
+  bindings: { positionals: [], flags: ["browser", "query"], build: buildBindings },
   list: { positionals: [], flags: [], build: () => ({ method: "list", params: {} }) },
   use: {
     positionals: ["ctx"],

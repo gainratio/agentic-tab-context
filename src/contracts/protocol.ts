@@ -3,13 +3,14 @@
  * at `${ATC_HOME}/daemon.sock`. One request line, one response line.
  */
 import type { ErrorCode } from "./errors.js";
-import type { BindOptions, BrowserName, Target } from "./types.js";
+import type { BindOptions, BindingFilter, BrowserName, Target } from "./types.js";
 
 /** `context` omitted => the daemon uses the current context (see `use`). */
 export type Request =
   | { method: "open"; params: { browser: BrowserName; profile?: string; headless?: boolean; use?: boolean } }
   | { method: "tabs"; params: { browser?: BrowserName; query?: string; active?: boolean } }
   | { method: "bind"; params: BindOptions }
+  | { method: "bindings"; params: BindingFilter }
   | { method: "list"; params: Record<string, never> }
   | { method: "use"; params: { context: string } }
   | { method: "current"; params: Record<string, never> }

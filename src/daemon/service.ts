@@ -7,6 +7,7 @@ import type { Method, OkResponse, Paths, Request, Response } from "../contracts/
 import type { BrowserDriver, BrowserName, BrowserSession, DriverFactory } from "../contracts/types.js";
 import type { ExtensionBridge } from "../drivers/extension/bridge.js";
 import { TabBinder } from "./binding.js";
+import { bindingsResponse } from "./bindings.js";
 import { doctorReport } from "./doctor.js";
 import { type Handler, PageCommands, type Resolved, refreshLocation } from "./page-commands.js";
 import { type Params, isRecord, optionalBoolean, optionalString, profileParam, requireBrowser, requireString } from "./params.js";
@@ -91,11 +92,12 @@ export class DaemonService {
     await Promise.allSettled(this.registry.openSessions().map(({ id }) => this.closeContext(id)));
   }
 
-  private contextHandlers(): Pick<Record<Method, Handler>, "open" | "tabs" | "bind" | "list" | "use" | "current" | "close" | "doctor" | "ping" | "shutdown"> {
+  private contextHandlers(): Pick<Record<Method, Handler>, "open" | "tabs" | "bind" | "bindings" | "list" | "use" | "current" | "close" | "doctor" | "ping" | "shutdown"> {
     return {
       open: (p) => this.open(p),
       tabs: (p) => this.binder.tabs(p),
       bind: (p) => this.binder.bind(p),
+      bindings: (p) => Promise.resolve(bindingsResponse(this.registry, p)),
       list: () => Promise.resolve({ ok: true, ...this.registry.snapshot() }),
       use: (p) => this.use(p),
       current: () => this.currentContext(),

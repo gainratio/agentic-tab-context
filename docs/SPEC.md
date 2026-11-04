@@ -34,6 +34,7 @@ This is the full contract. For an introduction, see the [README](../README.md).
 | `atc tabs [query] [--browser B] [--query Q] [--active]` | `{ok, tabs:[{tabId, browser, source, url, title, active, context?}]}` |
 | `atc bind [query] [--query Q] [--url U] [--title T] [--browser B] [--tab ID] [--active] [--use]` | `{ok, context, tabId, browser, source, url, title, current, reused}` |
 | `atc open <browser> [--profile P] [--headless] [--use]` | `{ok, context, browser, profile, current}`. `browser`: `chromium`, `chrome`, `brave`, `edge`, `firefox`, `webkit` |
+| `atc bindings [--query Q] [--browser B]` | `{ok, current, bindings:[{context, tabId, browser, source, url, title, current}]}`. Read-only list of every open context, including non-current ones; filters match title, URL, or hostname |
 | `atc list` / `atc current` / `atc use <ctx>` | Contexts / the current context / switch current |
 | `atc close [ctx]` | Close a context. For a live tab this only disconnects; your tab stays open |
 | `atc goto <url>` / `back` / `forward` / `reload` | `{ok, context, url, title}`. Relative URLs resolve against the current page |
