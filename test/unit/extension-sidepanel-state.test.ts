@@ -59,7 +59,7 @@ function stateApi(): StateApi {
 const BINDINGS = [
   {
     context: "ctx_mail",
-    tabId: "ext:chromium-0a1b2c3d:7",
+    tabId: "ext:chromium-11111111:7",
     browser: "chromium",
     source: "extension",
     url: "https://mail.google.com/mail/u/0/",
@@ -68,7 +68,7 @@ const BINDINGS = [
   },
   {
     context: "ctx_pr",
-    tabId: "ext:chromium-0a1b2c3d:8",
+    tabId: "ext:chromium-11111111:8",
     browser: "chromium",
     source: "extension",
     url: "https://github.com/gainratio/atc/pull/482",
@@ -146,9 +146,9 @@ describe("side-panel sensitive classifier", () => {
 describe("side-panel binding state", () => {
   it("parses the daemon's extension tab id format", () => {
     const state = stateApi();
-    expect(state.parseExtensionTabId("ext:chromium-0a1b2c3d:7")).toEqual({ key: "chromium-0a1b2c3d", tabId: 7 });
+    expect(state.parseExtensionTabId("ext:chromium-11111111:7")).toEqual({ key: "chromium-11111111", tabId: 7 });
     expect(state.parseExtensionTabId("ext:firefox-deadbeef:42")).toEqual({ key: "firefox-deadbeef", tabId: 42 });
-    expect(state.parseExtensionTabId("ext:chromium-0a1b2c3d:0")).toBeNull();
+    expect(state.parseExtensionTabId("ext:chromium-11111111:0")).toBeNull();
     expect(state.parseExtensionTabId("ext:../x:1")).toBeNull();
     expect(state.parseExtensionTabId("7")).toBeNull();
     expect(state.parseExtensionTabId(null)).toBeNull();
