@@ -84,6 +84,18 @@ describe("startServer authentication", () => {
     const accepted = await sendRaw(`${JSON.stringify({ id: 2, auth: "fixture-token", request: { method: "ping", params: {} } })}\n`);
     expect(accepted[0]?.response).toMatchObject({ ok: true, pid: process.pid });
   });
+
+  it("caps concurrent active socket connections (S-25)", async () => {
+    server = await startServer(service, paths, { maxConnections: 1 });
+    const held = createConnection(paths.socket);
+    await new Promise<void>((resolve) => held.once("connect", () => resolve()));
+    try {
+      const overflow = await sendRaw(`${JSON.stringify({ id: 9, request: { method: "ping", params: {} } })}\n`);
+      expect(overflow[0]?.response).toMatchObject({ ok: false, error: "DAEMON_UNAVAILABLE" });
+    } finally {
+      held.destroy();
+    }
+  });
 });
 
 describe("startServer", () => {

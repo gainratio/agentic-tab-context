@@ -29,13 +29,27 @@ export interface ServerOptions {
   onRequest?: (entry: RequestLogEntry) => void;
   /** When set, every CLI envelope must carry the matching per-install token. */
   authToken?: string;
+  /** Maximum concurrent active socket connections accepted by the server. */
+  maxConnections?: number;
 }
 
 const MAX_LINE_BYTES = 1024 * 1024;
+export const MAX_ACTIVE_CONNECTIONS = 64;
 
 export function startServer(service: DaemonService, paths: Paths, options: ServerOptions = {}): Promise<RunningServer> {
   const queue = new KeyedQueue();
-  return listenOwnerOnly(paths.socket, (socket) => serveConnection(socket, service, queue, options));
+  const active = new Set<Socket>();
+  const maxConnections = options.maxConnections ?? MAX_ACTIVE_CONNECTIONS;
+  return listenOwnerOnly(paths.socket, (socket) => {
+    if (active.size >= maxConnections) {
+      writeLine(socket, { id: -1, response: { ok: false, error: "DAEMON_UNAVAILABLE", message: "too many concurrent connections" } });
+      socket.end();
+      return;
+    }
+    active.add(socket);
+    socket.on("close", () => active.delete(socket));
+    serveConnection(socket, service, queue, options);
+  });
 }
 
 function serveConnection(socket: Socket, service: DaemonService, queue: KeyedQueue, options: ServerOptions): void {

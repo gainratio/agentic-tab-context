@@ -5,7 +5,14 @@ import { randomBytes } from "node:crypto";
 import { AtcError } from "../contracts/errors.js";
 import type { BrowserName, BrowserSession, TabContext, TabSource } from "../contracts/types.js";
 import { redactUrl } from "./redaction.js";
-import { ID_PATTERN, compareContexts, loadContexts, writeStateFile } from "./registry-store.js";
+import {
+  ID_PATTERN,
+  compareContexts,
+  isContextExpired,
+  loadContexts,
+  resolveContextTtlMs,
+  writeStateFile,
+} from "./registry-store.js";
 
 /** Returns `size` random bytes. Injectable so tests can force id collisions. */
 export type RandomSource = (size: number) => Uint8Array;
@@ -13,6 +20,9 @@ export type RandomSource = (size: number) => Uint8Array;
 export interface ContextRegistryOptions {
   statePath: string;
   random?: RandomSource;
+  ttlMs?: number;
+  env?: NodeJS.ProcessEnv;
+  now?: () => Date;
 }
 
 export interface NewContext {
@@ -33,6 +43,8 @@ const MAX_ID_ATTEMPTS = 4096;
 export class ContextRegistry {
   private readonly statePath: string;
   private readonly random: RandomSource;
+  private readonly ttlMs: number;
+  private readonly now: () => Date;
   private readonly contexts = new Map<string, TabContext>();
   private readonly sessions = new Map<string, BrowserSession>();
   private readonly usedIds = new Set<string>();
@@ -41,6 +53,8 @@ export class ContextRegistry {
   constructor(options: ContextRegistryOptions) {
     this.statePath = options.statePath;
     this.random = options.random ?? randomBytes;
+    this.ttlMs = resolveContextTtlMs(options.env, options.ttlMs);
+    this.now = options.now ?? (() => new Date());
     this.load();
   }
 
@@ -76,19 +90,24 @@ export class ContextRegistry {
 
   create(input: NewContext, session: BrowserSession): TabContext {
     const id = this.nextId();
+    const { browser, profile, createdAt, source, tabId } = input;
     const ctx: TabContext = {
-      id,
-      browser: input.browser,
-      status: "open",
-      profile: input.profile,
-      ...(input.source === undefined ? {} : { source: input.source }),
-      ...(input.tabId === undefined ? {} : { tabId: input.tabId }),
-      createdAt: input.createdAt,
+      id, browser, status: "open", profile, createdAt,
+      ...(source === undefined ? {} : { source }),
+      ...(tabId === undefined ? {} : { tabId }),
     };
     this.contexts.set(id, ctx);
     this.sessions.set(id, session);
+    if (Number.isFinite(Date.parse(createdAt))) this.pruneAt(Date.parse(createdAt));
     this.persist();
     return { ...ctx };
+  }
+
+  /** Prune closed contexts whose age exceeds `ttlMs`. Returns removed context ids. */
+  prune(now: Date = this.now()): string[] {
+    const removed = this.pruneAt(now.getTime());
+    if (removed.length > 0) this.persist();
+    return removed;
   }
 
   /** Records the page location last observed for an open context. */
@@ -140,12 +159,25 @@ export class ContextRegistry {
   private load(): void {
     const restored = loadContexts(this.statePath);
     if (restored === undefined) return;
+    const nowMs = this.now().getTime();
     for (const ctx of restored) {
-      this.contexts.set(ctx.id, { ...ctx, status: "closed" });
       this.usedIds.add(ctx.id);
+      const closed: TabContext = { ...ctx, status: "closed" };
+      if (!isContextExpired(closed, nowMs, this.ttlMs)) this.contexts.set(ctx.id, closed);
     }
     this.currentId = null;
     this.persist();
+  }
+
+  private pruneAt(nowMs: number): string[] {
+    const removed: string[] = [];
+    for (const [id, ctx] of this.contexts) {
+      if (isContextExpired(ctx, nowMs, this.ttlMs)) {
+        this.contexts.delete(id);
+        removed.push(id);
+      }
+    }
+    return removed;
   }
 
   private persist(): void {

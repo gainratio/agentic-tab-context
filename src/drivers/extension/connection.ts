@@ -15,11 +15,13 @@ import {
   type ExtensionToDaemon,
 } from "../../contracts/extension.js";
 import type { BrowserName, LiveTab } from "../../contracts/types.js";
+import { MAX_INBOUND_FRAME_BYTES } from "../../transport/frames.js";
 import { readLines, writeLine } from "../../transport/lines.js";
 import { parseExtensionMessage } from "./messages.js";
 
-/** Chrome's cap on one extension-to-host message; anything larger is not from a real browser. */
-const MAX_LINE_BYTES = 64 * 1024 * 1024;
+/** Bounded 16 MiB cap on one extension-to-host message (S-25). */
+export const MAX_EXTENSION_LINE_BYTES = MAX_INBOUND_FRAME_BYTES;
+const MAX_LINE_BYTES = MAX_EXTENSION_LINE_BYTES;
 
 interface Pending {
   resolve: (value: unknown) => void;

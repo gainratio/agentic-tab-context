@@ -37,7 +37,7 @@ function buildService(paths: Paths, bridge: ExtensionBridge): DaemonService {
   const executablePath = process.env.ATC_CHROMIUM_PATH;
   const options = { profilesDir: paths.profiles, extensionDriver, ...(executablePath ? { executablePath } : {}) };
   const service = new DaemonService({
-    registry: new ContextRegistry({ statePath: paths.state }),
+    registry: new ContextRegistry({ statePath: paths.state, env: process.env }),
     driverFactory: (browser: BrowserName) => createDriver(browser, options),
     paths,
     extensionBridge: bridge,

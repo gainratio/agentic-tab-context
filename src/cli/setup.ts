@@ -8,7 +8,7 @@ import { dirname, join } from "node:path";
 import { resolvePaths } from "../contracts/paths.js";
 import type { OkResponse } from "../contracts/protocol.js";
 import { PACKAGE_ROOT } from "../drivers/page-agent.js";
-import { EXTENSION_DIR, extensionIdFromKey, extensionManifest, installNativeHost } from "../native/install.js";
+import { EXTENSION_DIR, extensionIdFromKey, extensionManifest, installNativeHost, parseExtensionIds } from "../native/install.js";
 
 const SKILL_NAME = "agentic-tab-context";
 const SKILL_SOURCE = join(PACKAGE_ROOT, "skills", SKILL_NAME, "SKILL.md");
@@ -33,13 +33,14 @@ function installSkills(userHome: string): string[] {
 
 export function runSetup(env: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform): OkResponse {
   const home = env.HOME ?? homedir();
-  const extraExtensionIds = (env.ATC_EXTENSION_IDS ?? "").split(",").map((id) => id.trim()).filter(Boolean);
+  const extraExtensionIds = parseExtensionIds(env.ATC_EXTENSION_IDS);
   const nativeHostManifests = installNativeHost({ paths: resolvePaths(env), home, platform, extraExtensionIds });
+  const id = extensionIdFromKey(extensionManifest().key);
   return {
     ok: true,
     installedSkills: installSkills(home),
     nativeHostManifests,
-    extension: { folder: EXTENSION_DIR, id: extensionIdFromKey(extensionManifest().key) },
+    extension: { folder: EXTENSION_DIR, id, allowedIds: [id, ...extraExtensionIds] },
     next: "Load the extension folder via chrome://extensions > Developer mode > Load unpacked, then run `atc tabs`.",
   };
 }

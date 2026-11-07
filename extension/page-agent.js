@@ -13,6 +13,8 @@ globalThis.__atcAgent =
         store: globalThis.__atcAgent?.store ?? { console: [], network: [], seq: 0, watching: false },
         pressKeys: ["Enter", "Escape", "Tab", " ", "Backspace", "Delete", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End", "PageUp", "PageDown"],
         cap: 500,
+        entryByteCap: 4096,
+        bufferByteCap: 262144,
 
         run(op) {
           if (op.op === "inspect") return this.inspect();
@@ -77,7 +79,7 @@ globalThis.__atcAgent =
         },
         inspect() {
           const lines = this.elements(document.body).filter((el) => this.visible(el)).flatMap((el) => this.describe(el));
-          return { url: location.href, title: document.title, aria: lines.join("\n") };
+          return { url: location.href, title: document.title, aria: lines.join("\n"), provenance: "untrusted-page" };
         },
         elements(root = document) {
           const elements = root ? [...root.querySelectorAll("*")] : [];
@@ -169,7 +171,8 @@ globalThis.__atcAgent =
           if (!(el instanceof HTMLInputElement)) return false;
           const tokens = (el.getAttribute("autocomplete") || "").toLowerCase().split(/\s+/);
           this.passwords ??= new WeakSet();
-          if (el.type === "password" || tokens.some((value) => ["current-password", "new-password"].includes(value))) this.passwords.add(el);
+          const secret = el.type === "password" || tokens.some((v) => ["current-password", "new-password", "one-time-code"].includes(v) || v.startsWith("cc-"));
+          if (secret) this.passwords.add(el);
           return this.passwords.has(el);
         },
         watch() {

@@ -301,6 +301,7 @@ describe("inspect, screenshot, console, network", () => {
       url: "https://example.com/app",
       title: "app",
       aria: '- heading "app"',
+      provenance: "untrusted-page",
     });
   });
 

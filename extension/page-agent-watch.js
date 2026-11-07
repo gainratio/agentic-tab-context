@@ -40,8 +40,26 @@ globalThis.__atcWatch = {
     if (!agent.store.watching || epoch !== agent.captureEpoch) return;
     const list = agent.store[kind];
     agent.store.seq += 1;
-    list.push({ seq: agent.store.seq, ...entry, at: new Date().toISOString() });
-    if (list.length > agent.cap) list.shift();
+    list.push({ seq: agent.store.seq, ...this.sanitize(entry, agent.entryByteCap), at: new Date().toISOString() });
+    this.trim(list, agent.cap, agent.bufferByteCap);
+  },
+
+  sanitize(entry, maxBytes = 4096) {
+    const out = { ...entry };
+    for (const key of ["text", "url", "failure"]) {
+      if (typeof out[key] === "string" && out[key].length > maxBytes) {
+        out[key] = `${out[key].slice(0, Math.max(0, maxBytes - 14))}...[truncated]`;
+      }
+    }
+    return out;
+  },
+
+  trim(list, cap = 500, byteCap = 262144) {
+    while (list.length > cap) list.shift();
+    let total = list.reduce((sum, item) => sum + JSON.stringify(item).length, 0);
+    while (list.length > 0 && total > byteCap) {
+      total -= JSON.stringify(list.shift()).length;
+    }
   },
 
   hookConsole(agent, hooks) {

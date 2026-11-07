@@ -149,4 +149,34 @@ describe("ContextRegistry state", () => {
     copy.status = "closed";
     expect(registry.get(ctx.id)?.status).toBe("open");
   });
+
+  it("prunes stale closed contexts past TTL on reload and explicit prune while keeping open or fresh contexts (S-15)", () => {
+    const t0 = new Date("2026-05-01T00:00:00.000Z");
+    const tFresh = new Date("2026-05-01T20:00:00.000Z");
+    const tNow = new Date("2026-05-02T12:00:00.000Z");
+    const first = new ContextRegistry({
+      statePath,
+      now: () => t0,
+      random: sequenceRandom([0x0001, 0x0002]),
+    });
+    first.create({ ...base, createdAt: t0.toISOString() }, session(1));
+    first.create({ ...base, createdAt: tFresh.toISOString() }, session(2));
+
+    const reloaded = new ContextRegistry({ statePath, now: () => tNow });
+    expect(reloaded.list().map((c) => c.id)).toEqual(["ctx_0002"]);
+
+    const custom = new ContextRegistry({
+      statePath,
+      now: () => tNow,
+      env: { ATC_CONTEXT_TTL_MS: "1000" },
+      random: sequenceRandom([0x0003]),
+    });
+    expect(custom.list()).toEqual([]);
+    const openCtx = custom.create({ ...base, createdAt: t0.toISOString() }, session(3));
+    expect(custom.prune(tNow)).toEqual([]);
+    expect(custom.get(openCtx.id)?.status).toBe("open");
+    custom.markClosed(openCtx.id);
+    expect(custom.prune(tNow)).toEqual([openCtx.id]);
+    expect(custom.list()).toEqual([]);
+  });
 });

@@ -40,4 +40,25 @@ describe("redaction", () => {
     expect(redactUrl("https://example.com/docs?page=2")).toBe("https://example.com/docs?page=2");
     expect(redactText("a normal sentence")).toBe("a normal sentence");
   });
+
+  it("redacts Authorization headers, Cookie/Set-Cookie headers, OTP/CVV, card numbers, and AIza/ghp tokens (S-03)", () => {
+    const headers = redactText(
+      "Authorization: Bearer tok_secret_123456\nCookie: sid=abc123xyz; theme=dark\nSet-Cookie: session=topsecret; HttpOnly",
+    );
+    expect(headers).toContain("Authorization: Bearer [redacted]");
+    expect(headers).toContain("Cookie: [redacted]");
+    expect(headers).toContain("Set-Cookie: [redacted]");
+    expect(headers).not.toContain("tok_secret_123456");
+    expect(headers).not.toContain("sid=abc123xyz");
+    expect(headers).not.toContain("topsecret");
+
+    const secrets = redactText(
+      "OTP: 482910, cvv=842, card 4532-0151-1283-0366, ghp_1234567890abcdefghijklmnop, AIzaSyDaGmW1234567890abcdefghijk",
+    );
+    expect(secrets).not.toContain("482910");
+    expect(secrets).not.toContain("842");
+    expect(secrets).not.toContain("4532-0151-1283-0366");
+    expect(secrets).not.toContain("ghp_1234567890abcdefghijklmnop");
+    expect(secrets).not.toContain("AIzaSyDaGmW1234567890abcdefghijk");
+  });
 });

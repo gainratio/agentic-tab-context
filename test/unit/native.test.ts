@@ -9,9 +9,10 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runSetup } from "../../src/cli/setup.js";
 import { resolvePaths } from "../../src/contracts/paths.js";
-import { extensionIdFromKey, extensionManifest, installNativeHost } from "../../src/native/install.js";
+import { doctorReport } from "../../src/daemon/doctor.js";
+import { extensionIdFromKey, extensionManifest, installNativeHost, parseExtensionIds } from "../../src/native/install.js";
 import { NativeRelay } from "../../src/native/relay.js";
-import { FrameDecoder, MAX_OUTBOUND_FRAME_BYTES, encodeFrame } from "../../src/transport/frames.js";
+import { FrameDecoder, MAX_INBOUND_FRAME_BYTES, MAX_OUTBOUND_FRAME_BYTES, encodeFrame } from "../../src/transport/frames.js";
 import { LineSplitter } from "../../src/transport/lines.js";
 
 let dir: string;
@@ -32,9 +33,10 @@ describe("frames", () => {
     expect(() => encodeFrame("x".repeat(MAX_OUTBOUND_FRAME_BYTES))).toThrow(RangeError);
   });
 
-  it("refuses an inbound frame header above the 64 MiB cap", () => {
+  it("refuses an inbound frame header above the 16 MiB cap (S-25)", () => {
+    expect(MAX_INBOUND_FRAME_BYTES).toBe(16 * 1024 * 1024);
     const header = Buffer.alloc(4);
-    header.writeUInt32LE(0xffffffff, 0);
+    header.writeUInt32LE(MAX_INBOUND_FRAME_BYTES + 1, 0);
     expect(() => new FrameDecoder().push(header)).toThrow(RangeError);
   });
 });
@@ -145,11 +147,15 @@ describe("native host registration", () => {
     mkdirSync(join(support, "Google", "Chrome"), { recursive: true });
     mkdirSync(join(support, "Mozilla"), { recursive: true });
     const paths = resolvePaths({ ATC_HOME: join(dir, "atc") });
-    const written = installNativeHost({ paths, home, platform: "darwin", extraExtensionIds: ["storeid"] });
+    const storeId = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    const written = installNativeHost({ paths, home, platform: "darwin", extraExtensionIds: [storeId] });
     expect(written).toHaveLength(2);
     const chrome = JSON.parse(readFileSync(join(support, "Google", "Chrome", "NativeMessagingHosts", "com.gainratio.atc.json"), "utf8"));
     expect(chrome).toMatchObject({ name: "com.gainratio.atc", type: "stdio", path: paths.nativeHost });
-    expect(chrome.allowed_origins).toEqual(["chrome-extension://aecjddiglfcfcghkkoccljblamebifgd/", "chrome-extension://storeid/"]);
+    expect(chrome.allowed_origins).toEqual([
+      "chrome-extension://aecjddiglfcfcghkkoccljblamebifgd/",
+      `chrome-extension://${storeId}/`,
+    ]);
     const firefox = JSON.parse(readFileSync(join(support, "Mozilla", "NativeMessagingHosts", "com.gainratio.atc.json"), "utf8"));
     expect(firefox.allowed_extensions).toEqual([extensionManifest().geckoId]);
   });
@@ -170,6 +176,31 @@ describe("native host registration", () => {
       join(home, ".claude", "skills", "agentic-tab-context", "SKILL.md"),
       join(home, ".agents", "skills", "agentic-tab-context", "SKILL.md"),
       join(home, ".gemini", "config", "skills", "agentic-tab-context", "SKILL.md"),
+    ]);
+  });
+
+  it("strictly validates ATC_EXTENSION_IDS and reports validated IDs in setup and doctor (S-18)", () => {
+    const validChrome = "cccccccccccccccccccccccccccccccc";
+    const validFirefox = "custom-atc@gainratio.com";
+    expect(parseExtensionIds(`${validChrome}, ${validFirefox}`)).toEqual([validChrome, validFirefox]);
+    expect(() => parseExtensionIds("not-an-extension-id")).toThrow(
+      expect.objectContaining({ code: "INVALID_ARGUMENT" }),
+    );
+    expect(() => parseExtensionIds("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz")).toThrow(
+      expect.objectContaining({ code: "INVALID_ARGUMENT" }),
+    );
+    const paths = resolvePaths({ ATC_HOME: join(dir, "atc-doc") });
+    const report = doctorReport({
+      paths,
+      env: { ATC_EXTENSION_IDS: `${validChrome},${validFirefox}` },
+      tabs: [],
+      openContexts: 0,
+      current: null,
+    });
+    expect((report.extension as { allowedIds: string[] }).allowedIds).toEqual([
+      extensionIdFromKey(extensionManifest().key),
+      validChrome,
+      validFirefox,
     ]);
   });
 });

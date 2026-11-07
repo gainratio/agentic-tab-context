@@ -13,6 +13,28 @@ import { PACKAGE_ROOT } from "../drivers/page-agent.js";
 export const EXTENSION_DIR = join(PACKAGE_ROOT, "extension");
 const HOST_ENTRY = join(PACKAGE_ROOT, "dist", "native", "main.js");
 const ID_ALPHABET_OFFSET = "a".charCodeAt(0);
+const CHROME_EXT_ID_PATTERN = /^[a-p]{32}$/;
+const FIREFOX_EXT_ID_PATTERN =
+  /^(?:[A-Za-z0-9._-]+@[A-Za-z0-9.-]+|\{[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\})$/;
+
+export function isValidExtensionId(id: string): boolean {
+  return CHROME_EXT_ID_PATTERN.test(id) || FIREFOX_EXT_ID_PATTERN.test(id);
+}
+
+export function validateExtensionIds(ids: readonly string[]): string[] {
+  return ids.map((raw) => {
+    const id = raw.trim();
+    if (!isValidExtensionId(id)) {
+      throw new AtcError("INVALID_ARGUMENT", `invalid extension id in ATC_EXTENSION_IDS: ${id}`);
+    }
+    return id;
+  });
+}
+
+export function parseExtensionIds(raw: string | undefined): string[] {
+  if (raw === undefined || raw.trim() === "") return [];
+  return validateExtensionIds(raw.split(",").map((id) => id.trim()).filter(Boolean));
+}
 
 interface BrowserHostDir {
   browser: string;
@@ -75,9 +97,11 @@ function linuxHostDirs(home: string): BrowserHostDir[] {
 /** The JSON each browser reads to find and authorize the host. */
 export function hostManifest(launcher: string, firefox: boolean, extensionIds: readonly string[], geckoId: string): object {
   const base = { name: NATIVE_HOST_NAME, description: "Agentic Tab Context bridge", path: launcher, type: "stdio" };
+  const extraFirefox = extensionIds.filter((id) => !CHROME_EXT_ID_PATTERN.test(id) && id !== geckoId);
+  const chromeIds = extensionIds.filter((id) => CHROME_EXT_ID_PATTERN.test(id));
   return firefox
-    ? { ...base, allowed_extensions: [geckoId] }
-    : { ...base, allowed_origins: extensionIds.map((id) => `chrome-extension://${id}/`) };
+    ? { ...base, allowed_extensions: [geckoId, ...extraFirefox] }
+    : { ...base, allowed_origins: chromeIds.map((id) => `chrome-extension://${id}/`) };
 }
 
 /** Browsers start hosts with a minimal PATH, so pin the exact node binary and ATC_HOME. */
@@ -103,9 +127,10 @@ export interface HostInstallOptions {
 /** Write the launcher and register it with every browser whose profile folder exists. Returns the manifests written. */
 export function installNativeHost(options: HostInstallOptions): string[] {
   const browsers = browserHostDirs(options.home, options.platform).filter((d) => existsSync(d.profileRoot));
+  const extraIds = validateExtensionIds(options.extraExtensionIds);
   writeLauncher(options.paths);
   const { key, geckoId } = extensionManifest();
-  const ids = [extensionIdFromKey(key), ...options.extraExtensionIds];
+  const ids = [extensionIdFromKey(key), ...extraIds];
   const installed: string[] = [];
   for (const dir of browsers) {
     const target = join(dir.hostDir, `${NATIVE_HOST_NAME}.json`);

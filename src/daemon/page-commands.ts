@@ -3,10 +3,11 @@
  * screenshots, and console/network reads.
  */
 import { mkdir } from "node:fs/promises";
-import { dirname, isAbsolute, join } from "node:path";
-import { AtcError } from "../contracts/errors.js";
+import { dirname, join } from "node:path";
+import { assertSafeScreenshotPath, assertSafeUploadPath } from "../contracts/path-policy.js";
 import type { Method, OkResponse, Paths } from "../contracts/protocol.js";
 import type { ActionResult, BrowserDriver, BrowserSession, TabContext } from "../contracts/types.js";
+import { truncateLogEntry, trimLogBuffer } from "../drivers/playwright/logs.js";
 import { type Params, optionalBoolean, optionalNonNegativeInteger, optionalString, requireString, requireTarget } from "./params.js";
 import { redactText, redactUrl } from "./redaction.js";
 import type { ContextRegistry } from "./registry.js";
@@ -27,6 +28,7 @@ type EntriesOp = (driver: BrowserDriver, session: BrowserSession, since: number)
 export interface PageDeps {
   registry: ContextRegistry;
   paths: Paths;
+  env?: NodeJS.ProcessEnv;
   now: () => Date;
   resolve: (params: Params) => Resolved;
 }
@@ -87,14 +89,22 @@ export class PageCommands {
     const { ctx, driver, session } = this.deps.resolve(params);
     const state = await driver.inspect(session);
     this.deps.registry.updateLocation(ctx.id, { url: state.url, title: state.title });
-    return { ok: true, context: ctx.id, url: redactUrl(state.url), title: redactText(state.title), aria: redactText(state.aria) };
+    return {
+      ok: true,
+      context: ctx.id,
+      url: redactUrl(state.url),
+      title: redactText(state.title),
+      aria: redactText(state.aria),
+      provenance: state.provenance ?? "untrusted-page",
+    };
   }
 
   private async screenshot(params: Params): Promise<OkResponse> {
     const out = optionalString(params, "out");
     const { ctx, driver, session } = this.deps.resolve(params);
-    if (out !== undefined && !isAbsolute(out)) throw new AtcError("INVALID_ARGUMENT", "out must be an absolute path");
-    const path = out ?? join(this.deps.paths.screenshots, `${ctx.id}-${fileTimestamp(this.deps.now())}.png`);
+    const path = out !== undefined
+      ? assertSafeScreenshotPath(out)
+      : join(this.deps.paths.screenshots, `${ctx.id}-${fileTimestamp(this.deps.now())}.png`);
     await mkdir(dirname(path), { recursive: true });
     const result = await driver.screenshot(session, path, optionalBoolean(params, "fullPage") ?? false, optionalBoolean(params, "redact") ?? false);
     return { ok: true, context: ctx.id, path: result.path, bytes: result.bytes };
@@ -116,7 +126,7 @@ export class PageCommands {
   }
 
   private async upload(params: Params): Promise<OkResponse> {
-    const file = requireString(params, "file");
+    const file = assertSafeUploadPath(requireString(params, "file"), this.deps.env);
     const { ctx, driver, session } = this.deps.resolve(params);
     const result = await driver.upload(session, requireTarget(params), file);
     await refreshLocation(this.deps.registry, ctx.id, driver, session);
@@ -137,13 +147,16 @@ async function currentUrl({ ctx, driver, session }: Resolved): Promise<string | 
 }
 
 function redactEntries<T extends { seq: number }>(entries: readonly T[]): Array<Record<string, unknown>> {
-  return entries.map((entry) => {
-    const shaped = entry as Record<string, unknown>;
-    return {
-      ...shaped,
-      ...(typeof shaped.text === "string" ? { text: redactText(shaped.text) } : {}),
-      ...(typeof shaped.url === "string" ? { url: redactUrl(shaped.url) } : {}),
-      ...(typeof shaped.failure === "string" ? { failure: redactText(shaped.failure) } : {}),
+  const shaped = entries.map((entry) => {
+    const raw = entry as Record<string, unknown>;
+    const redacted = {
+      ...raw,
+      ...(typeof raw.text === "string" ? { text: redactText(raw.text) } : {}),
+      ...(typeof raw.url === "string" ? { url: redactUrl(raw.url) } : {}),
+      ...(typeof raw.failure === "string" ? { failure: redactText(raw.failure) } : {}),
     };
+    return truncateLogEntry(redacted as T) as Record<string, unknown>;
   });
+  trimLogBuffer(shaped);
+  return shaped;
 }
