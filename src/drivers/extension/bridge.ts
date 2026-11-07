@@ -3,6 +3,7 @@
  * native-messaging hosts connect to. No TCP port, so web pages cannot reach it,
  * and the browser only launches the host for our own extension ID.
  */
+import type { Socket } from "node:net";
 import { AtcError } from "../../contracts/errors.js";
 import { type ExtensionAction, type ExtensionBindings, HOST_RECONNECT_MS } from "../../contracts/extension.js";
 import type { LiveTab } from "../../contracts/types.js";
@@ -12,6 +13,7 @@ import { ExtensionConnection } from "./connection.js";
 const TAB_ID_PATTERN = /^ext:([a-z]+-[0-9a-f]{8}):(\d+)$/;
 /** After daemon start, wait this long for already-running browsers' hosts to reconnect. */
 const STARTUP_GRACE_MS = 4 * HOST_RECONNECT_MS;
+export const MAX_EXTENSION_CONNECTIONS = 16;
 
 export interface ConnectedExtension {
   key: string;
@@ -25,6 +27,7 @@ export class ExtensionBridge {
   private server: RunningServer | null = null;
   private startedAt = 0;
   private readonly connections = new Map<string, ExtensionConnection>();
+  private readonly activeSockets = new Set<Socket>();
   private pinHandler: (tabId: string) => Promise<string> = () => Promise.reject(new Error("daemon is not ready"));
   private bindingsHandler: () => Promise<ExtensionBindings> = () => Promise.reject(new Error("daemon is not ready"));
   private shareHandler: (tabId: string) => Promise<string> = () => Promise.reject(new Error("daemon is not ready"));
@@ -33,22 +36,28 @@ export class ExtensionBridge {
   private tabsListener: (key: string, tabs: readonly LiveTab[]) => void = () => undefined;
   private authToken: string | undefined;
 
+  constructor(private readonly maxConnections: number = MAX_EXTENSION_CONNECTIONS) {}
+
   async start(socketPath: string, authToken?: string): Promise<void> {
     this.startedAt = Date.now();
     this.authToken = authToken;
-    this.server = await listenOwnerOnly(socketPath, (socket) => {
-      const connection = new ExtensionConnection(socket, {
-        onIdentified: (conn) => this.identify(conn),
-        onTabs: (conn) => this.tabsChanged(conn),
-        onPin: (tabId) => this.pinHandler(tabId),
-        authToken: () => this.authToken,
-        onBindings: () => this.bindingsHandler(),
-        onShare: (tabId) => this.shareHandler(tabId),
-        onUnshare: (context) => this.unshareHandler(context),
-        onActivate: (context) => this.activateHandler(context),
-      });
-      socket.on("close", () => this.forget(connection));
+    this.server = await listenOwnerOnly(socketPath, (socket) => this.accept(socket));
+  }
+
+  private accept(socket: Socket): void {
+    if (this.activeSockets.size >= this.maxConnections) { socket.destroy(); return; }
+    this.activeSockets.add(socket);
+    const connection = new ExtensionConnection(socket, {
+      onIdentified: (conn) => this.identify(conn),
+      onTabs: (conn) => this.tabsChanged(conn),
+      onPin: (tabId) => this.pinHandler(tabId),
+      authToken: () => this.authToken,
+      onBindings: () => this.bindingsHandler(),
+      onShare: (tabId) => this.shareHandler(tabId),
+      onUnshare: (context) => this.unshareHandler(context),
+      onActivate: (context) => this.activateHandler(context),
     });
+    socket.on("close", () => { this.activeSockets.delete(socket); this.forget(connection); });
   }
 
   async close(): Promise<void> {

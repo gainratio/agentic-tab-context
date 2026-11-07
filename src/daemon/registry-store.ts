@@ -4,10 +4,35 @@
  */
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { AtcError } from "../contracts/errors.js";
 import { BROWSERS, type BrowserName, type TabContext } from "../contracts/types.js";
 
 export const ID_PATTERN = /^ctx_[0-9a-f]{4}$/;
+export const DEFAULT_CONTEXT_TTL_MS = 24 * 60 * 60 * 1000;
 let writeCounter = 0;
+
+export function resolveContextTtlMs(env: NodeJS.ProcessEnv = process.env, explicitTtlMs?: number): number {
+  if (explicitTtlMs !== undefined) {
+    if (!Number.isFinite(explicitTtlMs) || explicitTtlMs < 0) {
+      throw new AtcError("INVALID_ARGUMENT", "context ttlMs must be a non-negative finite number");
+    }
+    return explicitTtlMs;
+  }
+  const raw = env.ATC_CONTEXT_TTL_MS;
+  if (raw === undefined || raw.trim() === "") return DEFAULT_CONTEXT_TTL_MS;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new AtcError("INVALID_ARGUMENT", "ATC_CONTEXT_TTL_MS must be a non-negative finite number");
+  }
+  return parsed;
+}
+
+export function isContextExpired(ctx: TabContext, nowMs: number, ttlMs: number): boolean {
+  if (ctx.status === "open") return false;
+  const createdMs = Date.parse(ctx.createdAt);
+  if (Number.isNaN(createdMs)) return false;
+  return nowMs - createdMs > ttlMs;
+}
 
 /** Write via a temp file + rename so a crash never leaves a half-written state file. */
 export function writeStateFile(path: string, value: unknown): void {
@@ -19,9 +44,13 @@ export function writeStateFile(path: string, value: unknown): void {
 }
 
 /** Contexts from the last run, or undefined when there is no readable state file yet. */
-export function loadContexts(path: string): TabContext[] | undefined {
+export function loadContexts(path: string, options?: { nowMs?: number; ttlMs?: number }): TabContext[] | undefined {
   const raw = readStateFile(path);
-  return raw === undefined ? undefined : parseContexts(raw);
+  if (raw === undefined) return undefined;
+  const contexts = parseContexts(raw);
+  if (options?.ttlMs === undefined) return contexts;
+  const nowMs = options.nowMs ?? Date.now();
+  return contexts.filter((ctx) => !isContextExpired(ctx, nowMs, options.ttlMs!));
 }
 
 export function compareContexts(a: TabContext, b: TabContext): number {

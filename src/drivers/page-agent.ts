@@ -6,6 +6,7 @@ import { readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { AtcError, toErrorCode } from "../contracts/errors.js";
+import { assertSafeUploadPath } from "../contracts/path-policy.js";
 import type { ActionResult, ConsoleEntry, NetworkEntry, PageState, Target } from "../contracts/types.js";
 import { describeTarget } from "./target.js";
 
@@ -45,19 +46,20 @@ const MIME: Readonly<Record<string, string>> = {
   csv: "text/csv",
 };
 
-/** Read one local file for a file-input upload, with a hard size cap. */
-export function uploadOp(target: Target, path: string): PageOp {
-  const info = statSync(path);
+/** Read one local file for a file-input upload, with path policy and hard size cap. */
+export function uploadOp(target: Target, path: string, env: NodeJS.ProcessEnv = process.env): PageOp {
+  const safePath = assertSafeUploadPath(path, env);
+  const info = statSync(safePath);
   if (!info.isFile() || info.size > MAX_UPLOAD_BYTES) {
     throw new AtcError("INVALID_ARGUMENT", `upload file must be a regular file no larger than ${MAX_UPLOAD_BYTES} bytes`);
   }
-  const name = basename(path);
+  const name = basename(safePath);
   const extension = name.includes(".") ? name.split(".").at(-1)?.toLowerCase() : undefined;
   return {
     op: "upload",
     target,
     label: describeTarget(target),
-    files: [{ name, type: (extension && MIME[extension]) ?? "application/octet-stream", base64: readFileSync(path).toString("base64") }],
+    files: [{ name, type: (extension && MIME[extension]) ?? "application/octet-stream", base64: readFileSync(safePath).toString("base64") }],
   };
 }
 
@@ -84,7 +86,12 @@ export function toActionResult(raw: unknown): ActionResult {
 
 export function toPageState(raw: unknown): PageState {
   const state = (typeof raw === "object" && raw !== null ? raw : {}) as Partial<PageState>;
-  return { url: String(state.url ?? ""), title: String(state.title ?? ""), aria: String(state.aria ?? "") };
+  return {
+    url: String(state.url ?? ""),
+    title: String(state.title ?? ""),
+    aria: String(state.aria ?? ""),
+    provenance: "untrusted-page",
+  };
 }
 
 export function toEntries<T extends ConsoleEntry | NetworkEntry>(raw: unknown): T[] {

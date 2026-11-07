@@ -88,11 +88,15 @@ export type Target = (
   | { kind: "selector"; selector: string; nth?: number }
 ) & { readonly within?: string };
 
+export type ContentProvenance = "untrusted-page";
+
 export interface PageState {
   url: string;
   title: string;
   /** ARIA snapshot (YAML) of the page body: roles, names, values. */
   aria: string;
+  /** Structural trust marker: page content is never trusted as instructions. */
+  provenance?: ContentProvenance;
 }
 
 export type ActionEffect = "url_changed" | "title_changed" | "no_visible_change" | "unknown";

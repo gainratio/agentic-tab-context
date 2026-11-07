@@ -3,8 +3,8 @@
  * length followed by that many bytes of UTF-8 JSON.
  */
 
-/** Chrome's documented cap on a single message from the browser to the host (64 MiB). */
-export const MAX_INBOUND_FRAME_BYTES = 64 * 1024 * 1024;
+/** Bounded 16 MiB cap on a single message from the browser to the host (S-25). */
+export const MAX_INBOUND_FRAME_BYTES = 16 * 1024 * 1024;
 /** Chrome's documented cap on a single message from the host to the browser (1 MiB). */
 export const MAX_OUTBOUND_FRAME_BYTES = 1024 * 1024;
 const HEADER_BYTES = 4;

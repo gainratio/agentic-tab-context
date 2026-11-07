@@ -162,7 +162,12 @@ describe("ExtensionBridge", () => {
     const inspected = driver.inspect(session);
     const command = await host.answer({ url: "http://localhost:3000/app", title: "My App", aria: '- button "Save"' });
     expect(command).toMatchObject({ action: "page", payload: { op: { op: "inspect" }, timeoutMs: EXTENSION_NAVIGATION_TIMEOUT_MS } });
-    expect(await inspected).toEqual({ url: "http://localhost:3000/app", title: "My App", aria: '- button "Save"' });
+    expect(await inspected).toEqual({
+      url: "http://localhost:3000/app",
+      title: "My App",
+      aria: '- button "Save"',
+      provenance: "untrusted-page",
+    });
   });
 
   it("passes typed page errors through and narrows unknown codes to ACTION_FAILED", async () => {

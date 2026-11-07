@@ -40,11 +40,29 @@ function agentHarness() {
 }
 
 describe("shared page agent privacy and capture lifetime", () => {
-  it("omits the existing value of a password input", () => {
+  it("omits the existing value of a password input and marks provenance as untrusted-page (S-05)", () => {
     const h = agentHarness();
-    const result = h.agent.run({ op: "inspect" });
+    const result = h.agent.run({ op: "inspect" }) as { aria?: string; provenance?: string };
     expect(result.aria).toContain("Password");
     expect(result.aria).not.toContain("PASSWORD_SENTINEL");
+    expect(result.provenance).toBe("untrusted-page");
+  });
+
+  it("truncates oversized log entries to 4 KiB and enforces the 256 KiB total buffer cap (S-24)", () => {
+    const h = agentHarness();
+    h.agent.run({ op: "watch" });
+    vm.runInContext(`console.log("x".repeat(10000))`, h.context);
+    const [first] = h.agent.run({ op: "logs", kind: "console", since: 0 }) as Array<{ text: string }>;
+    expect(first?.text.length).toBeLessThanOrEqual(4096);
+    expect(first?.text.endsWith("...[truncated]")).toBe(true);
+
+    for (let i = 0; i < 120; i += 1) {
+      vm.runInContext(`console.log("${i}-" + "y".repeat(3500))`, h.context);
+    }
+    const entries = h.agent.run({ op: "logs", kind: "console", since: 0 }) as Array<{ text: string }>;
+    const totalBytes = entries.reduce((sum, item) => sum + JSON.stringify(item).length, 0);
+    expect(totalBytes).toBeLessThanOrEqual(262144);
+    expect(entries.length).toBeLessThan(80);
   });
 
   it("keeps an observed password redacted after the same input is revealed", () => {

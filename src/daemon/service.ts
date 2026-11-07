@@ -54,7 +54,7 @@ export class DaemonService {
     this.binder = new TabBinder({
       ...deps, env: this.env, now: this.now, drivers: this.drivers, driverFor: (browser) => this.driverFor(browser), attach: (id, driver, session) => this.attach(id, driver, session),
     });
-    this.handlers = { ...this.contextHandlers(), ...new PageCommands({ registry: this.registry, paths: deps.paths, now: this.now, resolve: (p) => this.resolve(p) }).handlers() };
+    this.handlers = { ...this.contextHandlers(), ...new PageCommands({ registry: this.registry, paths: deps.paths, env: this.env, now: this.now, resolve: (p) => this.resolve(p) }).handlers() };
   }
 
   async handle(req: Request): Promise<Response> {
