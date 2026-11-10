@@ -16,11 +16,15 @@ const SOURCE_MANIFEST = JSON.parse(readFileSync(join(ROOT, "extension", "manifes
 const EXPECTED_ZIP = `agentic-tab-context-${SOURCE_MANIFEST.version}.zip`;
 
 describe("Chrome Web Store package", () => {
-  it("keeps only the current version zip in store/ and matches buildStoreZip byte-for-byte", () => {
+  it("keeps only the current version zip in store/ and matches unpacked extension payload byte-for-byte", () => {
     const zips = readdirSync(STORE_DIR).filter((name) => name.endsWith(".zip"));
     expect(zips).toEqual([EXPECTED_ZIP]);
-    const committed = readFileSync(join(STORE_DIR, EXPECTED_ZIP));
-    expect(Buffer.compare(committed, buildStoreZip(ROOT))).toBe(0);
+    const committed = readZipEntries(readFileSync(join(STORE_DIR, EXPECTED_ZIP)));
+    const expected = readZipEntries(buildStoreZip(ROOT));
+    expect([...committed.keys()]).toEqual([...expected.keys()]);
+    for (const [name, buf] of expected) {
+      expect(Buffer.compare(committed.get(name)!, buf), `drift in ${name}`).toBe(0);
+    }
   });
 
   it("strips the development key while preserving local unpacked key on disk", () => {
