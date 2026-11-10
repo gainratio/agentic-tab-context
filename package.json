@@ -2,6 +2,16 @@
   "name": "agentic-tab-context",
   "version": "0.5.0",
   "description": "Let your coding assistant use the browser tab you already have open, instead of opening a new one.",
+  "keywords": [
+    "ai-agents",
+    "browser-automation",
+    "chrome-extension",
+    "claude-code",
+    "codex",
+    "native-messaging",
+    "playwright",
+    "tab-context"
+  ],
   "license": "MIT",
   "private": true,
   "type": "module",

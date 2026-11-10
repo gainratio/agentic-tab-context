@@ -206,7 +206,11 @@ For additional debugging, [Chrome DevTools for agents](https://github.com/Chrome
 
 When using another tool, select and verify the intended page in that tool before taking actions. ATC does not currently map its tab IDs to another connector's targets or hand sessions between connectors. Do not assume their current pages are the same. Combined use has not been tested in this project.
 
-## How it works
+---
+
+## Under the hood (for developers)
+
+### How it works
 
 ```mermaid
 flowchart LR
@@ -217,7 +221,23 @@ flowchart LR
   C -.->|"Mac only, without the extension"| F["Safari / Chrome via macOS automation"]
 ```
 
-The first `atc` command starts a small background service. It remembers which tab you connected to, so separate commands keep working on the same tab. The extension reports your open tabs to that service and carries out its commands inside the tab.
+The first `atc` command starts a small local daemon (`~/.atc/daemon.sock`, authenticated with a per-install token in `~/.atc/ipc.token`). It remembers which tabs you shared in `~/.atc/state.json` so separate CLI invocations keep working on the same tab context. The Manifest V3 browser extension connects to the daemon via Chrome Native Messaging (`com.gainratio.atc`) and executes DOM inspection, actions, and redacted viewport screenshots inside shared tabs.
+
+### Source layout
+
+| Directory | Responsibility |
+|---|---|
+| `bin/` & `src/cli/` | `atc` executable, command parser, `atc setup`, and Unix-socket client |
+| `src/contracts/` | JSON-line IPC protocol, typed `AtcError` codes, upload path-safety policy, and `ATC_HOME` paths |
+| `src/daemon/` | Background daemon service, multi-tab `ContextRegistry`, TTL eviction, and `atc doctor` |
+| `src/drivers/` | WebExtension live-tab driver, Playwright managed-browser driver, and macOS JXA discovery fallback |
+| `src/native/` | Native Messaging host wrapper and browser manifest installer |
+| `extension/` | Manifest V3 Chrome extension (background worker, popup, multi-tab side panel, content script) |
+| `skills/` | Assistant skill (`SKILL.md`) installed for Claude Code, Codex, and Antigravity |
+
+### Runtime configuration
+
+All settings have safe local defaults and require no `.env` file for normal use. To override `ATC_HOME`, custom Chromium binary paths, or context TTLs, inspect [`.env.example`](.env.example) (`cp .env.example .env`). Secrets and IPC tokens are never configured through environment variables.
 
 ## Troubleshooting
 
