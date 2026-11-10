@@ -6,6 +6,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 ## [Unreleased]
 
 ### Added
+- Added deterministic `npm run pack:store` packaging (`store/agentic-tab-context-0.5.0.zip`), CI drift verification (`test/unit/store-package.test.ts`), and refreshed `0.5.0` Chrome Web Store / Firefox Add-ons submission docs.
 - Exposed daemon protocol version through `atc ping` and `atc doctor` (#30).
 - Added `.env.example`, `CLAUDE.md`, `CHANGELOG.md`, `package.json` keywords, and the developer architecture/configuration section in `README.md`.
 
