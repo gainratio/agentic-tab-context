@@ -6,6 +6,10 @@ Keep your website open and ask Claude Code, Codex or Antigravity for help. Agent
 
 First time here? Complete the [one-time installation](#one-time-installation), including the steps for your assistant.
 
+![Live walkthrough: sharing an authenticated browser tab from the side panel, inspecting the DOM with password masking, and clicking in-place via atc](docs/assets/live-demo.gif)
+
+**[Watch the 1080p walkthrough](https://open-source.gainratio.com/agentic-tab-context/)** · **[30-second Safe Local Agents overview](https://open-source.gainratio.com/safe-local-agents/)**
+
 ## Shared tabs workspace
 
 The extension now ships a real multi-tab side panel: search all tabs, share/unshare without closing them, set the active target, lock sensitive sites, and see live removal when a tab closes. The daemon, side panel, and CLI share one context registry.
