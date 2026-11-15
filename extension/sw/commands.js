@@ -3,6 +3,7 @@
  */
 import { send } from "./native.js";
 import { captureTab } from "./capture.js";
+import { setTabKeepAlive } from "./keepalive.js";
 import { runPageOp, setWatched } from "./page.js";
 
 const HANDLERS = {
@@ -22,8 +23,10 @@ const HANDLERS = {
   },
   unwatch: async (tabId) => {
     await setWatched(tabId, false);
+    await setTabKeepAlive(tabId, false).catch(() => undefined);
     return runPageOp(tabId, { op: "unwatch" });
   },
+  keepalive: (tabId, p) => setTabKeepAlive(tabId, p.enabled === true),
 };
 
 export async function runCommand(command) {

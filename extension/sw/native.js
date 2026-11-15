@@ -11,12 +11,13 @@ import { browserName, instanceId } from "./identity.js";
 import { normalizeDaemonReply, responseTypeFor } from "./requests.js";
 
 const HOST_NAME = "com.gainratio.atc";
-const NATIVE_REPLY_TYPES = new Set(["bindings", "shared", "unshared", "activated"]);
+const NATIVE_REPLY_TYPES = new Set(["bindings", "shared", "unshared", "activated", "keepalive"]);
 const REQUEST_TIMEOUT_MS = Object.freeze({
   bindings: 10_000,
   share: 35_000,
   unshare: 15_000,
   activate: 15_000,
+  keepalive: 15_000,
 });
 
 let port = null;
@@ -79,6 +80,13 @@ export function activateContext(context) {
     return Promise.resolve({ ok: false, message: "Invalid context." });
   }
   return requestDaemon("activate", { context });
+}
+
+export function setContextKeepAlive(context, enabled) {
+  if (typeof context !== "string" || context.trim() === "" || typeof enabled !== "boolean") {
+    return Promise.resolve({ ok: false, message: "Invalid keep-alive request." });
+  }
+  return requestDaemon("keepalive", { context, enabled });
 }
 
 function requestDaemon(type, payload = {}) {

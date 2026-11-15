@@ -16,6 +16,7 @@ description: >
 ```sh
 atc bindings                  # contexts the user has shared; start here
 atc use <ctx>                 # choose the active shared tab
+atc keepalive [on|off|status] # keep a shared tab alive against idle auto-logout / tab discard
 atc tabs                      # discover open tabs (does NOT grant access)
 ```
 
@@ -60,6 +61,7 @@ atc screenshot            # prints the PNG path; open it to see the page
 | Error | What to do |
 |---|---|
 | `CONTEXT_CLOSED` | The user closed the tab. Bind again. |
+| `SESSION_EXPIRED` | A keep-alive tab redirected in the background to an SSO/login screen. Ask the user to sign back in on that tab before retrying actions. |
 | `TAB_MOVED` | Tab identity is uncertain. Inspect the tab list and bind the intended stable id again. |
 | `UNSUPPORTED_ACTION` | Safari is discovery-only; live extension screenshots are viewport-only. Report the limitation and use a supported operation. |
 | `ACTION_FAILED` mentioning "Apple Events" | The browser blocks page access. Tell the user to install the atc extension (`atc doctor` shows how) or enable the setting named in the message. |

@@ -117,6 +117,8 @@ ATCUI.createBadges = function createBadges(row) {
   const badges = [];
   if (row.shared) badges.push(ATCUI.sharedBadge(row));
   if (row.activeTarget) badges.push(ATCUI.activeBadge());
+  if (row.shared && row.keepAlive) badges.push(ATCUI.keepAliveBadge());
+  if (row.shared && row.sessionExpired) badges.push(ATCUI.expiredBadge());
   if (row.needsAccess && !row.shared) badges.push(ATCUI.accessBadge());
   if (row.sensitive) badges.push(ATCUI.sensitiveBadge());
   if (row.unsupported) badges.push(ATCUI.makeBadge("badge-unsupported", null, "Unsupported"));
@@ -130,9 +132,9 @@ ATCUI.makeBadge = function makeBadge(className, iconName, text) {
   return badge;
 };
 
-ATCUI.sharedBadge = function sharedBadge(row) {
-  return ATCUI.makeBadge(`badge-shared${row.sensitive ? " is-amber" : ""}`, row.sensitive ? "lock" : "check", "Shared");
-};
+ATCUI.sharedBadge = (row) => ATCUI.makeBadge(`badge-shared${row.sensitive ? " is-amber" : ""}`, row.sensitive ? "lock" : "check", "Shared");
+ATCUI.accessBadge = () => ATCUI.makeBadge("badge-access", "key", "Needs access");
+ATCUI.sensitiveBadge = () => ATCUI.makeBadge("badge-sensitive", "lock", "Sensitive");
 
 ATCUI.activeBadge = function activeBadge() {
   const badge = ATCUI.h("span", "badge badge-active");
@@ -140,17 +142,10 @@ ATCUI.activeBadge = function activeBadge() {
   return badge;
 };
 
-ATCUI.accessBadge = function accessBadge() {
-  return ATCUI.makeBadge("badge-access", "key", "Needs access");
-};
-
-ATCUI.sensitiveBadge = function sensitiveBadge() {
-  return ATCUI.makeBadge("badge-sensitive", "lock", "Sensitive");
-};
-
 ATCUI.createRowActions = function createRowActions(row) {
   const actions = ATCUI.h("span", "row-actions");
   if (row.sensitive && !row.shared && row.supported) actions.append(ATCUI.sensitiveShareButton(row));
+  if (row.shared) actions.append(ATCUI.keepAliveButton(row));
   if (row.shared && !row.activeTarget) actions.append(ATCUI.activateButton(row));
   if (row.shared) actions.append(ATCUI.unshareButton(row));
   actions.append(ATCUI.closeButton(row));

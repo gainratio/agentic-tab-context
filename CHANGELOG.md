@@ -6,6 +6,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 ## [Unreleased]
 
 ### Added
+- Added bound-tab session keep-alive (`atc bind --keep-alive`, `atc keepalive [on|off|status]`, and the Side Panel **Keep alive** toggle + `Keep alive` / `Sign-in needed` badges) combining `autoDiscardable: false`, a 2-minute MV3 `chrome.alarms` synthetic activity pulse, same-origin `HEAD` sliding-cookie touch, and a fail-closed `SESSION_EXPIRED` guard on background SSO redirects.
 - Added deterministic `npm run pack:store` packaging (`store/agentic-tab-context-0.5.0.zip`), CI drift verification (`test/unit/store-package.test.ts`), and refreshed `0.5.0` Chrome Web Store / Firefox Add-ons submission docs.
 - Exposed daemon protocol version through `atc ping` and `atc doctor` (#30).
 - Added `.env.example`, `CLAUDE.md`, `CHANGELOG.md`, `package.json` keywords, and the developer architecture/configuration section in `README.md`.

@@ -728,6 +728,18 @@ svg.icon {
   color: var(--amber-strong);
 }
 
+.badge-keepalive {
+  border-color: var(--blue-border);
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.badge-expired {
+  border-color: var(--danger-border);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
 .badge-unsupported {
   border-color: var(--border);
   background: var(--surface-subtle);
@@ -755,6 +767,16 @@ svg.icon {
 .row-icon-btn:hover {
   background: var(--surface-hover);
   color: var(--text);
+}
+
+.row-icon-btn.is-on {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.row-icon-btn.is-on:hover {
+  background: color-mix(in srgb, var(--blue-soft) 75%, var(--surface-hover));
+  color: var(--blue-hover);
 }
 
 .row-icon-btn .icon {

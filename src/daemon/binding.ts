@@ -18,6 +18,7 @@ export interface BinderDeps {
   driverFor: (browser: BrowserName) => BrowserDriver;
   /** Record which driver owns a new context and close it if the browser goes away. */
   attach: (contextId: string, driver: BrowserDriver, session: BrowserSession) => void;
+  onKeepAlive?: (contextId: string, reused: boolean) => Promise<void>;
   extensionBridge?: ExtensionBridge;
   extensionDriver?: BrowserDriver;
   macosDriver?: BrowserDriver;
@@ -44,7 +45,12 @@ export class TabBinder {
     const chosen = selectTabToBind(await this.discover(), options);
     assertNotSensitive(chosen);
     assertSharedOrManaged(this.deps, chosen);
-    return this.bindSerialized(chosen, options.use ?? true, true);
+    const bound = await this.bindSerialized(chosen, options.use ?? true, true);
+    if (options.keepAlive === true && typeof bound.context === "string") {
+      await this.deps.onKeepAlive?.(bound.context, bound.reused === true);
+      return { ...bound, keepAlive: true };
+    }
+    return bound;
   }
 
   /**

@@ -5,12 +5,13 @@
 import { AtcError } from "../contracts/errors.js";
 import type { Method, OkResponse, Paths, Request, Response } from "../contracts/protocol.js";
 import type { BrowserDriver, BrowserName, BrowserSession, DriverFactory } from "../contracts/types.js";
+import { DAEMON_PROTOCOL_VERSION } from "../contracts/version.js";
 import type { ExtensionBridge } from "../drivers/extension/bridge.js";
 import { TabBinder } from "./binding.js";
 import { bindingsResponse } from "./bindings.js";
 import { doctorReport } from "./doctor.js";
-import { DAEMON_PROTOCOL_VERSION } from "../contracts/version.js";
 import { eachResponse, isEachRequest } from "./each.js";
+import { KeepAliveTracker, applyKeepAlive, syncLiveTabs } from "./keepalive.js";
 import { type Handler, PageCommands, type Resolved, refreshLocation } from "./page-commands.js";
 import { type Params, isRecord, optionalBoolean, optionalString, profileParam, requireBrowser, requireString } from "./params.js";
 import type { ContextRegistry } from "./registry.js";
@@ -18,27 +19,19 @@ import { noCurrent, parseRequest, redact, toErrorResponse, typedValueOf } from "
 import { extensionTabToOpen } from "./tabs.js";
 
 export interface DaemonServiceDeps {
-  registry: ContextRegistry;
-  driverFactory: DriverFactory;
-  paths: Paths;
-  env?: NodeJS.ProcessEnv;
-  now?: () => Date;
-  extensionBridge?: ExtensionBridge;
-  extensionDriver?: BrowserDriver;
-  macosDriver?: BrowserDriver;
+  registry: ContextRegistry; driverFactory: DriverFactory; paths: Paths;
+  env?: NodeJS.ProcessEnv; now?: () => Date;
+  extensionBridge?: ExtensionBridge; extensionDriver?: BrowserDriver; macosDriver?: BrowserDriver;
 }
-
-export interface RoutedRequest {
-  key: string | null;
-  request: Request;
-}
+export interface RoutedRequest { key: string | null; request: Request; }
 
 const CONTEXT_METHODS: ReadonlySet<string> = new Set<Method>([
-  "close", "goto", "back", "forward", "reload", "inspect", "screenshot", "console", "network", "click", "type", "select",
+  "close", "goto", "back", "forward", "reload", "inspect", "screenshot", "console", "network", "click", "type", "select", "press", "upload", "keepalive",
 ]);
 
 export class DaemonService {
   private readonly registry: ContextRegistry;
+  private readonly keepAlive = new KeepAliveTracker();
   private readonly env: NodeJS.ProcessEnv;
   private readonly now: () => Date;
   private readonly drivers = new Map<BrowserName, BrowserDriver>();
@@ -52,9 +45,13 @@ export class DaemonService {
     this.env = deps.env ?? process.env;
     this.now = deps.now ?? (() => new Date());
     this.binder = new TabBinder({
-      ...deps, env: this.env, now: this.now, drivers: this.drivers, driverFor: (browser) => this.driverFor(browser), attach: (id, driver, session) => this.attach(id, driver, session),
+      ...deps, env: this.env, now: this.now, drivers: this.drivers, driverFor: (browser) => this.driverFor(browser),
+      attach: (id, driver, session) => this.attach(id, driver, session),
+      onKeepAlive: (id, reused) => this.enableBoundKeepAlive(id, reused),
     });
-    this.handlers = { ...this.contextHandlers(), ...new PageCommands({ registry: this.registry, paths: deps.paths, env: this.env, now: this.now, resolve: (p) => this.resolve(p) }).handlers() };
+    const page = new PageCommands({ registry: this.registry, keepAlive: this.keepAlive, paths: deps.paths, env: this.env, now: this.now, resolve: (p) => this.resolve(p) });
+    this.handlers = { ...this.contextHandlers(), ...page.handlers() };
+    deps.extensionBridge?.onTabsChanged((_key, tabs) => syncLiveTabs(this.registry, this.keepAlive, tabs));
   }
 
   async handle(req: Request): Promise<Response> {
@@ -82,25 +79,20 @@ export class DaemonService {
     if (raw.params !== undefined && !isRecord(raw.params)) return { key: null, request: req };
     if (raw.params !== undefined && raw.params.each === true) return { key: null, request: req };
     const params = isRecord(raw.params) ? raw.params : {};
-    const explicit = params.context;
-    if (typeof explicit === "string") return { key: explicit, request: req };
-    const current = this.registry.current;
-    if (current === null || explicit !== undefined) return { key: null, request: req };
-    const pinned: unknown = { ...raw, params: { ...params, context: current } };
-    return { key: current, request: pinned as Request };
+    if (typeof params.context === "string") return { key: params.context, request: req };
+    if (this.registry.current === null || params.context !== undefined) return { key: null, request: req };
+    return { key: this.registry.current, request: { ...raw, params: { ...params, context: this.registry.current } } as Request };
   }
-  onShutdown(listener: () => void): void {
-    this.shutdownListeners.push(listener);
-  }
-  async closeAll(): Promise<void> {
-    await Promise.allSettled(this.registry.openSessions().map(({ id }) => this.closeContext(id)));
-  }
+
+  onShutdown(listener: () => void): void { this.shutdownListeners.push(listener); }
+  async closeAll(): Promise<void> { await Promise.allSettled(this.registry.openSessions().map(({ id }) => this.closeContext(id))); }
+
   private contextHandlers(): Pick<Record<Method, Handler>, "open" | "tabs" | "bind" | "bindings" | "list" | "use" | "current" | "close" | "doctor" | "ping" | "shutdown"> {
     return {
       open: (p) => this.open(p),
       tabs: (p) => this.binder.tabs(p),
       bind: (p) => this.binder.bind(p),
-      bindings: (p) => Promise.resolve(bindingsResponse(this.registry, p)),
+      bindings: (p) => Promise.resolve(bindingsResponse(this.registry, p, this.keepAlive)),
       list: () => Promise.resolve({ ok: true, ...this.registry.snapshot() }),
       use: (p) => this.use(p),
       current: () => this.currentContext(),
@@ -122,11 +114,11 @@ export class DaemonService {
     const identity = session.tabId === undefined ? {} : { source: "managed" as const, tabId: session.tabId };
     const ctx = this.registry.create({ browser, profile, ...identity, createdAt: this.now().toISOString() }, session);
     this.attach(ctx.id, driver, session);
-    await refreshLocation(this.registry, ctx.id, driver, session);
-    const stillOpen = this.registry.session(ctx.id) === session;
-    if (stillOpen && (makeCurrent || this.registry.current === null)) this.registry.setCurrent(ctx.id);
+    await refreshLocation(this.registry, ctx.id, driver, session, this.keepAlive);
+    if (this.registry.session(ctx.id) === session && (makeCurrent || this.registry.current === null)) this.registry.setCurrent(ctx.id);
     return { ok: true, context: ctx.id, browser, profile, current: this.registry.current === ctx.id };
   }
+
   private async doctor(): Promise<OkResponse> {
     const { paths, extensionBridge } = this.deps;
     const tabs = await this.binder.discover();
@@ -141,16 +133,13 @@ export class DaemonService {
   }
 
   private currentContext(): Promise<OkResponse> {
-    const current = this.registry.current;
-    if (current === null) throw noCurrent();
-    return Promise.resolve({ ok: true, context: current });
+    if (this.registry.current === null) throw noCurrent();
+    return Promise.resolve({ ok: true, context: this.registry.current });
   }
 
   private async close(params: Params): Promise<OkResponse> {
-    const { ctx, session, driver } = this.resolve(params);
-    this.registry.markClosed(ctx.id);
-    this.contextDrivers.delete(ctx.id);
-    await driver.close(session);
+    const { ctx } = this.resolve(params);
+    await this.closeContext(ctx.id);
     return { ok: true, context: ctx.id };
   }
 
@@ -163,6 +152,7 @@ export class DaemonService {
 
   private async closeContext(id: string): Promise<void> {
     const ctx = this.registry.get(id);
+    this.keepAlive.disable(id);
     const session = this.registry.markClosed(id);
     const driver = this.contextDrivers.get(id) ?? (ctx === undefined ? undefined : this.drivers.get(ctx.browser));
     this.contextDrivers.delete(id);
@@ -173,9 +163,15 @@ export class DaemonService {
     this.contextDrivers.set(id, driver);
     driver.onDisconnect(session, () => {
       if (this.registry.session(id) !== session) return;
+      this.keepAlive.disable(id);
       this.registry.markClosed(id);
       this.contextDrivers.delete(id);
     });
+  }
+
+  private async enableBoundKeepAlive(id: string, reused: boolean): Promise<void> {
+    try { await applyKeepAlive(this.resolve({ context: id }), this.registry, this.keepAlive, true); }
+    catch (error) { if (!reused) await this.closeContext(id); throw error; }
   }
 
   private resolve(params: Params): Resolved {

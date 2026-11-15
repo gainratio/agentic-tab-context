@@ -52,6 +52,11 @@ describe("side-panel runtime request validation", () => {
       type: "atc:activate",
       context: "ctx_1",
     });
+    expect(api.parseSidepanelMessage({ type: "atc:keepalive", context: "ctx_1", enabled: true })).toEqual({
+      type: "atc:keepalive",
+      context: "ctx_1",
+      enabled: true,
+    });
     expect(api.parseSidepanelMessage({ type: "atc:open-sidepanel" })).toEqual({
       type: "atc:open-sidepanel",
       windowId: undefined,
@@ -73,6 +78,8 @@ describe("side-panel runtime request validation", () => {
       { type: "atc:unshare" },
       { type: "atc:unshare", context: "" },
       { type: "atc:activate", context: 7 },
+      { type: "atc:keepalive", context: "ctx_1" },
+      { type: "atc:keepalive", context: "ctx_1", enabled: "yes" },
       { type: "atc:open-sidepanel", windowId: 0 },
       { type: "atc:open-sidepanel", windowId: "3" },
       { type: "atc:unknown" },
@@ -88,6 +95,7 @@ describe("side-panel runtime request validation", () => {
     expect(api.responseTypeFor("share")).toBe("shared");
     expect(api.responseTypeFor("unshare")).toBe("unshared");
     expect(api.responseTypeFor("activate")).toBe("activated");
+    expect(api.responseTypeFor("keepalive")).toBe("keepalive");
     expect(api.responseTypeFor("hello")).toBeUndefined();
   });
 });

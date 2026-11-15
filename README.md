@@ -12,7 +12,7 @@ First time here? Complete the [one-time installation](#one-time-installation), i
 
 ## Shared tabs workspace
 
-The extension now ships a real multi-tab side panel: search all tabs, share/unshare without closing them, set the active target, lock sensitive sites, and see live removal when a tab closes. The daemon, side panel, and CLI share one context registry.
+The extension ships a real multi-tab side panel: search all tabs, share/unshare without closing them, toggle **Keep alive** on shared tabs (preventing Chrome background tab discarding and idle session auto-logouts without reloading the page), set the active target, lock sensitive sites, and see live removal when a tab closes. The daemon, side panel, and CLI share one context registry.
 
 - [Side-panel prototype](prototype/index.html) — interaction reference
 - [UX and reliability spec](docs/ATC-UX-SPEC.md)
