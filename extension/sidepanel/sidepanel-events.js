@@ -87,6 +87,8 @@ ATCUI.handleRowAction = function handleRowAction(target) {
   if (close !== null) return ATCUI.runRowAction(ATCUI.closeTab, close.dataset.closeTab);
   const sensitive = target.closest("[data-share-sensitive]");
   if (sensitive !== null) return ATCUI.runRowAction(ATCUI.openSensitiveDialog, sensitive.dataset.shareSensitive);
+  const keepalive = target.closest("[data-keepalive-tab]");
+  if (keepalive !== null) return ATCUI.runRowAction(ATCUI.toggleKeepAlive, keepalive.dataset.keepaliveTab);
   const activate = target.closest("[data-activate-tab]");
   if (activate !== null) return ATCUI.runRowAction(ATCUI.activateRow, activate.dataset.activateTab);
   const unshare = target.closest("[data-unshare-tab]");

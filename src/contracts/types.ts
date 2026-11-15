@@ -17,6 +17,8 @@ export type BrowserName = (typeof BROWSERS)[number];
 
 export type ContextStatus = "open" | "closed";
 export type TabSource = "extension" | "managed" | "macos";
+export const KEEPALIVE_MODES = ["on", "off", "status"] as const;
+export type KeepAliveMode = (typeof KEEPALIVE_MODES)[number];
 
 /** The public, stable view of one browser context. */
 export interface TabContext {
@@ -26,8 +28,11 @@ export interface TabContext {
   profile: string;
   source?: TabSource;
   tabId?: string;
+  boundUrl?: string;
   url?: string;
   title?: string;
+  keepAlive?: boolean;
+  sessionExpired?: boolean;
   createdAt: string; // ISO-8601
 }
 
@@ -51,6 +56,7 @@ export interface BindOptions {
   browser?: BrowserName;
   active?: boolean;
   use?: boolean;
+  keepAlive?: boolean;
 }
 
 /** Filter for listing every open context: title/url/hostname text plus browser. */
@@ -68,6 +74,8 @@ export interface BindingView {
   url: string | null;
   title: string | null;
   current: boolean;
+  keepAlive?: boolean;
+  sessionExpired?: boolean;
 }
 
 /** Locator kinds whose value lives in a field named after the kind (label.label, text.text, ...). */
@@ -164,6 +172,7 @@ export interface BrowserDriver {
   network(session: BrowserSession, sinceSeq: number): Promise<NetworkEntry[]>;
   listTabs?(): Promise<LiveTab[]>;
   bindTab?(tabId: string): Promise<BrowserSession>;
+  setKeepAlive?(session: BrowserSession, enabled: boolean): Promise<void>;
 }
 
 export type DriverFactory = (browser: BrowserName) => BrowserDriver;

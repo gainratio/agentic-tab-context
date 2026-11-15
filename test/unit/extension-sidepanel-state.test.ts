@@ -186,9 +186,26 @@ describe("side-panel binding state", () => {
   it("validates action outcomes", () => {
     const state = stateApi();
     expect(state.normalizeOutcomeReply({ ok: true, context: "ctx_1" })).toEqual({ ok: true, context: "ctx_1" });
+    expect(state.normalizeOutcomeReply({ ok: true, context: "ctx_1", keepAlive: true })).toEqual({
+      ok: true,
+      context: "ctx_1",
+      keepAlive: true,
+    });
     expect(state.normalizeOutcomeReply({ ok: false, message: "nope" })).toEqual({ ok: false, message: "nope" });
     expect(state.normalizeOutcomeReply({ ok: true, context: 4 })).toMatchObject({ ok: false });
     expect(state.normalizeOutcomeReply("shared")).toMatchObject({ ok: false });
+  });
+
+  it("propagates keepAlive and sessionExpired flags onto shared rows", () => {
+    const state = stateApi();
+    const built = state.createRows(
+      [{ id: 8, index: 0, windowId: 1, active: false, title: "PR #482", url: "https://github.com/gainratio/atc/pull/482" }],
+      {
+        current: "ctx_pr",
+        bindings: [{ ...BINDINGS[1], current: true, keepAlive: true, sessionExpired: true }],
+      },
+    );
+    expect(built[0]).toMatchObject({ id: 8, shared: true, keepAlive: true, sessionExpired: true });
   });
 
   it("filters by shared, sensitive, window, and title/host/url search", () => {

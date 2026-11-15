@@ -16,6 +16,7 @@ describe("side-panel message parsing", () => {
     ["share", { type: "share", id: 2, tabId: 7 }, { type: "share", id: 2, tabId: 7 }],
     ["unshare", { type: "unshare", id: 3, context: "ctx_ab12" }, { type: "unshare", id: 3, context: "ctx_ab12" }],
     ["activate", { type: "activate", id: 4, context: "ctx_cd34" }, { type: "activate", id: 4, context: "ctx_cd34" }],
+    ["keepalive", { type: "keepalive", id: 5, context: "ctx_cd34", enabled: true }, { type: "keepalive", id: 5, context: "ctx_cd34", enabled: true }],
   ])("accepts a well-formed %s request", (_label, input, expected) => {
     expect(parse(input)).toStrictEqual(expected);
   });
@@ -49,6 +50,8 @@ describe("side-panel message parsing", () => {
     ["whitespace context", { type: "unshare", id: 1, context: "   " }],
     ["non-string context", { type: "activate", id: 1, context: 7 }],
     ["missing context", { type: "activate", id: 1 }],
+    ["keepalive missing enabled", { type: "keepalive", id: 1, context: "ctx_cd34" }],
+    ["keepalive string enabled", { type: "keepalive", id: 1, context: "ctx_cd34", enabled: "true" }],
     ["pin with a zero tab id", { type: "pin", id: 1, tabId: 0 }],
     ["pin with a zero id", { type: "pin", id: 0, tabId: 7 }],
   ])("drops %s", (_label, input) => {

@@ -55,6 +55,7 @@ function wireSidePanel(service: DaemonService, bridge: ExtensionBridge): void {
   bridge.onShare((tabId) => service.shareFromExtension(tabId));
   bridge.onUnshare((context) => closeFromExtension(service, context));
   bridge.onActivate((context) => activateFromExtension(service, context));
+  bridge.onKeepAlive((context, enabled) => keepAliveFromExtension(service, context, enabled));
 }
 
 /** The side panel's read-only workspace view; never discovers, binds, or acts on a tab. */
@@ -77,6 +78,13 @@ async function closeFromExtension(service: DaemonService, context: string): Prom
 async function activateFromExtension(service: DaemonService, context: string): Promise<void> {
   const res = await service.handle({ method: "use", params: { context } });
   if (!res.ok) throw new Error(res.message);
+}
+
+/** The side panel's keepalive toggle turns session keep-alive on or off for a shared context. */
+async function keepAliveFromExtension(service: DaemonService, context: string, enabled: boolean): Promise<boolean> {
+  const res = await service.handle({ method: "keepalive", params: { context, mode: enabled ? "on" : "off" } });
+  if (!res.ok) throw new Error(res.message);
+  return res.keepAlive === true;
 }
 
 /**

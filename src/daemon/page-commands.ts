@@ -8,6 +8,7 @@ import { assertSafeScreenshotPath, assertSafeUploadPath } from "../contracts/pat
 import type { Method, OkResponse, Paths } from "../contracts/protocol.js";
 import type { ActionResult, BrowserDriver, BrowserSession, TabContext } from "../contracts/types.js";
 import { truncateLogEntry, trimLogBuffer } from "../drivers/playwright/logs.js";
+import { type KeepAliveTracker, assertSessionAlive, keepAliveCommand } from "./keepalive.js";
 import { type Params, optionalBoolean, optionalNonNegativeInteger, optionalString, requireString, requireTarget } from "./params.js";
 import { redactText, redactUrl } from "./redaction.js";
 import type { ContextRegistry } from "./registry.js";
@@ -21,12 +22,13 @@ export interface Resolved {
 }
 
 export type Handler = (params: Params) => Promise<OkResponse>;
-export type PageMethod = "goto" | "back" | "forward" | "reload" | "inspect" | "screenshot" | "console" | "network" | "click" | "type" | "select" | "press" | "upload" ;
+export type PageMethod = "goto" | "back" | "forward" | "reload" | "inspect" | "screenshot" | "console" | "network" | "click" | "type" | "select" | "press" | "upload" | "keepalive";
 type DriverOp<T> = (driver: BrowserDriver, session: BrowserSession, params: Params) => Promise<T>;
 type EntriesOp = (driver: BrowserDriver, session: BrowserSession, since: number) => Promise<Array<{ seq: number }>>;
 
 export interface PageDeps {
   registry: ContextRegistry;
+  keepAlive: KeepAliveTracker;
   paths: Paths;
   env?: NodeJS.ProcessEnv;
   now: () => Date;
@@ -34,9 +36,17 @@ export interface PageDeps {
 }
 
 /** Record the tab's latest URL/title; a stale value in `atc list` is harmless, so failures are ignored. */
-export async function refreshLocation(registry: ContextRegistry, id: string, driver: BrowserDriver, session: BrowserSession): Promise<void> {
+export async function refreshLocation(
+  registry: ContextRegistry,
+  id: string,
+  driver: BrowserDriver,
+  session: BrowserSession,
+  keepAlive?: KeepAliveTracker,
+): Promise<void> {
   try {
-    registry.updateLocation(id, await driver.location(session));
+    const loc = await driver.location(session);
+    registry.updateLocation(id, loc);
+    keepAlive?.observeUrl(id, loc.url);
   } catch {
     // Location is informational only.
   }
@@ -62,10 +72,11 @@ export class PageCommands {
     };
   }
 
-  private pageActions(): Pick<Record<PageMethod, Handler>, "press" | "upload" > {
+  private pageActions(): Pick<Record<PageMethod, Handler>, "press" | "upload" | "keepalive"> {
     return {
       press: (p) => this.press(p),
       upload: (p) => this.upload(p),
+      keepalive: (p) => keepAliveCommand(this.deps.resolve, this.deps.registry, this.deps.keepAlive, p),
     };
   }
 
@@ -74,7 +85,9 @@ export class PageCommands {
     const resolved = this.deps.resolve(params);
     const base = isRelativeUrl(url) ? await currentUrl(resolved) : undefined;
     const target = resolveGotoUrl(url, base);
-    return this.navigate(params, (d, s) => d.navigate(s, target), resolved);
+    const res = await this.navigate(params, (d, s) => d.navigate(s, target), resolved);
+    this.deps.keepAlive.recordIntentionalUrl(resolved.ctx.id, typeof res.url === "string" ? res.url : target);
+    return res;
   }
 
   private async navigate(params: Params, op: DriverOp<void>, pre?: Resolved): Promise<OkResponse> {
@@ -82,6 +95,7 @@ export class PageCommands {
     await op(driver, session, params);
     const loc = await driver.location(session);
     this.deps.registry.updateLocation(ctx.id, loc);
+    this.deps.keepAlive.observeUrl(ctx.id, loc.url);
     return { ok: true, context: ctx.id, url: loc.url, title: loc.title };
   }
 
@@ -89,6 +103,7 @@ export class PageCommands {
     const { ctx, driver, session } = this.deps.resolve(params);
     const state = await driver.inspect(session);
     this.deps.registry.updateLocation(ctx.id, { url: state.url, title: state.title });
+    this.deps.keepAlive.observeUrl(ctx.id, state.url);
     return {
       ok: true,
       context: ctx.id,
@@ -119,25 +134,28 @@ export class PageCommands {
 
   private async press(params: Params): Promise<OkResponse> {
     const key = requireString(params, "key");
-    const { ctx, driver, session } = this.deps.resolve(params);
-    const result = await driver.press(session, key);
-    await refreshLocation(this.deps.registry, ctx.id, driver, session);
-    return { ok: true, context: ctx.id, matched: result.matched, ...(result.effect === undefined ? {} : { effect: result.effect }) };
+    const resolved = this.deps.resolve(params);
+    await assertSessionAlive(resolved, this.deps.registry, this.deps.keepAlive);
+    const result = await resolved.driver.press(resolved.session, key);
+    await refreshLocation(this.deps.registry, resolved.ctx.id, resolved.driver, resolved.session, this.deps.keepAlive);
+    return { ok: true, context: resolved.ctx.id, matched: result.matched, ...(result.effect === undefined ? {} : { effect: result.effect }) };
   }
 
   private async upload(params: Params): Promise<OkResponse> {
     const file = assertSafeUploadPath(requireString(params, "file"), this.deps.env);
-    const { ctx, driver, session } = this.deps.resolve(params);
-    const result = await driver.upload(session, requireTarget(params), file);
-    await refreshLocation(this.deps.registry, ctx.id, driver, session);
-    return { ok: true, context: ctx.id, matched: result.matched, ...(result.effect === undefined ? {} : { effect: result.effect }) };
+    const resolved = this.deps.resolve(params);
+    await assertSessionAlive(resolved, this.deps.registry, this.deps.keepAlive);
+    const result = await resolved.driver.upload(resolved.session, requireTarget(params), file);
+    await refreshLocation(this.deps.registry, resolved.ctx.id, resolved.driver, resolved.session, this.deps.keepAlive);
+    return { ok: true, context: resolved.ctx.id, matched: result.matched, ...(result.effect === undefined ? {} : { effect: result.effect }) };
   }
 
   private async act(params: Params, op: DriverOp<ActionResult>): Promise<OkResponse> {
-    const { ctx, driver, session } = this.deps.resolve(params);
-    const result = await op(driver, session, params);
-    await refreshLocation(this.deps.registry, ctx.id, driver, session);
-    return { ok: true, context: ctx.id, matched: result.matched, ...(result.effect === undefined ? {} : { effect: result.effect }) };
+    const resolved = this.deps.resolve(params);
+    await assertSessionAlive(resolved, this.deps.registry, this.deps.keepAlive);
+    const result = await op(resolved.driver, resolved.session, params);
+    await refreshLocation(this.deps.registry, resolved.ctx.id, resolved.driver, resolved.session, this.deps.keepAlive);
+    return { ok: true, context: resolved.ctx.id, matched: result.matched, ...(result.effect === undefined ? {} : { effect: result.effect }) };
   }
 }
 

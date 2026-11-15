@@ -10,6 +10,7 @@ const REQUEST_REPLY_TYPES = Object.freeze({
   share: "shared",
   unshare: "unshared",
   activate: "activated",
+  keepalive: "keepalive",
 });
 
 const REPLY_TYPES = new Set(Object.values(REQUEST_REPLY_TYPES));
@@ -52,8 +53,14 @@ function parseKnownMessage(message) {
   if (message.type === "atc:share") return parseShareMessage(message);
   if (message.type === "atc:unshare") return parseContextMessage("atc:unshare", message);
   if (message.type === "atc:activate") return parseContextMessage("atc:activate", message);
+  if (message.type === "atc:keepalive") return parseKeepaliveMessage(message);
   if (message.type === "atc:open-sidepanel") return parseOpenSidepanelMessage(message);
   return undefined;
+}
+
+function parseKeepaliveMessage(message) {
+  if (!isContext(message.context) || typeof message.enabled !== "boolean") return undefined;
+  return { type: "atc:keepalive", context: message.context, enabled: message.enabled };
 }
 
 function parseShareMessage(message) {
@@ -69,21 +76,28 @@ function parseOpenSidepanelMessage(message) {
   return isPositiveId(message.windowId) ? { type: "atc:open-sidepanel", windowId: message.windowId } : undefined;
 }
 
-function normalizeBinding(raw) {
-  if (!isRecord(raw)) return undefined;
-  if (!isContext(raw.context) || !nullableString(raw.tabId) || !nullableString(raw.source)) return undefined;
-  if (typeof raw.browser !== "string" || typeof raw.current !== "boolean") return undefined;
-  if (raw.tabId === undefined || raw.source === undefined) return undefined;
-  if (raw.url !== undefined && raw.url !== null && typeof raw.url !== "string") return undefined;
-  if (raw.title !== undefined && raw.title !== null && typeof raw.title !== "string") return undefined;
+function optionalBoolean(value) {
+  return value === undefined || typeof value === "boolean";
+}
+
+function bindingFlags(raw) {
+  if (!optionalBoolean(raw.keepAlive) || !optionalBoolean(raw.sessionExpired)) return undefined;
   return {
-    context: raw.context,
-    tabId: raw.tabId === null ? null : raw.tabId,
-    browser: raw.browser,
-    source: raw.source === null ? null : raw.source,
-    url: typeof raw.url === "string" ? raw.url : null,
-    title: typeof raw.title === "string" ? raw.title : null,
-    current: raw.current,
+    ...(typeof raw.keepAlive === "boolean" ? { keepAlive: raw.keepAlive } : {}),
+    ...(typeof raw.sessionExpired === "boolean" ? { sessionExpired: raw.sessionExpired } : {}),
+  };
+}
+
+function normalizeBinding(raw) {
+  if (!isRecord(raw) || !isContext(raw.context) || typeof raw.browser !== "string" || typeof raw.current !== "boolean") return undefined;
+  if (!nullableString(raw.tabId) || !nullableString(raw.source) || !optionalString(raw.url === null ? undefined : raw.url)) return undefined;
+  if (!optionalString(raw.title === null ? undefined : raw.title)) return undefined;
+  const flags = bindingFlags(raw);
+  if (flags === undefined) return undefined;
+  return {
+    context: raw.context, tabId: raw.tabId, browser: raw.browser, source: raw.source,
+    url: typeof raw.url === "string" ? raw.url : null, title: typeof raw.title === "string" ? raw.title : null,
+    current: raw.current, ...flags,
   };
 }
 
@@ -132,9 +146,10 @@ function normalizeBindingList(rawBindings) {
 }
 
 function normalizeOutcomeReply(base, message) {
-  if (!optionalString(message.context)) return undefined;
+  if (!optionalString(message.context) || !optionalBoolean(message.keepAlive)) return undefined;
   return {
     ...base,
     ...(typeof message.context === "string" ? { context: message.context } : {}),
+    ...(typeof message.keepAlive === "boolean" ? { keepAlive: message.keepAlive } : {}),
   };
 }

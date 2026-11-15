@@ -22,6 +22,8 @@ interface TestBinding {
   url: string | null;
   title: string | null;
   current: boolean;
+  keepAlive?: boolean;
+  sessionExpired?: boolean;
 }
 
 interface SidepanelModel {
@@ -30,7 +32,7 @@ interface SidepanelModel {
   current: string | null;
   removed: number[];
   shareCalls: number[];
-  messages: Array<{ type: string; tabId?: number; context?: string }>;
+  messages: Array<{ type: string; tabId?: number; context?: string; enabled?: boolean }>;
   listeners: Array<(message: unknown) => void>;
   removeGate: Promise<void> | null;
   releaseRemove: (() => void) | null;
@@ -112,10 +114,17 @@ async function sidepanel(): Promise<Page> {
             !origins.some((origin) => origin.includes("needsaccess")),
         },
         runtime: {
-          sendMessage: async (message: { type: string; tabId?: number; context?: string }) => {
+          sendMessage: async (message: { type: string; tabId?: number; context?: string; enabled?: boolean }) => {
             model.messages.push({ ...message });
             if (message.type === "atc:bindings") {
               return { ok: true, current: model.current, bindings: model.bindings.map((binding) => ({ ...binding })) };
+            }
+            if (message.type === "atc:keepalive") {
+              const target = model.bindings.find((binding) => binding.context === message.context);
+              if (target === undefined) return { ok: false, message: "unknown context" };
+              target.keepAlive = Boolean(message.enabled);
+              if (!target.keepAlive) delete target.sessionExpired;
+              return { ok: true, context: target.context, keepAlive: target.keepAlive };
             }
             if (message.type === "atc:share") {
               const tab = model.tabs.find((entry) => entry.id === message.tabId);
@@ -346,4 +355,25 @@ it("stays usable at a narrow side-panel width", async () => {
   const rowBox = await row(page, 8).boundingBox();
   expect(rowBox!.width).toBeLessThanOrEqual(300);
   expect(await page.locator("#search-kbd").isVisible()).toBe(false);
+});
+
+it("toggles Keep alive on a shared row and surfaces Sign-in needed when expired", async () => {
+  const page = await sidepanel();
+  const btn = row(page, 8).locator("[data-keepalive-tab]");
+  expect(await btn.getAttribute("aria-pressed")).toBe("false");
+
+  await btn.click();
+  await waitForVisible(row(page, 8).locator(".badge-keepalive"));
+  expect(await row(page, 8).locator("[data-keepalive-tab]").getAttribute("aria-pressed")).toBe("true");
+  expect((await messages(page)).some((m) => m.type === "atc:keepalive" && m.context === "ctx_github" && m.enabled === true)).toBe(true);
+  await waitForContains(page.locator("#toast"), "Keeping");
+
+  await page.evaluate(() => {
+    const model = (globalThis as unknown as { __atcTest: SidepanelModel }).__atcTest;
+    const target = model.bindings.find((b) => b.context === "ctx_github");
+    if (target !== undefined) target.sessionExpired = true;
+    for (const listener of model.listeners) listener({ type: "atc:bindings-changed" });
+  });
+  await waitForVisible(row(page, 8).locator(".badge-expired"));
+  expect(await row(page, 8).locator(".badge-expired").innerText()).toBe("Sign-in needed");
 });

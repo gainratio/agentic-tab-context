@@ -33,7 +33,8 @@ export class ExtensionBridge {
   private shareHandler: (tabId: string) => Promise<string> = () => Promise.reject(new Error("daemon is not ready"));
   private unshareHandler: (context: string) => Promise<void> = () => Promise.reject(new Error("daemon is not ready"));
   private activateHandler: (context: string) => Promise<void> = () => Promise.reject(new Error("daemon is not ready"));
-  private tabsListener: (key: string, tabs: readonly LiveTab[]) => void = () => undefined;
+  private keepAliveHandler: (context: string, enabled: boolean) => Promise<boolean> = () => Promise.reject(new Error("daemon is not ready"));
+  private readonly tabsListeners: Array<(key: string, tabs: readonly LiveTab[]) => void> = [];
   private authToken: string | undefined;
 
   constructor(private readonly maxConnections: number = MAX_EXTENSION_CONNECTIONS) {}
@@ -56,6 +57,7 @@ export class ExtensionBridge {
       onShare: (tabId) => this.shareHandler(tabId),
       onUnshare: (context) => this.unshareHandler(context),
       onActivate: (context) => this.activateHandler(context),
+      onKeepAlive: (context, enabled) => this.keepAliveHandler(context, enabled),
     });
     socket.on("close", () => { this.activeSockets.delete(socket); this.forget(connection); });
   }
@@ -89,8 +91,13 @@ export class ExtensionBridge {
     this.activateHandler = handler;
   }
 
+  /** Side-panel `keepalive` request: toggle session keep-alive on a shared context. */
+  onKeepAlive(handler: (context: string, enabled: boolean) => Promise<boolean>): void {
+    this.keepAliveHandler = handler;
+  }
+
   onTabsChanged(listener: (key: string, tabs: readonly LiveTab[]) => void): void {
-    this.tabsListener = listener;
+    this.tabsListeners.push(listener);
   }
 
   connected(): ConnectedExtension[] {
@@ -120,17 +127,21 @@ export class ExtensionBridge {
   private forget(connection: ExtensionConnection): void {
     if (this.connections.get(connection.key) !== connection) return;
     this.connections.delete(connection.key);
-    this.tabsListener(connection.key, []);
+    this.notifyTabs(connection.key, []);
   }
 
   private identify(connection: ExtensionConnection): void {
     const previous = this.connections.get(connection.key);
     this.connections.set(connection.key, connection);
-    if (previous !== undefined && previous !== connection) this.tabsListener(connection.key, []);
+    if (previous !== undefined && previous !== connection) this.notifyTabs(connection.key, []);
   }
 
   private tabsChanged(connection: ExtensionConnection): void {
-    if (this.connections.get(connection.key) === connection) this.tabsListener(connection.key, connection.tabs);
+    if (this.connections.get(connection.key) === connection) this.notifyTabs(connection.key, connection.tabs);
+  }
+
+  private notifyTabs(key: string, tabs: readonly LiveTab[]): void {
+    for (const listener of this.tabsListeners) listener(key, tabs);
   }
 }
 

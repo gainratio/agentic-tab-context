@@ -3,7 +3,7 @@
  * at `${ATC_HOME}/daemon.sock`. One request line, one response line.
  */
 import type { ErrorCode } from "./errors.js";
-import type { BindOptions, BindingFilter, BrowserName, Target } from "./types.js";
+import type { BindOptions, BindingFilter, BrowserName, KeepAliveMode, Target } from "./types.js";
 
 /** `context` omitted => the daemon uses the current context (see `use`). */
 export type Request =
@@ -24,6 +24,7 @@ export type Request =
   | { method: "type" | "select"; params: { context?: string; each?: boolean; target: Target; value: string } }
   | { method: "press"; params: { context?: string; each?: boolean; key: string } }
   | { method: "upload"; params: { context?: string; each?: boolean; target: Target; file: string } }
+  | { method: "keepalive"; params: { context?: string; mode?: KeepAliveMode } }
   | { method: "doctor"; params: Record<string, never> }
   | { method: "ping"; params: Record<string, never> }
   | { method: "shutdown"; params: Record<string, never> };

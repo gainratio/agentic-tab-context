@@ -24,20 +24,26 @@ function parseExtensionTabId(tabId) {
   if (!Number.isSafeInteger(rawTabId) || rawTabId <= 0) return null;
   return { key: match[1], tabId: rawTabId };
 }
-function normalizeBinding(raw) {
-  if (!bindingIsRecord(raw)) return null;
-  if (typeof raw.context !== "string" || raw.context.trim() === "") return null;
-  if (!nullableString(raw.tabId) || !nullableString(raw.source)) return null;
-  if (typeof raw.browser !== "string" || typeof raw.current !== "boolean") return null;
-  if (raw.tabId === undefined || raw.source === undefined) return null;
+function optionalBool(value) {
+  return value === undefined || typeof value === "boolean";
+}
+function bindingKeepAliveFlags(raw) {
+  if (!optionalBool(raw.keepAlive) || !optionalBool(raw.sessionExpired)) return null;
   return {
-    context: raw.context,
-    tabId: raw.tabId,
-    browser: raw.browser,
-    source: raw.source,
-    url: typeof raw.url === "string" ? raw.url : null,
-    title: typeof raw.title === "string" ? raw.title : null,
-    current: raw.current,
+    ...(typeof raw.keepAlive === "boolean" ? { keepAlive: raw.keepAlive } : {}),
+    ...(typeof raw.sessionExpired === "boolean" ? { sessionExpired: raw.sessionExpired } : {}),
+  };
+}
+function normalizeBinding(raw) {
+  if (!bindingIsRecord(raw) || typeof raw.context !== "string" || raw.context.trim() === "") return null;
+  if (!nullableString(raw.tabId) || !nullableString(raw.source) || raw.tabId === undefined || raw.source === undefined) return null;
+  if (typeof raw.browser !== "string" || typeof raw.current !== "boolean") return null;
+  const flags = bindingKeepAliveFlags(raw);
+  if (flags === null) return null;
+  return {
+    context: raw.context, tabId: raw.tabId, browser: raw.browser, source: raw.source,
+    url: typeof raw.url === "string" ? raw.url : null, title: typeof raw.title === "string" ? raw.title : null,
+    current: raw.current, ...flags,
   };
 }
 function normalizeBindingList(rawList) {
@@ -62,10 +68,12 @@ function normalizeBindingsReply(reply) {
 function normalizeOutcomeReply(reply) {
   if (!bindingIsRecord(reply) || typeof reply.ok !== "boolean") return { ok: false, message: "atc sent an invalid response." };
   if (reply.context !== undefined && typeof reply.context !== "string") return { ok: false, message: "atc sent an invalid response." };
+  if (!optionalBool(reply.keepAlive)) return { ok: false, message: "atc sent an invalid response." };
   if (!optionalNullableString(reply.message) || !optionalNullableString(reply.error)) return { ok: false, message: "atc sent an invalid response." };
   return {
     ok: reply.ok,
     ...(typeof reply.context === "string" ? { context: reply.context } : {}),
+    ...(typeof reply.keepAlive === "boolean" ? { keepAlive: reply.keepAlive } : {}),
     ...(typeof reply.message === "string" ? { message: reply.message } : {}),
     ...(typeof reply.error === "string" ? { error: reply.error } : {}),
   };
@@ -100,6 +108,8 @@ function tabBinding(binding, current) {
     context: binding ? binding.context : null,
     shared: binding !== null,
     activeTarget: binding !== null && binding.context === current,
+    keepAlive: Boolean(binding && binding.keepAlive === true),
+    sessionExpired: Boolean(binding && binding.sessionExpired === true),
   };
 }
 function tabRisk(classified, needsAccess, tabId) {

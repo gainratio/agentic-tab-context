@@ -45,4 +45,19 @@ globalThis.__atcActions = {
     el.dispatchEvent(new Event("change", { bubbles: true }));
     return { ok: true, matched: 1 };
   },
+  keepalive() {
+    const root = document.documentElement || document.body;
+    if (root) this.pulseEvents(root);
+    if (typeof scrollBy === "function") scrollBy(0, 0);
+    this.touchSession();
+    return { ok: true, pulsed: true, url: location.href };
+  },
+  pulseEvents(root) {
+    if (typeof PointerEvent === "function") root.dispatchEvent(new PointerEvent("pointermove", { bubbles: true }));
+    if (typeof MouseEvent === "function") root.dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+  },
+  touchSession() {
+    if (!/^https?:$/.test(location.protocol) || typeof fetch !== "function") return;
+    void fetch(location.href, { method: "HEAD", credentials: "include", cache: "no-store" }).catch(() => undefined);
+  },
 };

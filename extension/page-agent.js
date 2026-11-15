@@ -24,6 +24,7 @@ globalThis.__atcAgent =
           if (op.op === "watch") return this.watch();
           if (op.op === "unwatch") return this.unwatch();
           if (op.op === "logs") return this.logs(op.kind, op.since);
+          if (op.op === "keepalive") return globalThis.__atcActions.keepalive();
           return { ok: false, error: "INVALID_ARGUMENT", message: "unknown page operation" };
         },
         visible(el) {

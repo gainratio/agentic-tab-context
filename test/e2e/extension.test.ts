@@ -329,9 +329,30 @@ describe("side panel end to end", () => {
     const activated = await eventually(() => atc("current"), (r) => r.json.context === binding?.context);
     expect(activated.json).toMatchObject({ context: binding?.context });
 
+    await row.locator("[data-keepalive-tab]").click();
+    const kaStatus = await eventually(
+      () => atc("keepalive", "status", "-c", String(binding?.context)),
+      (r) => r.json.keepAlive === true,
+    );
+    expect(kaStatus.json).toMatchObject({ ok: true, context: binding?.context, keepAlive: true, sessionExpired: false });
+    const worker = context.serviceWorkers()[0]!;
+    const rawTabId = Number(String(binding?.tabId).split(":").pop());
+    const swState = await worker.evaluate(async (tabId: number) => {
+      const tab = await (globalThis as unknown as { chrome: { tabs: { get(id: number): Promise<{ autoDiscardable?: boolean }> } } }).chrome.tabs.get(tabId);
+      const alarm = await (globalThis as unknown as { chrome: { alarms: { get(name: string): Promise<{ name: string } | undefined> } } }).chrome.alarms.get("atc-keepalive");
+      return { autoDiscardable: tab.autoDiscardable, alarmName: alarm?.name ?? null };
+    }, rawTabId);
+    expect(swState).toEqual({ autoDiscardable: false, alarmName: "atc-keepalive" });
+
     await row.locator("button[data-unshare-tab]").click();
     const unshared = await eventually(() => atc("bindings"), (r) => Array.isArray(r.json.bindings) && !(r.json.bindings as Json[]).some((entry) => entry.context === binding?.context));
     expect((unshared.json.bindings as Json[]).some((entry) => entry.context === binding?.context)).toBe(false);
+    const cleaned = await worker.evaluate(async (tabId: number) => {
+      const tab = await (globalThis as unknown as { chrome: { tabs: { get(id: number): Promise<{ autoDiscardable?: boolean }> } } }).chrome.tabs.get(tabId);
+      const alarm = await (globalThis as unknown as { chrome: { alarms: { get(name: string): Promise<{ name: string } | undefined> } } }).chrome.alarms.get("atc-keepalive");
+      return { autoDiscardable: tab.autoDiscardable, alarmName: alarm?.name ?? null };
+    }, rawTabId);
+    expect(cleaned).toEqual({ autoDiscardable: true, alarmName: null });
 
     await row.locator("[data-select-id]").check();
     await panel.locator("#share-selected").click();
