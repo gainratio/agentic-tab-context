@@ -4,8 +4,9 @@
  * sends for tabs the user shared, and brokers the side panel's membership
  * requests. No page content crosses this worker.
  */
+import { KEEPALIVE_ALARM, dropKeepAliveTab, pulseKeepAliveTabs } from "./sw/keepalive.js";
 import { runConnectedCommand, setCaptureConnection } from "./sw/lifecycle.js";
-import { activateContext, connect, isConnected, requestBindings, send, setMessageHandler, shareTab, unshareContext } from "./sw/native.js";
+import { activateContext, connect, isConnected, requestBindings, send, setContextKeepAlive, setMessageHandler, shareTab, unshareContext } from "./sw/native.js";
 import { runPageOp, watchedTabs } from "./sw/page.js";
 import { parseSidepanelMessage } from "./sw/requests.js";
 import { pushTabs } from "./sw/tabs.js";
@@ -100,6 +101,7 @@ function sidepanelAction(request) {
   if (request.type === "atc:share") return () => shareTab(request.tabId);
   if (request.type === "atc:unshare") return () => unshareContext(request.context);
   if (request.type === "atc:activate") return () => activateContext(request.context);
+  if (request.type === "atc:keepalive") return () => setContextKeepAlive(request.context, request.enabled);
   return null;
 }
 
@@ -151,13 +153,17 @@ chrome.runtime.onInstalled.addListener(() => void start());
 chrome.runtime.onStartup.addListener(() => void start());
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === RETRY_ALARM.name && !isConnected()) void start();
+  if (alarm.name === KEEPALIVE_ALARM.name) void pulseKeepAliveTabs();
 });
 chrome.tabs.onUpdated.addListener((tabId, change) => {
   void reinjectWatch(tabId, change);
   if (change.status === "complete" || change.title || change.url) scheduleTabsChanged();
 });
 listen(chrome.tabs.onCreated, () => scheduleTabsChanged());
-listen(chrome.tabs.onRemoved, () => scheduleTabsChanged());
+listen(chrome.tabs.onRemoved, (tabId) => {
+  void dropKeepAliveTab(tabId);
+  scheduleTabsChanged();
+});
 listen(chrome.tabs.onMoved, () => scheduleTabsChanged());
 listen(chrome.tabs.onReplaced, () => scheduleTabsChanged());
 listen(chrome.tabs.onActivated, () => scheduleTabsChanged());

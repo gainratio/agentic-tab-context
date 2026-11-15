@@ -7,18 +7,7 @@ import { mkdir, stat, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { AtcError } from "../../contracts/errors.js";
 import type { ExtensionAction } from "../../contracts/extension.js";
-import type {
-  ActionResult,
-  BrowserDriver,
-  BrowserSession,
-  ConsoleEntry,
-  LiveTab,
-  NetworkEntry,
-  OpenOptions,
-  PageState,
-  ScreenshotResult,
-  Target,
-} from "../../contracts/types.js";
+import type { ActionResult, BrowserDriver, BrowserSession, ConsoleEntry, LiveTab, NetworkEntry, OpenOptions, PageState, ScreenshotResult, Target } from "../../contracts/types.js";
 import { type ActAction, type PageOp, actOp, toActionResult, toEntries, toPageState, uploadOp } from "../page-agent.js";
 import { observedAction } from "../action-observe.js";
 import { type ExtensionBridge, parseExtensionTabId } from "./bridge.js";
@@ -141,6 +130,9 @@ export class ExtensionDriver implements BrowserDriver {
     return this.observed(session, async () => toActionResult(await this.page(session, uploadOp(target, path))));
   }
 
+  async setKeepAlive(session: BrowserSession, enabled: boolean): Promise<void> {
+    await this.send(session, "keepalive", { enabled });
+  }
 
   async screenshot(session: BrowserSession, path: string, fullPage: boolean, redact = false): Promise<ScreenshotResult> {
     if (fullPage) throw new AtcError("UNSUPPORTED_ACTION", "full-page screenshots are not supported for live extension tabs");

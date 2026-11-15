@@ -94,6 +94,11 @@ function parseActivate(raw: Raw): ExtensionToDaemon | undefined {
   return isPositiveId(raw.id) && isContext(raw.context) ? { type: "activate", id: raw.id, context: raw.context } : undefined;
 }
 
+function parseKeepAlive(raw: Raw): ExtensionToDaemon | undefined {
+  if (!isPositiveId(raw.id) || !isContext(raw.context) || typeof raw.enabled !== "boolean") return undefined;
+  return { type: "keepalive", id: raw.id, context: raw.context, enabled: raw.enabled };
+}
+
 const PARSERS: Readonly<Record<string, (raw: Raw) => ExtensionToDaemon | undefined>> = {
   hello: parseHello,
   tabs: parseTabs,
@@ -103,6 +108,7 @@ const PARSERS: Readonly<Record<string, (raw: Raw) => ExtensionToDaemon | undefin
   share: parseShare,
   unshare: parseUnshare,
   activate: parseActivate,
+  keepalive: parseKeepAlive,
 };
 
 export function parseExtensionMessage(line: string): ExtensionToDaemon | undefined {

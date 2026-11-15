@@ -25,6 +25,11 @@ const HAPPY: ReadonlyArray<readonly [string, string[], unknown]> = [
   ["bind query", ["bind", "--query", "aml-filter"], { method: "bind", params: { query: "aml-filter" } }],
   ["bind positional query", ["bind", "localhost:5181"], { method: "bind", params: { query: "localhost:5181" } }],
   ["bind tab id", ["bind", "--tab", "macos:chrome:1:2", "--use"], { method: "bind", params: { tab: "macos:chrome:1:2", use: true } }],
+  ["bind keep-alive", ["bind", "inbox", "--keep-alive"], { method: "bind", params: { query: "inbox", keepAlive: true } }],
+  ["keepalive default", ["keepalive"], { method: "keepalive", params: {} }],
+  ["keepalive on", ["keepalive", "on", "-c", CTX], { method: "keepalive", params: { context: CTX, mode: "on" } }],
+  ["keepalive off", ["keepalive", "off"], { method: "keepalive", params: { mode: "off" } }],
+  ["keepalive status", ["keepalive", "status"], { method: "keepalive", params: { mode: "status" } }],
   ["bind url and title", ["bind", "--url", "localhost", "--title", "Dashboard", "-b", "safari", "-a"], { method: "bind", params: { url: "localhost", title: "Dashboard", browser: "safari", active: true } }],
   ["bindings", ["bindings"], { method: "bindings", params: {} }],
   ["bindings filtered", ["bindings", "--query", "docs.example.com", "--browser", "chrome"], { method: "bindings", params: { query: "docs.example.com", browser: "chrome" } }],
@@ -201,6 +206,7 @@ const INVALID: ReadonlyArray<readonly [string, string[], RegExp]> = [
   ["select missing value", ["select", "--label", "Env"], /select: missing required --value/],
   ["type missing target", ["type", "--value", "x"], /type: a target is required/],
   ["value on click", ["click", "--role", "button", "--value", "x"], /click: unknown flag --value/],
+  ["keepalive bad mode", ["keepalive", "forever"], /keepalive: mode must be one of/],
 ];
 
 describe("parseArgs rejects malformed input with INVALID_ARGUMENT", () => {

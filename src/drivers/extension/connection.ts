@@ -5,15 +5,7 @@
  */
 import type { Socket } from "node:net";
 import { AtcError, toErrorCode } from "../../contracts/errors.js";
-import {
-  EXTENSION_COMMAND_TIMEOUT_MS,
-  EXTENSION_NAVIGATION_TIMEOUT_MS,
-  type DaemonToExtension,
-  type ExtensionAction,
-  type ExtensionBindings,
-  type ExtensionTab,
-  type ExtensionToDaemon,
-} from "../../contracts/extension.js";
+import { EXTENSION_COMMAND_TIMEOUT_MS, EXTENSION_NAVIGATION_TIMEOUT_MS, type DaemonToExtension, type ExtensionAction, type ExtensionBindings, type ExtensionTab, type ExtensionToDaemon } from "../../contracts/extension.js";
 import type { BrowserName, LiveTab } from "../../contracts/types.js";
 import { MAX_INBOUND_FRAME_BYTES } from "../../transport/frames.js";
 import { readLines, writeLine } from "../../transport/lines.js";
@@ -39,6 +31,7 @@ export interface ConnectionEvents {
   onShare: (tabId: string) => Promise<string>;
   onUnshare: (context: string) => Promise<void>;
   onActivate: (context: string) => Promise<void>;
+  onKeepAlive?: (context: string, enabled: boolean) => Promise<boolean>;
   authToken?: () => string | undefined;
 }
 
@@ -81,11 +74,16 @@ export class ExtensionConnection {
     else if (this.key === "") return;
     else if (message.type === "tabs") this.updateTabs(message.tabs);
     else if (message.type === "result") this.complete(message);
-    else if (message.type === "pin") void this.pin(message.id, message.tabId);
+    else this.handlePanelRequest(message);
+  }
+
+  private handlePanelRequest(message: Exclude<ExtensionToDaemon, { type: "hello" | "tabs" | "result" }>): void {
+    if (message.type === "pin") void this.pin(message.id, message.tabId);
     else if (message.type === "bindings") void this.bindings(message.id);
     else if (message.type === "share") void this.share(message.id, message.tabId);
-    else if (message.type === "unshare") void this.unshare(message.id, message.context);
-    else void this.activate(message.id, message.context);
+    else if (message.type === "unshare") void this.contextOutcome("unshared", message.id, message.context, () => this.events.onUnshare(message.context));
+    else if (message.type === "activate") void this.contextOutcome("activated", message.id, message.context, () => this.events.onActivate(message.context));
+    else void this.keepAlive(message.id, message.context, message.enabled);
   }
 
   private identify(browser: BrowserName, instance: string, protocol: number, version: string, auth?: string): void {
@@ -150,21 +148,22 @@ export class ExtensionConnection {
     }
   }
 
-  private async unshare(id: number, context: string): Promise<void> {
+  private async contextOutcome(type: "unshared" | "activated", id: number, context: string, work: () => Promise<void>): Promise<void> {
     try {
-      await this.events.onUnshare(context);
-      this.respond({ type: "unshared", id, ok: true, context });
+      await work();
+      this.respond({ type, id, ok: true, context });
     } catch (error) {
-      this.respond({ type: "unshared", id, ok: false, message: errorMessage(error) });
+      this.respond({ type, id, ok: false, message: errorMessage(error) });
     }
   }
 
-  private async activate(id: number, context: string): Promise<void> {
+  private async keepAlive(id: number, context: string, enabled: boolean): Promise<void> {
     try {
-      await this.events.onActivate(context);
-      this.respond({ type: "activated", id, ok: true, context });
+      if (this.events.onKeepAlive === undefined) throw new Error("keep-alive is not configured");
+      const keepAlive = await this.events.onKeepAlive(context, enabled);
+      this.respond({ type: "keepalive", id, ok: true, context, keepAlive });
     } catch (error) {
-      this.respond({ type: "activated", id, ok: false, message: errorMessage(error) });
+      this.respond({ type: "keepalive", id, ok: false, message: errorMessage(error) });
     }
   }
 

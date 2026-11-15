@@ -19,6 +19,7 @@ export type PageOp =
   | { op: "inspect" }
   | { op: "watch" }
   | { op: "unwatch" }
+  | { op: "keepalive" }
   | { op: "logs"; kind: "console" | "network"; since: number }
   | { op: "act"; action: ActAction; target: Target; label: string; value?: string }
   | { op: "press"; key: string }

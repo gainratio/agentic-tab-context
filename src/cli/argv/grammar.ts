@@ -42,6 +42,7 @@ export const FLAG_KINDS = {
   title: "string",
   tab: "string",
   active: "boolean",
+  "keep-alive": "boolean",
   each: "boolean",
   redact: "boolean",
 } as const satisfies Record<string, FlagKind>;

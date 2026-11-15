@@ -32,6 +32,7 @@ export const EXTENSION_ACTIONS = [
   "page",
   "watch",
   "unwatch",
+  "keepalive",
 ] as const;
 export type ExtensionAction = (typeof EXTENSION_ACTIONS)[number];
 
@@ -56,7 +57,8 @@ export type ExtensionToDaemon =
   | { type: "bindings"; id: number }
   | { type: "share"; id: number; tabId: number }
   | { type: "unshare"; id: number; context: string }
-  | { type: "activate"; id: number; context: string };
+  | { type: "activate"; id: number; context: string }
+  | { type: "keepalive"; id: number; context: string; enabled: boolean };
 
 export type DaemonToExtension =
   | { type: "command"; id: number; tabId: number; action: ExtensionAction; payload: Record<string, unknown> }
@@ -64,7 +66,8 @@ export type DaemonToExtension =
   | ({ type: "bindings"; id: number; ok: boolean; message?: string } & ExtensionBindings)
   | { type: "shared"; id: number; ok: boolean; context?: string; message?: string }
   | { type: "unshared"; id: number; ok: boolean; context?: string; message?: string }
-  | { type: "activated"; id: number; ok: boolean; context?: string; message?: string };
+  | { type: "activated"; id: number; ok: boolean; context?: string; message?: string }
+  | { type: "keepalive"; id: number; ok: boolean; context?: string; keepAlive?: boolean; message?: string };
 
 /** Sent by the native host itself so the extension can show whether atc is reachable. */
 export interface HostToExtension {

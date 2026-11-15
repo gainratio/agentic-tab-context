@@ -18,11 +18,12 @@ function workerHarness() {
   let pushes = 0;
   const event = (name: string) => ({ addListener: (fn: (value?: unknown) => void) => listeners.set(name, fn) });
   const context = vm.createContext({
+    URL,
     chrome: {
       storage: { session: { get: async () => ({ ...data }), set: async (value: Record<string, unknown>) => Object.assign(data, value) } },
-      alarms: { create: async () => undefined, onAlarm: event("onAlarm") },
+      alarms: { create: async () => undefined, clear: async () => undefined, onAlarm: event("onAlarm") },
       runtime: { onInstalled: event("onInstalled"), onStartup: event("onStartup"), onMessage: event("onMessage") },
-      tabs: { onUpdated: event("onUpdated"), onCreated: event("onCreated"), onRemoved: event("onRemoved"), onMoved: event("onMoved"), onReplaced: event("onReplaced"), onActivated: event("onActivated") },
+      tabs: { get: async (id: number) => ({ id, url: "https://example.com/" }), update: async () => undefined, onUpdated: event("onUpdated"), onCreated: event("onCreated"), onRemoved: event("onRemoved"), onMoved: event("onMoved"), onReplaced: event("onReplaced"), onActivated: event("onActivated") },
       windows: { onFocusChanged: event("onFocusChanged") },
       scripting: { executeScript: async (script: { args?: { op: string }[]; target: { tabId: number } }) => {
         const operation = script.args?.[0]?.op;
@@ -36,6 +37,7 @@ function workerHarness() {
     send: (message: Record<string, unknown>) => results.push(message),
   });
   vm.runInContext(source("sw/page.js"), context);
+  vm.runInContext(source("sw/keepalive.js"), context);
   vm.runInContext(`globalThis.runCommand = async (message) => {
     await setWatched(message.tabId, true);
     await runPageOp(message.tabId, {op:"watch"});

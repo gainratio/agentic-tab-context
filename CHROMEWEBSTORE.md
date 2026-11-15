@@ -21,6 +21,7 @@ Lets your coding assistant (Claude Code, Codex, Antigravity) work in the browser
 
 What it does
 - Share one or more open tabs from the toolbar popup or the Shared Tabs side panel
+- Optional per-tab Keep alive toggle prevents Chrome background tab discarding and idle session timeouts on shared tabs without reloading forms
 - Lets your assistant read the page, click buttons, fill in forms, and choose options in shared tabs
 - Prompts before sharing sensitive sites (such as banking, email, or cloud consoles) and lets you stop sharing at any time without closing the tab
 - Takes viewport screenshots (with password fields masked) and reports console errors and failed requests from shared tabs
@@ -58,7 +59,7 @@ English
 | `scripting` | permissions | Reads the visible content of explicitly shared tabs and performs the clicks and form entries the user's assistant requests in those tabs. |
 | `nativeMessaging` | permissions | The only channel to the local `atc` program on the same computer. No network connection is used by the extension. |
 | `storage` | permissions | Keeps a random per-profile identifier locally and shared-tab identifiers for the current browser session. Shared tabs do not persist across browser restarts. |
-| `alarms` | permissions | Retries the connection to the local `atc` program every 30 seconds if it isn't installed or running yet. |
+| `alarms` | permissions | Retries the connection to the local `atc` program every 30 seconds if it isn't running yet, and drives the optional 2-minute session keep-alive pulse on tabs where the user enables Keep alive. |
 | `sidePanel` | permissions | Hosts the Shared Tabs side panel where the user searches, shares, switches, and unshares tabs. |
 | `<all_urls>` | host_permissions | Developers work on local servers (`localhost`), staging, and production sites on any domain; the extension only inspects or acts on tabs the user explicitly shares. |
 

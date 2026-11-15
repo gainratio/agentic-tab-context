@@ -163,5 +163,52 @@ describe("side panel through the real daemon", () => {
 
     const bound = await atc("bind", "--tab", SAFE_TAB);
     expect(bound.json).toMatchObject({ ok: true, tabId: SAFE_TAB, source: "extension", reused: true });
+    const context = String(bound.json.context);
+
+    host.send({ type: "keepalive", id: 701, context, enabled: true });
+    expect(await host.answer({ url: "https://example.com/", title: "Example" })).toMatchObject({
+      type: "command",
+      tabId: 8,
+      action: "location",
+    });
+    expect(await host.answer({ ok: true, keepAlive: true })).toMatchObject({
+      type: "command",
+      tabId: 8,
+      action: "keepalive",
+      payload: { enabled: true },
+    });
+    expect(await host.next()).toEqual({ type: "keepalive", id: 701, ok: true, context, keepAlive: true });
+    const [statusRes, statusCmd] = await Promise.all([
+      atc("keepalive", "status", "-c", context),
+      host.answer({ url: "https://example.com/", title: "Example" }),
+    ]);
+    expect(statusCmd).toMatchObject({ type: "command", tabId: 8, action: "location" });
+    expect(statusRes.json).toEqual({
+      ok: true,
+      context,
+      keepAlive: true,
+      sessionExpired: false,
+    });
+
+    host.send({
+      type: "tabs",
+      tabs: [
+        { id: 7, url: "https://mail.google.com/mail/u/0/", title: "Inbox", active: true },
+        { id: 8, url: "https://sso.okta.com/login", title: "Sign in", active: false },
+      ],
+    });
+    await eventually(
+      () => atc("bindings"),
+      (res) => ((res.json.bindings as Json[] | undefined) ?? [])[0]?.sessionExpired === true,
+    );
+    const [blocked] = await Promise.all([
+      atc("click", "--role", "button", "--name", "Save", "-c", context),
+      host.answer({ url: "https://sso.okta.com/login", title: "Sign in" }),
+    ]);
+    expect(blocked.json).toMatchObject({ ok: false, error: "SESSION_EXPIRED" });
+
+    host.send({ type: "unshare", id: 702, context });
+    expect(await host.answer({ ok: true })).toMatchObject({ type: "command", tabId: 8, action: "unwatch" });
+    expect(await host.next()).toEqual({ type: "unshared", id: 702, ok: true, context });
   });
 });

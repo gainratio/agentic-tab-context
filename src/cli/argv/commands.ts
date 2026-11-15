@@ -4,7 +4,7 @@
 import { resolve } from "node:path";
 import { PROFILE_PATTERN } from "../../contracts/patterns.js";
 import type { Request } from "../../contracts/protocol.js";
-import type { BindOptions, BindingFilter, BrowserName } from "../../contracts/types.js";
+import { KEEPALIVE_MODES, type BindOptions, type BindingFilter, type BrowserName, type KeepAliveMode } from "../../contracts/types.js";
 import { definedOnly } from "../../daemon/params.js";
 import { type CommandSpec, type FlagName, type Parsed, TARGET_FLAGS, invalid } from "./grammar.js";
 import { checkBrowser, checkContextId, contextFlag, intFlag, nonEmpty, parseTarget, positional, requiredPositional, requiredValue } from "./values.js";
@@ -44,7 +44,17 @@ function buildTabs(parsed: Parsed): Request {
 }
 
 function buildBind(parsed: Parsed): Request {
-  return { method: "bind", params: tabFilter(parsed) };
+  const base = tabFilter(parsed);
+  return { method: "bind", params: parsed.booleans.has("keep-alive") ? { ...base, keepAlive: true } : base };
+}
+
+function buildKeepAlive(parsed: Parsed): Request {
+  const raw = positional(parsed, 0);
+  if (raw !== undefined && !(KEEPALIVE_MODES as readonly string[]).includes(raw)) {
+    invalid(`keepalive: mode must be one of ${KEEPALIVE_MODES.join(", ")}, got "${raw}"`);
+  }
+  const mode = raw as KeepAliveMode | undefined;
+  return { method: "keepalive", params: { ...contextFlag(parsed), ...(mode === undefined ? {} : { mode }) } };
 }
 
 function buildBindings(parsed: Parsed): Request {
@@ -121,9 +131,10 @@ export const COMMANDS: Readonly<Record<string, CommandSpec>> = {
   tabs: { positionals: ["query?"], flags: ["browser", "query", "active"], build: buildTabs },
   bind: {
     positionals: ["query?"],
-    flags: ["query", "url", "title", "browser", "tab", "active", "use"],
+    flags: ["query", "url", "title", "browser", "tab", "active", "use", "keep-alive"],
     build: buildBind,
   },
+  keepalive: { positionals: ["mode?"], flags: PAGE, build: buildKeepAlive },
   bindings: { positionals: [], flags: ["browser", "query"], build: buildBindings },
   list: { positionals: [], flags: [], build: () => ({ method: "list", params: {} }) },
   use: {

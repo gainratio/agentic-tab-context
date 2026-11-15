@@ -9,6 +9,7 @@ This is the message contract for the real side panel. It is additive to the exis
 | { type: "share"; id: number; tabId: number }
 | { type: "unshare"; id: number; context: string }
 | { type: "activate"; id: number; context: string }
+| { type: "keepalive"; id: number; context: string; enabled: boolean }
 ```
 
 `id` is a positive integer chosen by the extension; each request gets exactly one response.
@@ -20,6 +21,7 @@ This is the message contract for the real side panel. It is additive to the exis
 | { type: "shared"; id: number; ok: boolean; context?: string; message?: string }
 | { type: "unshared"; id: number; ok: boolean; context?: string; message?: string }
 | { type: "activated"; id: number; ok: boolean; context?: string; message?: string }
+| { type: "keepalive"; id: number; ok: boolean; context?: string; keepAlive?: boolean; message?: string }
 ```
 
 ## Semantics
@@ -28,6 +30,7 @@ This is the message contract for the real side panel. It is additive to the exis
 - **share**: user-initiated bind of a tab. Creates/reuses a context but does **not** change the active context. Sensitive URLs are allowed only through this user-initiated path.
 - **unshare**: closes the context connection; the browser tab remains open.
 - **activate**: makes an existing context current. It does not bind or navigate.
+- **keepalive**: enables or disables non-destructive session keep-alive (`autoDiscardable: false` + 2-minute MV3 alarm pulse) on an open context; cleared automatically on `unshare` or tab close.
 - A tab that closes in the browser closes its context through the existing `tabs` reconciliation and disappears from the next `bindings` response.
 - `share`/`activate` operate on the extension's own tab ids/contexts; reject unknown ids.
 

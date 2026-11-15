@@ -32,6 +32,7 @@ const LOAD = { waitUntil: "load", timeout: NAVIGATION_TIMEOUT_MS } as const;
 
 export class PlaywrightDriver implements BrowserDriver {
   private readonly sessions = new Map<string, SessionState>();
+  private readonly keepAliveTimers = new Map<string, ReturnType<typeof setInterval>>();
   private readonly tabs: ManagedTabs;
 
   constructor(
@@ -53,13 +54,14 @@ export class PlaywrightDriver implements BrowserDriver {
   }
 
   async close(session: BrowserSession): Promise<void> {
+    this.clearKeepAliveTimer(session.sessionId);
     await this.tabs.close(session.sessionId);
   }
 
   onDisconnect(session: BrowserSession, callback: () => void): void {
     const state = this.sessions.get(session.sessionId);
     if (state === undefined || state.disconnected) queueMicrotask(callback);
-    else state.disconnectCallbacks.push(callback);
+    else state.disconnectCallbacks.push(() => { this.clearKeepAliveTimer(session.sessionId); callback(); });
   }
 
   async navigate(session: BrowserSession, url: string): Promise<void> {
@@ -150,6 +152,22 @@ export class PlaywrightDriver implements BrowserDriver {
 
   bindTab(tabId: string): Promise<BrowserSession> {
     return Promise.resolve().then(() => this.tabs.bind(tabId));
+  }
+
+  async setKeepAlive(session: BrowserSession, enabled: boolean): Promise<void> {
+    const state = this.live(session);
+    this.clearKeepAliveTimer(session.sessionId);
+    if (!enabled) return;
+    await state.page.evaluate<string>(pageExpression({ op: "keepalive" })).catch(() => undefined);
+    const timer = setInterval(() => void state.page.evaluate<string>(pageExpression({ op: "keepalive" })).catch(() => undefined), 120_000);
+    timer.unref();
+    this.keepAliveTimers.set(session.sessionId, timer);
+  }
+
+  private clearKeepAliveTimer(sessionId: string): void {
+    const timer = this.keepAliveTimers.get(sessionId);
+    if (timer !== undefined) clearInterval(timer);
+    this.keepAliveTimers.delete(sessionId);
   }
 
   /** Throws CONTEXT_CLOSED synchronously-in-a-promise for closed or unknown sessions. */

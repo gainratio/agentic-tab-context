@@ -26,6 +26,7 @@ export interface FakeSessionState {
   history: string[];
   index: number;
   closed: boolean;
+  keepAlive: boolean;
   console: ConsoleEntry[];
   network: NetworkEntry[];
   onDisconnect?: () => void;
@@ -82,8 +83,22 @@ export class FakeDriver implements BrowserDriver {
     const sessionId = `fake-${this.name}-${this.counter}`;
     this.record("open", sessionId, [options]);
     this.maybeFail("open");
-    this.sessions.set(sessionId, { options, history: ["about:blank"], index: 0, closed: false, console: [], network: [] });
+    this.sessions.set(sessionId, {
+      options,
+      history: ["about:blank"],
+      index: 0,
+      closed: false,
+      keepAlive: false,
+      console: [],
+      network: [],
+    });
     return { sessionId };
+  }
+
+  setKeepAlive(session: BrowserSession, enabled: boolean): Promise<void> {
+    return this.page("setKeepAlive", session, [enabled], (s) => {
+      s.keepAlive = enabled;
+    });
   }
 
   async close(session: BrowserSession): Promise<void> {

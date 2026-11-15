@@ -72,6 +72,7 @@ export function parseBindOptions(params: Params): BindOptions {
     browser: optionalBrowser(params),
     active: optionalBoolean(params, "active"),
     use: optionalBoolean(params, "use"),
+    keepAlive: optionalBoolean(params, "keepAlive"),
   });
 }
 

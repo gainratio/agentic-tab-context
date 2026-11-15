@@ -4,6 +4,7 @@
  */
 import type { OkResponse } from "../contracts/protocol.js";
 import type { BindingFilter, BindingView, TabContext } from "../contracts/types.js";
+import type { KeepAliveTracker } from "./keepalive.js";
 import { type Params, definedOnly, optionalBrowser, optionalString } from "./params.js";
 import { redactText, redactUrl } from "./redaction.js";
 import type { ContextRegistry } from "./registry.js";
@@ -14,26 +15,26 @@ export interface BindingList {
 }
 
 /** Handler for `atc bindings`: validate the filters, then list the registry snapshot. */
-export function bindingsResponse(registry: ContextRegistry, params: Params): OkResponse {
+export function bindingsResponse(registry: ContextRegistry, params: Params, keepAlive?: KeepAliveTracker): OkResponse {
   const filter = definedOnly<BindingFilter>({
     query: optionalString(params, "query"),
     browser: optionalBrowser(params),
   });
-  return { ok: true, ...listBindings(registry, filter) };
+  return { ok: true, ...listBindings(registry, filter, keepAlive) };
 }
 
 /** Open contexts in registry (createdAt, id) order, optionally filtered, with no guessed fields. */
-export function listBindings(registry: ContextRegistry, filter: BindingFilter = {}): BindingList {
+export function listBindings(registry: ContextRegistry, filter: BindingFilter = {}, keepAlive?: KeepAliveTracker): BindingList {
   const current = registry.current;
   const bindings = registry
     .list()
     .filter((ctx) => ctx.status === "open")
     .filter((ctx) => matchesFilter(ctx, filter))
-    .map((ctx) => toBinding(ctx, current));
+    .map((ctx) => toBinding(ctx, current, keepAlive));
   return { current, bindings };
 }
 
-function toBinding(ctx: TabContext, current: string | null): BindingView {
+function toBinding(ctx: TabContext, current: string | null, keepAlive?: KeepAliveTracker): BindingView {
   return {
     context: ctx.id,
     tabId: ctx.tabId ?? null,
@@ -42,6 +43,8 @@ function toBinding(ctx: TabContext, current: string | null): BindingView {
     url: ctx.url === undefined ? null : redactUrl(ctx.url),
     title: ctx.title === undefined ? null : redactText(ctx.title),
     current: ctx.id === current,
+    ...(keepAlive?.isEnabled(ctx.id) === true ? { keepAlive: true } : {}),
+    ...(keepAlive?.isExpired(ctx.id) === true ? { sessionExpired: true } : {}),
   };
 }
 
