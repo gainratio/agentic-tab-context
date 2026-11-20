@@ -1,9 +1,9 @@
 # Chrome Web Store listing: Agentic Tab Context
 
-> Last updated: 2026-11-10
+> Last updated: 2026-11-20
 
 > [!IMPORTANT]
-> **Submission archive**: `store/agentic-tab-context-0.5.0.zip` (rebuilt deterministically via `npm run pack:store` with the unpacked-dev `key` stripped).
+> **Submission archive**: `store/agentic-tab-context-0.5.1.zip` (rebuilt deterministically via `npm run pack:store` with the unpacked-dev `key` stripped).
 > The 1280×800 screenshot is in `store/screenshot-1.png`. After store approval, set
 > `ATC_EXTENSION_IDS=<store id>` and run `atc setup`, so the native host also allows the
 > store build. The store assigns its own id.
@@ -47,7 +47,7 @@ English
 
 | Asset | Dimensions | Status | File |
 |---|---|---|---|
-| Package ZIP | Manifest V3 (`0.5.0`, no `key`) | ✅ Ready | `store/agentic-tab-context-0.5.0.zip` |
+| Package ZIP | Manifest V3 (`0.5.1`, no `key`) | ✅ Ready | `store/agentic-tab-context-0.5.1.zip` |
 | Store icon | 128×128 PNG | ✅ Ready | `extension/icons/icon-128.png` |
 | Screenshot 1 | 1280×800 | ✅ Ready | `store/screenshot-1.png` |
 
@@ -59,7 +59,7 @@ English
 | `scripting` | permissions | Reads the visible content of explicitly shared tabs and performs the clicks and form entries the user's assistant requests in those tabs. |
 | `nativeMessaging` | permissions | The only channel to the local `atc` program on the same computer. No network connection is used by the extension. |
 | `storage` | permissions | Keeps a random per-profile identifier locally and shared-tab identifiers for the current browser session. Shared tabs do not persist across browser restarts. |
-| `alarms` | permissions | Retries the connection to the local `atc` program every 30 seconds if it isn't running yet, and drives the optional 2-minute session keep-alive pulse on tabs where the user enables Keep alive. |
+| `alarms` | permissions | Retries the connection to the local `atc` program every 30 seconds if it isn't running yet, and drives the optional 1-minute session keep-alive pulse on tabs where the user enables Keep alive. |
 | `sidePanel` | permissions | Hosts the Shared Tabs side panel where the user searches, shares, switches, and unshares tabs. |
 | `<all_urls>` | host_permissions | Developers work on local servers (`localhost`), staging, and production sites on any domain; the extension only inspects or acts on tabs the user explicitly shares. |
 
@@ -84,7 +84,8 @@ https://github.com/gainratio/agentic-tab-context/blob/main/PRIVACY.md
 
 | Version | Date | Changes | Status |
 |---|---|---|---|
-| 0.5.0 | 2026-11-10 | Multi-tab side panel, explicit tab-sharing consent, sensitive-tab gate, password-masked screenshots, protocol handshake, URL/log redaction | **Ready to submit** |
+| 0.5.1 | 2026-11-20 | Native-host daemon auto-start, direct popup "Keep this tab signed in" switch with 1-minute keep-alive pulse and GET fallback, and coding-assistant CLI ergonomics (`--version`, `status`, sole-tab auto-targeting) | **Ready to submit** |
+| 0.5.0 | 2026-11-10 | Multi-tab side panel, explicit tab-sharing consent, sensitive-tab gate, password-masked screenshots, protocol handshake, URL/log redaction | Superseded |
 | 0.4.1 | 2026-10-26 | Removes `eval` from the extension so the store build contains no remote-code execution; `press`, `upload`, and `--within` remain | Superseded |
 | 0.4.0 | 2026-10-25 | `press`, `upload`, `eval`, and `--within` scoped locators; normalized accessible-name fallback; page agent v3 | Superseded |
 | 0.3.0 | 2026-10-22 | Native messaging replaces the localhost port; isolated-world page access; screenshots restore the user's tab | Draft |
