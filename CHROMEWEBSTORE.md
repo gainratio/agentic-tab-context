@@ -4,9 +4,10 @@
 
 > [!IMPORTANT]
 > **Submission archive**: `store/agentic-tab-context-0.5.1.zip` (rebuilt deterministically via `npm run pack:store` with the unpacked-dev `key` stripped).
-> The 1280×800 screenshot is in `store/screenshot-1.png`. After store approval, set
-> `ATC_EXTENSION_IDS=<store id>` and run `atc setup`, so the native host also allows the
-> store build. The store assigns its own id.
+> The 1280×800 screenshot is in `store/screenshot-1.png`. The published Chrome Web Store ID
+> (`bdjnjipgnacnpgomkcbabgabejmjkllb`) is included in `atc setup`'s default native-host allowlist
+> alongside the unpacked development build (`aecjddiglfcfcghkkoccljblamebifgd`). Use
+> `ATC_EXTENSION_IDS=<id>` only if you also run a custom or forked extension ID.
 
 ## Store listing
 

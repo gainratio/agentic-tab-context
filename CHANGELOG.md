@@ -5,6 +5,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added
+- Included the published Chrome Web Store extension ID (`bdjnjipgnacnpgomkcbabgabejmjkllb`) in `atc setup` and `atc doctor`'s default native-host allowlist so Chrome Web Store installs connect automatically without setting `ATC_EXTENSION_IDS`.
+
 ## [0.5.1] - 2026-11-20
 
 ### Added

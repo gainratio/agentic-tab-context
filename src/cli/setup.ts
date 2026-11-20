@@ -8,7 +8,15 @@ import { dirname, join } from "node:path";
 import { resolvePaths } from "../contracts/paths.js";
 import type { OkResponse } from "../contracts/protocol.js";
 import { PACKAGE_ROOT } from "../drivers/page-agent.js";
-import { EXTENSION_DIR, extensionIdFromKey, extensionManifest, installNativeHost, parseExtensionIds } from "../native/install.js";
+import {
+  allowedExtensionIds,
+  CHROME_WEB_STORE_EXTENSION_ID,
+  EXTENSION_DIR,
+  extensionIdFromKey,
+  extensionManifest,
+  installNativeHost,
+  parseExtensionIds,
+} from "../native/install.js";
 
 const SKILL_NAME = "agentic-tab-context";
 const SKILL_SOURCE = join(PACKAGE_ROOT, "skills", SKILL_NAME, "SKILL.md");
@@ -36,11 +44,12 @@ export function runSetup(env: NodeJS.ProcessEnv = process.env, platform: NodeJS.
   const extraExtensionIds = parseExtensionIds(env.ATC_EXTENSION_IDS);
   const nativeHostManifests = installNativeHost({ paths: resolvePaths(env), home, platform, extraExtensionIds });
   const id = extensionIdFromKey(extensionManifest().key);
+  const allowedIds = allowedExtensionIds(extraExtensionIds);
   return {
     ok: true,
     installedSkills: installSkills(home),
     nativeHostManifests,
-    extension: { folder: EXTENSION_DIR, id, allowedIds: [id, ...extraExtensionIds] },
-    next: "Load the extension folder via chrome://extensions > Developer mode > Load unpacked; the extension auto-starts the atc daemon automatically.",
+    extension: { folder: EXTENSION_DIR, id, storeId: CHROME_WEB_STORE_EXTENSION_ID, allowedIds },
+    next: "Install Agentic Tab Context from the Chrome Web Store or load the extension folder via chrome://extensions > Developer mode > Load unpacked; the extension auto-starts the atc daemon automatically.",
   };
 }
