@@ -71,7 +71,7 @@ Every page command accepts `--context C` (`-c C`). Short flags: `-q` query, `-b`
 | `ATC_HOME` | State folder (default `~/.atc`). Separate folders run separate services. |
 | `ATC_HEADLESS` | `1` makes `atc open` headless by default. |
 | `ATC_CHROMIUM_PATH` | Chromium executable for `atc open chromium`. |
-| `ATC_EXTENSION_IDS` | Extra extension ids (comma-separated) that `atc setup` allows, e.g. a Chrome Web Store build. |
+| `ATC_EXTENSION_IDS` | Extra extension ids (comma-separated) that `atc setup` allows in addition to the unpacked build (`aecjddiglfcfcghkkoccljblamebifgd`) and published Chrome Web Store build (`bdjnjipgnacnpgomkcbabgabejmjkllb`). |
 
 ## Files under `ATC_HOME`
 
@@ -101,7 +101,7 @@ flowchart LR
 ```
 
 - `extension/page-agent.js` and its watch helper provide the shared in-page logic. In the extension, inspect and actions run in an isolated world. Console and network capture run in the page's own world so they can see its calls. Unwatch restores capture hooks and clears the page buffers; pending captures from an earlier watch cannot populate a later watch.
-- The extension has a fixed key, so its id is stable. `atc setup` writes a native host manifest that allows only that id (plus `ATC_EXTENSION_IDS`), for each installed Chrome, Chromium, Brave, Edge and Firefox profile.
+- The unpacked extension has a fixed key (`aecjddiglfcfcghkkoccljblamebifgd`) and the Chrome Web Store release has a fixed store id (`bdjnjipgnacnpgomkcbabgabejmjkllb`). `atc setup` writes a native host manifest that allows those official ids (plus any validated `ATC_EXTENSION_IDS`), for each installed Chrome, Chromium, Brave, Edge and Firefox profile.
 - Requests that target the same context run one at a time; different contexts run in parallel. Concurrent binds to one stable tab identity reuse one context. Screenshot captures serialize per browser window and reject interfering focus changes.
 
 ## Security model

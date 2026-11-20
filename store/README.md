@@ -7,5 +7,5 @@
 - Listing copy and permission justifications: [`../CHROMEWEBSTORE.md`](../CHROMEWEBSTORE.md).
 - Step-by-step upload checklist: [`SUBMISSION.md`](./SUBMISSION.md).
 
-After Chrome Web Store approval, set `ATC_EXTENSION_IDS=<store id>` and run `atc setup`,
-so the native host also allows the store build.
+The published Chrome Web Store ID (`bdjnjipgnacnpgomkcbabgabejmjkllb`) is allowed by default
+when running `atc setup`; set `ATC_EXTENSION_IDS=<id>` only for additional custom/forked builds.

@@ -11,13 +11,9 @@
 8. *(Optional — Firefox Add-ons)* Upload the same `agentic-tab-context-0.5.1.zip` on
    [addons.mozilla.org](https://addons.mozilla.org/developers/) (`browser_specific_settings.gecko`
    is already declared in `manifest.json` as `agentic-tab-context@gainratio`, Firefox ≥ 128).
-9. After Chrome Web Store approval, run:
-
-   ```sh
-   ATC_EXTENSION_IDS=<store id> atc setup
-   ```
-
-   so the native host allowlist includes the published store extension id alongside local unpacked builds.
+9. The published Chrome Web Store ID (`bdjnjipgnacnpgomkcbabgabejmjkllb`) is included in
+   `atc setup`'s default native-host allowlist alongside local unpacked builds. Use
+   `ATC_EXTENSION_IDS=<custom id> atc setup` only if you also need to authorize a separate fork or unlisted build.
 
 `npm run pack:store` builds `store/agentic-tab-context-0.5.1.zip` deterministically from `extension/`
 with the local unpacked `key` removed (Chrome Web Store rejects initial uploads containing `key`),

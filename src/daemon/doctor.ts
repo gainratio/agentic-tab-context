@@ -5,7 +5,7 @@ import type { OkResponse, Paths } from "../contracts/protocol.js";
 import type { LiveTab } from "../contracts/types.js";
 import type { ExtensionBridge } from "../drivers/extension/bridge.js";
 import { detectInstalledBrowsers } from "../drivers/playwright/executables.js";
-import { EXTENSION_DIR, extensionIdFromKey, extensionManifest, parseExtensionIds } from "../native/install.js";
+import { allowedExtensionIds, EXTENSION_DIR, parseExtensionIds } from "../native/install.js";
 import { DAEMON_PROTOCOL_VERSION } from "../contracts/version.js";
 
 export interface DoctorInput {
@@ -35,7 +35,7 @@ function nextSteps(input: DoctorInput, extensions: readonly { protocol?: number 
 
 export function doctorReport(input: DoctorInput): OkResponse {
   const extensions = input.bridge?.connected() ?? [];
-  const allowedIds = [extensionIdFromKey(extensionManifest().key), ...parseExtensionIds(input.env.ATC_EXTENSION_IDS)];
+  const allowedIds = allowedExtensionIds(parseExtensionIds(input.env.ATC_EXTENSION_IDS));
   const count = (source: LiveTab["source"]): number => input.tabs.filter((tab) => tab.source === source).length;
   return {
     ok: true,

@@ -180,6 +180,7 @@ describe("native host registration", () => {
     expect(chrome).toMatchObject({ name: "com.gainratio.atc", type: "stdio", path: paths.nativeHost });
     expect(chrome.allowed_origins).toEqual([
       "chrome-extension://aecjddiglfcfcghkkoccljblamebifgd/",
+      "chrome-extension://bdjnjipgnacnpgomkcbabgabejmjkllb/",
       `chrome-extension://${storeId}/`,
     ]);
     const firefox = JSON.parse(readFileSync(join(support, "Mozilla", "NativeMessagingHosts", "com.gainratio.atc.json"), "utf8"));
@@ -225,8 +226,20 @@ describe("native host registration", () => {
     });
     expect((report.extension as { allowedIds: string[] }).allowedIds).toEqual([
       extensionIdFromKey(extensionManifest().key),
+      "bdjnjipgnacnpgomkcbabgabejmjkllb",
       validChrome,
       validFirefox,
+    ]);
+    const dedup = doctorReport({
+      paths,
+      env: { ATC_EXTENSION_IDS: "bdjnjipgnacnpgomkcbabgabejmjkllb" },
+      tabs: [],
+      openContexts: 0,
+      current: null,
+    });
+    expect((dedup.extension as { allowedIds: string[] }).allowedIds).toEqual([
+      extensionIdFromKey(extensionManifest().key),
+      "bdjnjipgnacnpgomkcbabgabejmjkllb",
     ]);
   });
 });

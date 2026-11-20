@@ -11,6 +11,7 @@ import type { Paths } from "../contracts/protocol.js";
 import { PACKAGE_ROOT } from "../drivers/page-agent.js";
 
 export const EXTENSION_DIR = join(PACKAGE_ROOT, "extension");
+export const CHROME_WEB_STORE_EXTENSION_ID = "bdjnjipgnacnpgomkcbabgabejmjkllb";
 const HOST_ENTRY = join(PACKAGE_ROOT, "dist", "native", "main.js");
 const ID_ALPHABET_OFFSET = "a".charCodeAt(0);
 const CHROME_EXT_ID_PATTERN = /^[a-p]{32}$/;
@@ -124,13 +125,17 @@ export interface HostInstallOptions {
   extraExtensionIds: readonly string[];
 }
 
+export function allowedExtensionIds(extraExtensionIds: readonly string[] = []): string[] {
+  const extra = validateExtensionIds(extraExtensionIds);
+  return [...new Set([extensionIdFromKey(extensionManifest().key), CHROME_WEB_STORE_EXTENSION_ID, ...extra])];
+}
+
 /** Write the launcher and register it with every browser whose profile folder exists. Returns the manifests written. */
 export function installNativeHost(options: HostInstallOptions): string[] {
   const browsers = browserHostDirs(options.home, options.platform).filter((d) => existsSync(d.profileRoot));
-  const extraIds = validateExtensionIds(options.extraExtensionIds);
+  const ids = allowedExtensionIds(options.extraExtensionIds);
   writeLauncher(options.paths);
-  const { key, geckoId } = extensionManifest();
-  const ids = [extensionIdFromKey(key), ...extraIds];
+  const { geckoId } = extensionManifest();
   const installed: string[] = [];
   for (const dir of browsers) {
     const target = join(dir.hostDir, `${NATIVE_HOST_NAME}.json`);
