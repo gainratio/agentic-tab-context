@@ -11,9 +11,10 @@ import { browserName, instanceId } from "./identity.js";
 import { normalizeDaemonReply, responseTypeFor } from "./requests.js";
 
 const HOST_NAME = "com.gainratio.atc";
-const NATIVE_REPLY_TYPES = new Set(["bindings", "shared", "unshared", "activated", "keepalive"]);
+const NATIVE_REPLY_TYPES = new Set(["bindings", "pinned", "shared", "unshared", "activated", "keepalive"]);
 const REQUEST_TIMEOUT_MS = Object.freeze({
   bindings: 10_000,
+  pin: 35_000,
   share: 35_000,
   unshare: 15_000,
   activate: 15_000,
@@ -60,6 +61,12 @@ export function send(message) {
 /** Read-only workspace snapshot for the side panel. */
 export function requestBindings() {
   return requestDaemon("bindings");
+}
+
+/** User-initiated popup bind: shares the tab and makes it the active context. */
+export function pinTab(tabId) {
+  if (!Number.isSafeInteger(tabId) || tabId <= 0) return Promise.resolve({ ok: false, message: "Invalid tab id." });
+  return requestDaemon("pin", { tabId });
 }
 
 /** User-initiated share of a raw browser tab id (sensitive URLs are allowed only through this path). */
