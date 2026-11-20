@@ -2,52 +2,32 @@
 
 **Let your coding assistant use the browser tab you already have open.**
 
-Keep your website open and ask Claude Code, Codex or Antigravity for help. Agentic Tab Context connects your assistant to that page, with your existing logins. You write requests in your usual assistant chat.
-
-First time here? Complete the [one-time installation](#one-time-installation), including the steps for your assistant.
+Keep your website open and ask Claude Code, Codex, Cursor, or Antigravity for help. Agentic Tab Context connects your assistant directly to that tab — with your existing logins, explicit per-tab share consent, password masking, and zero open network ports.
 
 ![Live walkthrough: sharing an authenticated browser tab from the side panel, inspecting the DOM with password masking, and clicking in-place via atc](docs/assets/live-demo.gif)
 
-**[Watch the 1080p walkthrough](https://open-source.gainratio.com/agentic-tab-context/)** · **[30-second Safe Local Agents overview](https://open-source.gainratio.com/safe-local-agents/)**
+**[Install from Chrome Web Store](https://chromewebstore.google.com/detail/agentic-tab-context/bdjnjipgnacnpgomkcbabgabejmjkllb)** · **[Watch the 1080p walkthrough](https://open-source.gainratio.com/agentic-tab-context/)** · **[30-second Safe Local Agents overview](https://open-source.gainratio.com/safe-local-agents/)**
 
-## Shared tabs workspace
+## Why Agentic Tab Context?
 
-The extension ships a real multi-tab side panel: search all tabs, share/unshare without closing them, toggle **Keep alive** on shared tabs (preventing Chrome background tab discarding and idle session auto-logouts without reloading the page), set the active target, lock sensitive sites, and see live removal when a tab closes. The daemon, side panel, and CLI share one context registry.
-
-- [Side-panel prototype](prototype/index.html) — interaction reference
-- [UX and reliability spec](docs/ATC-UX-SPEC.md)
-- [Security and privacy review](docs/ATC-SECURITY-REVIEW.md)
-- [Security status after 0.5.0](docs/ATC-SECURITY-STATUS.md)
-- [Extension ↔ daemon contract](docs/ATC-EXTENSION-CONTRACT.md)
-- [Workspace implementation plan](docs/ATC-WORKSPACE-PLAN.md)
-
-`atc bindings` lists every open context; `atc use <ctx>` switches the active one. See the [command reference](docs/SPEC.md#commands).
-
-## Everyday use: share, then ask
-
-1. **Open your website** in the browser you normally use. Log in yourself if needed.
-2. **Share the tab** from the Agentic Tab Context side panel. Select one or more tabs and choose **Share selected**. Sensitive sites stay locked until you explicitly confirm.
-3. **Ask your assistant about the page.** It starts from `atc bindings`, the tabs you shared, and can switch the active target or unshare a tab with you.
-
-The assistant cannot bind an unshared extension tab; it gets `TAB_NOT_SHARED` and asks you to share. Managed tabs opened with `atc open` are separate and do not need this step.
-
-## Optional: point to one exact tab
-
-If you prefer to choose the page yourself, use the small popup in your browser toolbar:
-
-1. On the page you want help with, open Chrome's **Extensions** menu and select **Agentic Tab Context**. If its icon is pinned, click that directly.
-2. Check the page shown under **This tab**, then press **Let my assistant use this tab**.
-3. Wait for **“Bound. Your assistant can now use this tab.”** Return to your assistant chat and say, “Look at the tab I selected.”
-
-<img src="docs/images/extension-popup.png" width="320" alt="Actual Agentic Tab Context popup showing Connected to atc, the Example app settings tab, the Let my assistant use this tab button, and successful connection feedback.">
-
-*The actual Chrome popup, shown with a local demonstration page. This popup selects a page; your conversation stays in your coding assistant.*
+| Capability | Agentic Tab Context (`atc`) | Playwright MCP | Chrome DevTools MCP |
+|---|---|---|---|
+| Uses your **already logged-in tab** (SSO, cookies, local state) | **Yes** — native extension bridge | No — spawns a separate browser | Requires launching Chrome with remote debugging |
+| **Explicit per-tab consent** (sensitive sites locked by default) | **Yes** — `TAB_NOT_SHARED` until you share | No per-tab consent gate | Full profile / target access |
+| **Password masking** in DOM inspection & screenshots | **Yes** — redacted before leaving browser | No | No |
+| **Tab keep-alive** (prevents background discard & idle logout) | **Yes** — one-click popup & side-panel switch | No | No |
+| **Zero open TCP/localhost ports** | **Yes** — Chrome Native Messaging + `0600` Unix socket | Local MCP transport | Remote debugging port |
+| **Works across Claude Code, Codex, Cursor, Antigravity** | **Yes** — plain JSON CLI + bundled `SKILL.md` | MCP clients only | MCP clients only |
 
 ## One-time installation
 
 You need macOS or Linux, Git, [Node.js](https://nodejs.org) 22 or newer with npm, and Chrome (or another Chromium browser). Open the browser once before installing so setup can find its profile. Windows installation is unsupported and stops before writing files.
 
-**1. Install**
+**1. Install the Chrome extension**
+
+Install **[Agentic Tab Context on the Chrome Web Store](https://chromewebstore.google.com/detail/agentic-tab-context/bdjnjipgnacnpgomkcbabgabejmjkllb)** (or for local development, open `chrome://extensions` → **Developer mode** → **Load unpacked** → choose this repo's `extension/` folder).
+
+**2. Install the `atc` CLI & browser bridge**
 
 ```sh
 git clone https://github.com/gainratio/agentic-tab-context.git
@@ -55,29 +35,30 @@ cd agentic-tab-context
 ./install.sh
 ```
 
-This builds the CLI, links `atc` into npm's global executable folder, installs the assistant skill for all three assistants, and registers the browser bridge. Keep the clone in place: the CLI and browser bridge use files inside it.
+This builds the CLI, links `atc` globally, installs the `agentic-tab-context` skill for Claude Code, Codex, and Antigravity, and registers the native-messaging bridge for both the Chrome Web Store extension and local unpacked builds. Keep the clone in place while linked from source.
 
-**2. Add the browser extension**
+**3. Verify and ask**
 
-1. Open `chrome://extensions`.
-2. Turn on **Developer mode** (top right).
-3. Click **Load unpacked** and choose the `extension` folder inside this project.
-
-**3. Check the browser connection**
+You do **not** need to start `atc` in a terminal first — clicking the extension automatically starts the local daemon. You can verify the bridge anytime with:
 
 ```sh
-atc doctor
+atc status
 ```
 
-The `extension.connected` array should list your browser. If not, `nextSteps` tells you what to do. This checks the browser bridge; verify assistant discovery separately using the steps below.
-
-**4. Connect your assistant and ask**
-
-Follow the activation steps for [Claude Code](#claude-code), [Codex](#codex), or [Antigravity](#antigravity) below. The installer adds the skill files; your assistant also needs to discover them and be able to run `atc`. Once connected, ask:
+Then open any page, share it from the extension popup or side panel, and ask your assistant:
 
 > "Look at my browser. The checkout page shows an error after I click Pay. What's wrong?"
 
-The assistant starts from the tabs you shared. The [toolbar popup](#optional-point-to-one-exact-tab) is an optional way to share one particular tab; open it from the toolbar rather than opening `popup.html` as a file.
+## Everyday use: share, keep alive, ask
+
+1. **Open your website** in Chrome and log in as usual.
+2. **Share the tab** from the **Shared Tabs side panel** or the **toolbar popup** (`Let my assistant use this tab`). Sensitive sites (banking, email, cloud consoles) require explicit confirmation; unshare anytime without closing the tab.
+3. **Optional: Keep signed in** — flip **"Keep this tab signed in"** in the toolbar popup (or **Keep alive** in the side panel) to prevent Chrome tab discarding and idle session timeouts without reloading forms.
+4. **Ask your assistant about the page.** When a single tab is shared, `atc inspect` / `atc click` / `atc screenshot` target it automatically; when multiple tabs are shared, `atc bindings` lists them and `atc use <ctx>` switches targets.
+
+<img src="docs/images/extension-popup.png" width="320" alt="Actual Agentic Tab Context popup showing Connected to atc, the Example app settings tab, the Let my assistant use this tab button, and successful connection feedback.">
+
+*The actual Chrome popup, shown with a local demonstration page. This popup selects a page; your conversation stays in your coding assistant.*
 
 ## Connect your assistant
 
@@ -193,8 +174,9 @@ You rarely need these yourself; your assistant runs them. Every command prints o
 | `atc screenshot` | Save a picture of the tab |
 | `atc console` / `atc network` | Show console messages / network requests |
 | `atc goto <url>` / `back` / `reload` | Move around |
-| `atc doctor` | Check that everything is connected |
-| `atc setup` | Reinstall the assistant skill and browser connection |
+| `atc status` / `atc doctor` | Check daemon, connected browsers, and allowed extension IDs |
+| `atc --version` | Print CLI version and protocol level (no daemon required) |
+| `atc setup` | Reinstall the assistant skill and browser native-host manifests |
 
 Element actions require one exact match. Tab binding prefers a unique exact URL/title match, then a unique active tab; otherwise it lists the choices. Use `--tab <id>` when you need one specific tab.
 
@@ -225,7 +207,17 @@ flowchart LR
   C -.->|"Mac only, without the extension"| F["Safari / Chrome via macOS automation"]
 ```
 
-The first `atc` command starts a small local daemon (`~/.atc/daemon.sock`, authenticated with a per-install token in `~/.atc/ipc.token`). It remembers which tabs you shared in `~/.atc/state.json` so separate CLI invocations keep working on the same tab context. The Manifest V3 browser extension connects to the daemon via Chrome Native Messaging (`com.gainratio.atc`) and executes DOM inspection, actions, and redacted viewport screenshots inside shared tabs.
+The first `atc` command — or clicking the browser extension — starts a small local daemon (`~/.atc/daemon.sock`, authenticated with a per-install token in `~/.atc/auth-token`). It remembers which tabs you shared in `~/.atc/state.json` so separate CLI invocations keep working on the same tab context. The Manifest V3 browser extension connects to the daemon via Chrome Native Messaging (`com.gainratio.atc`) and executes DOM inspection, actions, keep-alive pulses, and redacted viewport screenshots inside shared tabs.
+
+### Design & security specs
+
+- [Command & protocol reference](docs/SPEC.md)
+- [UX and reliability spec](docs/ATC-UX-SPEC.md)
+- [Security and privacy review](docs/ATC-SECURITY-REVIEW.md)
+- [Security status after 0.5.0](docs/ATC-SECURITY-STATUS.md)
+- [Extension ↔ daemon contract](docs/ATC-EXTENSION-CONTRACT.md)
+- [Workspace implementation plan](docs/ATC-WORKSPACE-PLAN.md)
+- [Side-panel prototype](prototype/index.html)
 
 ### Source layout
 
@@ -269,7 +261,7 @@ Reload the extension in your browser and reload previously bound pages after upd
 
 To remove it, run `atc shutdown` and `npm unlink --global agentic-tab-context`, then remove the browser extension. Remove the `nativeHostManifests` and `installedSkills` files listed in your original setup output. The native manifests are named `com.gainratio.atc.json` in the browser's native-host folder. Keep `~/.atc` (or your `ATC_HOME`) if you want to retain managed-browser logins and saved screenshots; delete it only when you intend to remove those too. The clone can then be removed.
 
-The npm package is private. Local archives include the compiled CLI and extension assets; publishing an npm package or Chrome Web Store build is a separate release action.
+The package manifest is configured for public npm publication (`npm pack` bundles the compiled CLI, extension assets, and assistant skill). Publishing a new npm or Chrome Web Store build is a separate release action.
 
 ## Contributing
 
