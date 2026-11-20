@@ -7,6 +7,7 @@
 
 const REQUEST_REPLY_TYPES = Object.freeze({
   bindings: "bindings",
+  pin: "pinned",
   share: "shared",
   unshare: "unshared",
   activate: "activated",

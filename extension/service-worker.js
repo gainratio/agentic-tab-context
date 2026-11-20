@@ -6,21 +6,18 @@
  */
 import { KEEPALIVE_ALARM, dropKeepAliveTab, isTabKeepAlive, pulseKeepAliveTabs, refreshKeepAliveTab, setTabKeepAlive } from "./sw/keepalive.js";
 import { runConnectedCommand, setCaptureConnection } from "./sw/lifecycle.js";
-import { activateContext, connect, isConnected, requestBindings, send, setContextKeepAlive, setMessageHandler, shareTab, unshareContext } from "./sw/native.js";
+import { activateContext, connect, isConnected, pinTab, requestBindings, setContextKeepAlive, setMessageHandler, shareTab, unshareContext } from "./sw/native.js";
 import { runPageOp, watchedTabs } from "./sw/page.js";
 import { parseSidepanelMessage } from "./sw/requests.js";
 import { pushTabs } from "./sw/tabs.js";
 
 /** Chrome's minimum alarm period; only used to retry if the native host is not installed yet. */
 const RETRY_ALARM = { name: "atc-reconnect", periodInMinutes: 0.5 };
-const pendingPins = new Map();
-let nextPinId = 1;
 
 setMessageHandler(async (message) => {
   if (message.type === "command") await runConnectedCommand(message);
-  else if (message.type === "pinned") pendingPins.get(message.id)?.(message);
   else if (message.type === "daemon") await onDaemon(message.connected);
-  // bindings/shared/unshared/activated replies are settled inside sw/native.js.
+  // bindings/pinned/shared/unshared/activated/keepalive replies are settled inside sw/native.js.
 });
 
 async function onDaemon(connected) {
@@ -37,15 +34,10 @@ async function start() {
   await pushTabs();
 }
 
-function pinActiveTab(tabId) {
-  return new Promise((resolve) => {
-    const id = nextPinId++;
-    pendingPins.set(id, (reply) => {
-      pendingPins.delete(id);
-      resolve(reply);
-    });
-    send({ type: "pin", id, tabId });
-  });
+async function pinActiveTab(tabId) {
+  const reply = await pinTab(tabId);
+  if (reply.ok) broadcastMembershipChanged();
+  return reply;
 }
 
 async function reinjectWatch(tabId, change) {

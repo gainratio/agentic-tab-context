@@ -166,6 +166,7 @@ describe("daemon reply validation", () => {
 
 interface NativeApi {
   connect(): Promise<void>;
+  pinTab(tabId: number): Promise<Record<string, unknown>>;
   requestBindings(): Promise<Record<string, unknown>>;
   shareTab(tabId: number): Promise<Record<string, unknown>>;
   unshareContext(context: string): Promise<Record<string, unknown>>;
@@ -194,7 +195,7 @@ function nativeHarness() {
   });
   vm.runInContext(source("sw/requests.js"), context);
   vm.runInContext(
-    `${source("sw/native.js")}\nglobalThis.api = { connect, requestBindings, shareTab, unshareContext, activateContext };`,
+    `${source("sw/native.js")}\nglobalThis.api = { connect, pinTab, requestBindings, shareTab, unshareContext, activateContext };`,
     context,
   );
   return {
@@ -274,9 +275,25 @@ describe("native pending request map", () => {
     const h = nativeHarness();
     await h.api.connect();
     h.posted.splice(0);
+    await expect(h.api.pinTab(0)).resolves.toMatchObject({ ok: false });
     await expect(h.api.shareTab(0)).resolves.toMatchObject({ ok: false });
     await expect(h.api.unshareContext("")).resolves.toMatchObject({ ok: false });
     await expect(h.api.activateContext(null as unknown as string)).resolves.toMatchObject({ ok: false });
     expect(h.posted).toEqual([]);
+  });
+
+  it("auto-connects and settles popup pinTab requests with typed replies and timeouts", async () => {
+    vi.useFakeTimers();
+    const h = nativeHarness();
+    const pending = h.api.pinTab(42);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.posted.map((msg) => msg.type)).toEqual(["hello", "pin"]);
+    expect(h.posted[1]).toEqual({ type: "pin", id: 1, tabId: 42 });
+    h.receive({ type: "pinned", id: 1, ok: true, context: "ctx_42" });
+    await expect(pending).resolves.toEqual({ type: "pinned", id: 1, ok: true, context: "ctx_42" });
+
+    const timedOut = h.api.pinTab(43);
+    await vi.advanceTimersByTimeAsync(35_000);
+    await expect(timedOut).resolves.toMatchObject({ ok: false, message: expect.stringContaining("did not respond") });
   });
 });
