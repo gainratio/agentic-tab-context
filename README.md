@@ -6,7 +6,7 @@ Keep your website open and ask Claude Code, Codex, Cursor, or Antigravity for he
 
 ![Live walkthrough: sharing an authenticated browser tab from the side panel, inspecting the DOM with password masking, and clicking in-place via atc](docs/assets/live-demo.gif)
 
-**[Install from Chrome Web Store](https://chromewebstore.google.com/detail/agentic-tab-context/bdjnjipgnacnpgomkcbabgabejmjkllb)** · **[Watch the 1080p walkthrough](https://open-source.gainratio.com/agentic-tab-context/)** · **[30-second Safe Local Agents overview](https://open-source.gainratio.com/safe-local-agents/)**
+**[Install from Chrome Web Store](https://chromewebstore.google.com/detail/agentic-tab-context/bdjnjipgnacnpgomkcbabgabejmjkllb)** · **[npm (`agentic-tab-context`)](https://www.npmjs.com/package/agentic-tab-context)** · **[Watch the 1080p walkthrough](https://open-source.gainratio.com/agentic-tab-context/)** · **[30-second Safe Local Agents overview](https://open-source.gainratio.com/safe-local-agents/)**
 
 ## Why Agentic Tab Context?
 
@@ -21,7 +21,7 @@ Keep your website open and ask Claude Code, Codex, Cursor, or Antigravity for he
 
 ## One-time installation
 
-You need macOS or Linux, Git, [Node.js](https://nodejs.org) 22 or newer with npm, and Chrome (or another Chromium browser). Open the browser once before installing so setup can find its profile. Windows installation is unsupported and stops before writing files.
+You need macOS or Linux, [Node.js](https://nodejs.org) 22 or newer with npm, and Chrome (or another Chromium browser). Open the browser once before installing so setup can find its profile. Windows installation is unsupported and stops before writing files.
 
 **1. Install the Chrome extension**
 
@@ -30,12 +30,23 @@ Install **[Agentic Tab Context on the Chrome Web Store](https://chromewebstore.g
 **2. Install the `atc` CLI & browser bridge**
 
 ```sh
+npm install -g agentic-tab-context
+atc setup
+```
+
+`atc setup` installs the `agentic-tab-context` skill for Claude Code, Codex, and Antigravity and registers the native-messaging bridge for both the Chrome Web Store extension (`bdjnjipgnacnpgomkcbabgabejmjkllb`) and local unpacked builds.
+
+<details>
+<summary>Install from source instead</summary>
+
+```sh
 git clone https://github.com/gainratio/agentic-tab-context.git
 cd agentic-tab-context
 ./install.sh
 ```
 
-This builds the CLI, links `atc` globally, installs the `agentic-tab-context` skill for Claude Code, Codex, and Antigravity, and registers the native-messaging bridge for both the Chrome Web Store extension and local unpacked builds. Keep the clone in place while linked from source.
+Keep the clone in place while linked from source.
+</details>
 
 **3. Verify and ask**
 
