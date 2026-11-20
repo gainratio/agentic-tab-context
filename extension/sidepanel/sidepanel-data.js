@@ -97,7 +97,7 @@ ATCUI.refreshBindings = async function refreshBindings() {
   try {
     reply = await chrome.runtime.sendMessage({ type: "atc:bindings" });
   } catch {
-    reply = { ok: false, message: "Could not reach atc. Start it in a terminal, then reopen this panel." };
+    reply = { ok: false, message: "Could not reach atc. Reopen this panel or run `atc doctor`." };
   }
   if (generation !== ATCUI.bindingsGeneration) return;
   ATCUI.applyBindings(ATCState.normalizeBindingsReply(reply));
@@ -118,7 +118,7 @@ ATCUI.applyBindings = function applyBindings(normalized) {
   } else {
     ATCUI.state.snapshot = { current: null, bindings: [] };
     ATCUI.state.connection = "error";
-    ATCUI.state.connectionMessage = normalized.message || "atc isn't connected. Start it in a terminal, then try again.";
+    ATCUI.state.connectionMessage = normalized.message || "atc is starting. Wait a moment or run `atc doctor`.";
   }
   ATCUI.renderAll();
 };

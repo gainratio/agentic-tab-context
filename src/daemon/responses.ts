@@ -4,6 +4,7 @@
  */
 import { AtcError, isAtcError } from "../contracts/errors.js";
 import type { ErrorResponse, Method } from "../contracts/protocol.js";
+import type { BindingView } from "../contracts/types.js";
 import { type Params, isRecord } from "./params.js";
 
 const REDACTED = "[redacted]";
@@ -20,8 +21,18 @@ export function parseRequest(raw: unknown, methods: Readonly<Record<Method, unkn
   return { method: raw.method as Method, params };
 }
 
-export function noCurrent(): AtcError {
-  return new AtcError("NO_CURRENT_CONTEXT", "no current context; run `atc bind` (or `atc use <ctx>`) or pass --context");
+export function noCurrent(bindings: readonly BindingView[] = []): AtcError {
+  if (bindings.length > 0) {
+    return new AtcError(
+      "NO_CURRENT_CONTEXT",
+      "multiple tabs are shared; run `atc use <ctx>` or pass --context <ctx>",
+      { bindings },
+    );
+  }
+  return new AtcError(
+    "NO_CURRENT_CONTEXT",
+    "no current context; share a tab in the Agentic Tab Context extension or run `atc bind` / `atc open chromium --use`",
+  );
 }
 
 export function typedValueOf(raw: unknown): string | undefined {

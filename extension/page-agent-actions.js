@@ -45,6 +45,7 @@ globalThis.__atcActions = {
     el.dispatchEvent(new Event("change", { bubbles: true }));
     return { ok: true, matched: 1 };
   },
+  keepalivePhase: 0,
   keepalive() {
     const root = document.documentElement || document.body;
     if (root) this.pulseEvents(root);
@@ -53,11 +54,16 @@ globalThis.__atcActions = {
     return { ok: true, pulsed: true, url: location.href };
   },
   pulseEvents(root) {
-    if (typeof PointerEvent === "function") root.dispatchEvent(new PointerEvent("pointermove", { bubbles: true }));
-    if (typeof MouseEvent === "function") root.dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+    const pos = this.keepalivePhase++ % 2 === 0 ? 1 : 2;
+    const init = { bubbles: true, composed: true, clientX: pos, clientY: pos };
+    if (typeof PointerEvent === "function") root.dispatchEvent(new PointerEvent("pointermove", init));
+    if (typeof MouseEvent === "function") root.dispatchEvent(new MouseEvent("mousemove", init));
   },
   touchSession() {
     if (!/^https?:$/.test(location.protocol) || typeof fetch !== "function") return;
-    void fetch(location.href, { method: "HEAD", credentials: "include", cache: "no-store" }).catch(() => undefined);
+    const opts = { credentials: "include", cache: "no-store" };
+    void fetch(location.href, { method: "HEAD", ...opts })
+      .then((res) => (res && (res.status === 405 || res.status === 501) ? fetch(location.href, { method: "GET", ...opts }) : undefined))
+      .catch(() => undefined);
   },
 };

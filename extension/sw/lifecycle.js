@@ -1,6 +1,5 @@
 /** Capture belongs to a live daemon connection and ends when that connection does. */
 import { runCommand } from "./commands.js";
-import { clearAllKeepAlive } from "./keepalive.js";
 import { send } from "./native.js";
 import { clearWatched, runPageOp } from "./page.js";
 
@@ -29,6 +28,6 @@ export async function runConnectedCommand(command) {
 }
 
 async function stopWatching() {
-  const [tabs] = await Promise.all([clearWatched(), clearAllKeepAlive()]);
+  const tabs = await clearWatched();
   await Promise.all([...tabs].map((tabId) => runPageOp(tabId, { op: "unwatch" }).catch(() => undefined)));
 }

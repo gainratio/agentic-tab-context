@@ -8,7 +8,7 @@ import type { BrowserDriver, BrowserName, BrowserSession, DriverFactory } from "
 import { DAEMON_PROTOCOL_VERSION } from "../contracts/version.js";
 import type { ExtensionBridge } from "../drivers/extension/bridge.js";
 import { TabBinder } from "./binding.js";
-import { bindingsResponse } from "./bindings.js";
+import { bindingsResponse, listBindings } from "./bindings.js";
 import { doctorReport } from "./doctor.js";
 import { eachResponse, isEachRequest } from "./each.js";
 import { KeepAliveTracker, applyKeepAlive, syncLiveTabs } from "./keepalive.js";
@@ -80,8 +80,9 @@ export class DaemonService {
     if (raw.params !== undefined && raw.params.each === true) return { key: null, request: req };
     const params = isRecord(raw.params) ? raw.params : {};
     if (typeof params.context === "string") return { key: params.context, request: req };
-    if (this.registry.current === null || params.context !== undefined) return { key: null, request: req };
-    return { key: this.registry.current, request: { ...raw, params: { ...params, context: this.registry.current } } as Request };
+    const implicit = params.context === undefined ? this.implicitContextId() : null;
+    if (implicit === null) return { key: null, request: req };
+    return { key: implicit, request: { ...raw, params: { ...params, context: implicit } } as Request };
   }
 
   onShutdown(listener: () => void): void { this.shutdownListeners.push(listener); }
@@ -131,25 +132,22 @@ export class DaemonService {
     this.registry.setCurrent(ctx.id);
     return Promise.resolve({ ok: true, context: ctx.id });
   }
-
   private currentContext(): Promise<OkResponse> {
-    if (this.registry.current === null) throw noCurrent();
-    return Promise.resolve({ ok: true, context: this.registry.current });
+    const id = this.implicitContextId();
+    if (id === null) throw noCurrent(listBindings(this.registry, {}, this.keepAlive).bindings);
+    return Promise.resolve({ ok: true, context: id });
   }
-
   private async close(params: Params): Promise<OkResponse> {
     const { ctx } = this.resolve(params);
     await this.closeContext(ctx.id);
     return { ok: true, context: ctx.id };
   }
-
   private async shutdown(): Promise<OkResponse> {
     await this.closeAll();
     const listeners = this.shutdownListeners.splice(0);
     setImmediate(() => listeners.forEach((listener) => listener()));
     return { ok: true };
   }
-
   private async closeContext(id: string): Promise<void> {
     const ctx = this.registry.get(id);
     this.keepAlive.disable(id);
@@ -158,7 +156,6 @@ export class DaemonService {
     this.contextDrivers.delete(id);
     if (session !== undefined && driver !== undefined) await driver.close(session);
   }
-
   private attach(id: string, driver: BrowserDriver, session: BrowserSession): void {
     this.contextDrivers.set(id, driver);
     driver.onDisconnect(session, () => {
@@ -168,22 +165,24 @@ export class DaemonService {
       this.contextDrivers.delete(id);
     });
   }
-
   private async enableBoundKeepAlive(id: string, reused: boolean): Promise<void> {
     try { await applyKeepAlive(this.resolve({ context: id }), this.registry, this.keepAlive, true); }
     catch (error) { if (!reused) await this.closeContext(id); throw error; }
   }
+  private implicitContextId(): string | null {
+    if (this.registry.current !== null) return this.registry.current;
+    const open = this.registry.openSessions();
+    return open.length === 1 ? (open[0]?.id ?? null) : null;
+  }
 
   private resolve(params: Params): Resolved {
-    const id = optionalString(params, "context") ?? this.registry.current;
-    if (id === null) throw noCurrent();
+    const id = optionalString(params, "context") ?? this.implicitContextId();
+    if (id === null) throw noCurrent(listBindings(this.registry, {}, this.keepAlive).bindings);
     const ctx = this.registry.get(id);
     if (ctx === undefined) throw new AtcError("CONTEXT_NOT_FOUND", `no context ${id}`, { context: id });
     const session = this.registry.session(id);
     const driver = this.contextDrivers.get(id) ?? this.drivers.get(ctx.browser);
-    if (ctx.status === "closed" || session === undefined || driver === undefined) {
-      throw new AtcError("CONTEXT_CLOSED", `context ${id} is closed`, { context: id });
-    }
+    if (ctx.status === "closed" || session === undefined || driver === undefined) throw new AtcError("CONTEXT_CLOSED", `context ${id} is closed`, { context: id });
     return { ctx, session, driver };
   }
 

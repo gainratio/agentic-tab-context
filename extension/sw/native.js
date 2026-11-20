@@ -89,12 +89,11 @@ export function setContextKeepAlive(context, enabled) {
   return requestDaemon("keepalive", { context, enabled });
 }
 
-function requestDaemon(type, payload = {}) {
+async function requestDaemon(type, payload = {}) {
   const responseType = responseTypeFor(type);
-  if (responseType === undefined) return Promise.resolve({ ok: false, message: `Unsupported request: ${type}` });
-  if (port === null) {
-    return Promise.resolve({ ok: false, message: "atc is not connected. Start atc in a terminal, then try again." });
-  }
+  if (responseType === undefined) return { ok: false, message: `Unsupported request: ${type}` };
+  if (port === null && typeof chrome.runtime?.connectNative === "function") await connect().catch(() => undefined);
+  if (port === null) return { ok: false, message: "atc is starting or not installed. Run `atc setup` if this persists." };
   return createPendingRequest(type, responseType, payload);
 }
 

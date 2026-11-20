@@ -5,6 +5,7 @@
 import { isAtcError } from "../contracts/errors.js";
 import { resolvePaths } from "../contracts/paths.js";
 import type { ErrorResponse, Paths, Request, Response } from "../contracts/protocol.js";
+import { DAEMON_PROTOCOL_VERSION, PACKAGE_VERSION } from "../contracts/version.js";
 import { parseArgs, USAGE } from "./args.js";
 import { sendRequest } from "./client.js";
 import { runSetup } from "./setup.js";
@@ -48,6 +49,7 @@ async function run(argv: string[], env: NodeJS.ProcessEnv, transport: Transport)
   try {
     const parsed = parseArgs(argv);
     if ("help" in parsed) return { ok: true, usage: [...USAGE] };
+    if ("version" in parsed) return { ok: true, version: PACKAGE_VERSION, protocol: DAEMON_PROTOCOL_VERSION };
     if ("setup" in parsed) return runSetup(env);
     return await transport(parsed, resolvePaths(env), env);
   } catch (error) {

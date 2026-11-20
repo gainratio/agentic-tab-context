@@ -8,14 +8,24 @@ import { HELP_TOKENS, HelpSignal, checkPositionalCount, tokenize } from "./argv/
 
 export type { ParseResult } from "./argv/grammar.js";
 
+const VERSION_TOKENS = new Set(["version", "--version", "-v"]);
+
 export function parseArgs(argv: readonly string[]): ParseResult {
   const [command, ...rest] = argv;
   if (command === undefined || command === "help" || HELP_TOKENS.has(command)) {
     if (rest.length > 0) invalid(`help: unexpected argument "${rest[0] ?? ""}"`);
     return { help: true };
   }
+  if (VERSION_TOKENS.has(command)) {
+    if (rest.length > 0) invalid(`version: unexpected argument "${rest[0] ?? ""}"`);
+    return { version: true };
+  }
   const spec = Object.hasOwn(COMMANDS, command) ? COMMANDS[command] : undefined;
   if (spec === undefined) invalid(`unknown command "${command}"; run "atc help" for usage`);
+  return parseCommand(command, rest, spec);
+}
+
+function parseCommand(command: string, rest: readonly string[], spec: (typeof COMMANDS)[string]): ParseResult {
   try {
     const parsed = tokenize(command, rest, spec);
     checkPositionalCount(parsed, spec);
@@ -46,7 +56,8 @@ export const USAGE: readonly string[] = [
   "atc type <target> --value V [--context C] [--each]",
   "atc select <target> --value V [--context C]",
   "atc setup   install the agentic-tab-context skill for Claude Code, Codex, and Antigravity",
-  "atc doctor   check browser executables, live tabs, extension bridge, and daemon status",
+  "atc doctor | status   check browser executables, live tabs, extension bridge, and daemon status",
+  "atc version | --version   print CLI and daemon protocol version",
   "atc shutdown   stop the background daemon",
   "atc help",
   "target: exactly one of --role R [--name N] | --label L | --text T | --placeholder P | --testid ID | --selector CSS, plus optional --nth N (0-based)",

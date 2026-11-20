@@ -41,6 +41,6 @@ export function runSetup(env: NodeJS.ProcessEnv = process.env, platform: NodeJS.
     installedSkills: installSkills(home),
     nativeHostManifests,
     extension: { folder: EXTENSION_DIR, id, allowedIds: [id, ...extraExtensionIds] },
-    next: "Load the extension folder via chrome://extensions > Developer mode > Load unpacked, then run `atc tabs`.",
+    next: "Load the extension folder via chrome://extensions > Developer mode > Load unpacked; the extension auto-starts the atc daemon automatically.",
   };
 }
