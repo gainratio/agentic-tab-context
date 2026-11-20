@@ -5,7 +5,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-20
+
 ### Added
+- Auto-started the local `atc` daemon directly from the browser native messaging host with dynamic auth-token reads so users no longer need to start `atc` in a terminal before clicking Share/Bind in Chrome (#38).
+- Added a direct **"Keep this tab signed in"** switch in the toolbar popup, tightened the MV3 keep-alive alarm cadence to 1 minute, preserved keep-alive across daemon restarts and navigations, alternated pointer/mouse activity coordinates, and added a read-only `GET` fallback when same-origin session-touch endpoints return `405`/`501` (#38).
+- Added `atc --version` / `-v` / `version` (zero daemon required) and `atc status` (alias for `doctor`), auto-targeted the sole open shared tab when `current` is null, and included live `bindings` inside multi-tab `NO_CURRENT_CONTEXT` errors (#38).
+
+## [0.5.0] - 2026-11-11
+
+### Added
+- Multi-tab Chrome side panel workspace: search open tabs, share/unshare without closing tabs, switch active target, and gate sensitive sites (#19, #20, #22).
+- `atc bindings` and `atc use <ctx>` commands backed by a shared daemon/extension context registry (#19).
+- Explicit `--each` multi-tab action execution and daemon-extension protocol version handshake (#20, #21).
 - Added bound-tab session keep-alive (`atc bind --keep-alive`, `atc keepalive [on|off|status]`, and the Side Panel **Keep alive** toggle + `Keep alive` / `Sign-in needed` badges) combining `autoDiscardable: false`, a 2-minute MV3 `chrome.alarms` synthetic activity pulse, same-origin `HEAD` sliding-cookie touch, and a fail-closed `SESSION_EXPIRED` guard on background SSO redirects.
 - Added deterministic `npm run pack:store` packaging (`store/agentic-tab-context-0.5.0.zip`), CI drift verification (`test/unit/store-package.test.ts`), and refreshed `0.5.0` Chrome Web Store / Firefox Add-ons submission docs.
 - Exposed daemon protocol version through `atc ping` and `atc doctor` (#30).
@@ -21,15 +33,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 ### Fixed
 - Reported hidden and disabled action targets with typed actionable errors (#23).
 - Verified tab identity preservation across create, move, replace, and close lifecycle events (#26, #27).
-
-## [0.5.0] - 2026-11-04
-
-*Note: `package.json` advanced to `0.5.0` in #22; annotated git tag `v0.5.0` was not cut prior to post-0.5.0 security hardening.*
-
-### Added
-- Multi-tab Chrome side panel workspace: search open tabs, share/unshare without closing tabs, switch active target, and gate sensitive sites (#19, #20, #22).
-- `atc bindings` and `atc use <ctx>` commands backed by a shared daemon/extension context registry (#19).
-- Explicit `--each` multi-tab action execution and daemon-extension protocol version handshake (#20, #21).
 
 ## [0.4.1] - 2026-10-26
 

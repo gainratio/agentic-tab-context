@@ -4,7 +4,7 @@ Canonical agent instructions for `gainratio/agentic-tab-context`.
 
 ## Status & Portfolio Pointers
 
-- **Package version:** `0.5.0` (`package.json`, Node `>=22`, MIT)
+- **Package version:** `0.5.1` (`package.json`, Node `>=22`, MIT)
 - **Portfolio hub:** `https://open-source.gainratio.com/agentic-tab-context/`
 - **Portfolio engineering standard §8 (WASM):** Not applicable — Node.js CLI/daemon + Manifest V3 WebExtension + Playwright managed-browser driver; zero WASM modules.
 - **Portfolio engineering standard §3.1–§3.4:**
