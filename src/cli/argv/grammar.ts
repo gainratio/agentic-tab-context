@@ -12,7 +12,11 @@ export interface SetupRequest {
   setup: true;
 }
 
-export type ParseResult = Request | HelpRequest | SetupRequest;
+export interface VersionRequest {
+  version: true;
+}
+
+export type ParseResult = Request | HelpRequest | SetupRequest | VersionRequest;
 
 export const NON_NEGATIVE_INT = /^(0|[1-9][0-9]*)$/;
 

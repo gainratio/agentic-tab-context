@@ -3,29 +3,15 @@
  * line back, over the Unix socket at `paths.socket`. Auto-starts the daemon
  * when nothing is listening (except for `shutdown`).
  */
-import { spawn, type SpawnOptions } from "node:child_process";
-import { closeSync, openSync } from "node:fs";
-import { mkdir } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
 import { readToken } from "../contracts/auth.js";
 import { AtcError } from "../contracts/errors.js";
 import type { Paths, Request, Response } from "../contracts/protocol.js";
+import { DEFAULT_DAEMON_ENTRY, type SpawnDaemonOptions, type SpawnFn, type SpawnedProcess, spawnDaemon } from "../daemon/spawn.js";
 import { NoDaemon, exchange } from "./exchange.js";
 
-/** The subset of a spawned child the client needs. */
-export interface SpawnedProcess {
-  unref(): void;
-}
+export { DEFAULT_DAEMON_ENTRY, type SpawnFn, type SpawnedProcess };
 
-/** Same shape as `child_process.spawn`, so tests can substitute a fake. */
-export type SpawnFn = (command: string, args: readonly string[], options: SpawnOptions) => SpawnedProcess;
-
-export interface ClientOptions {
-  /** Absolute path of the compiled daemon entrypoint. */
-  daemonEntry?: string;
-  spawn?: SpawnFn;
-  /** Environment handed to the daemon (it resolves ATC_HOME from it). */
-  env?: NodeJS.ProcessEnv;
+export interface ClientOptions extends SpawnDaemonOptions {
   requestTimeoutMs?: number;
   startTimeoutMs?: number;
   pollIntervalMs?: number;
@@ -35,31 +21,6 @@ export const DEFAULT_REQUEST_TIMEOUT_MS = 120_000;
 export const DEFAULT_START_TIMEOUT_MS = 10_000;
 export const DEFAULT_POLL_INTERVAL_MS = 100;
 const PING_TIMEOUT_MS = 2_000;
-
-export const DEFAULT_DAEMON_ENTRY = fileURLToPath(new URL("../daemon/main.js", import.meta.url));
-
-function defaultSpawn(command: string, args: readonly string[], options: SpawnOptions): SpawnedProcess {
-  const child = spawn(command, [...args], options);
-  // A spawn failure surfaces later as DAEMON_UNAVAILABLE; never crash the CLI on it.
-  child.on("error", () => undefined);
-  return child;
-}
-
-async function startDaemon(paths: Paths, options: ClientOptions): Promise<void> {
-  await mkdir(paths.home, { recursive: true, mode: 0o700 });
-  const logFd = openSync(paths.daemonLog, "a", 0o600);
-  try {
-    const run = options.spawn ?? defaultSpawn;
-    const child = run(process.execPath, [options.daemonEntry ?? DEFAULT_DAEMON_ENTRY], {
-      detached: true,
-      stdio: ["ignore", logFd, logFd],
-      env: options.env ?? process.env,
-    });
-    child.unref();
-  } finally {
-    closeSync(logFd);
-  }
-}
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -104,7 +65,7 @@ export async function sendRequest(request: Request, paths: Paths, options: Clien
     if (!(error instanceof NoDaemon)) throw error;
   }
   if (request.method === "shutdown") return { ok: true, running: false };
-  await startDaemon(paths, options);
+  await spawnDaemon(paths, options);
   await waitForDaemon(paths, options);
   try {
     return await exchange(paths.socket, request, timeout, readToken(paths));

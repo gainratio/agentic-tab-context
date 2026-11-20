@@ -133,6 +133,32 @@ describe("NativeRelay", () => {
     daemon.connections[0]?.destroy();
     await daemon.close();
   });
+
+  it("auto-starts the daemon when the socket is absent and reads a newly created auth token", async () => {
+    const socketPath = join(dir, "auto.sock");
+    let daemon: FakeDaemon | undefined;
+    let token: string | undefined;
+    let spawns = 0;
+    const decoder = new FrameDecoder();
+    const relay = new NativeRelay({
+      writeToBrowser: (frame) => decoder.push(frame),
+      connectToDaemon: () => createConnection(socketPath),
+      schedule: (task) => setTimeout(task, 5),
+      readAuthToken: () => token,
+      ensureDaemon: async () => {
+        spawns += 1;
+        token = "fresh-daemon-token";
+        daemon = await FakeDaemon.start(socketPath);
+      },
+    });
+    relay.fromBrowser(encodeFrame({ type: "hello", browser: "chrome", instance: "0a1b2c3d" }));
+    relay.start();
+    await until(() => daemon !== undefined && daemon.lines.length === 1);
+    expect(spawns).toBe(1);
+    expect(daemon!.lines[0]).toMatchObject({ type: "hello", auth: "fresh-daemon-token" });
+    daemon!.connections[0]?.destroy();
+    await daemon!.close();
+  });
 });
 
 describe("native host registration", () => {

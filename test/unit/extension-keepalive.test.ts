@@ -77,7 +77,7 @@ describe("extension service-worker keep-alive", () => {
     expect(await h.api.setTabKeepAlive(7, true)).toEqual({ ok: true, keepAlive: true });
     expect(await h.api.keepAliveEntries()).toEqual({ "7": { url: "https://app.example.com/dashboard" } });
     expect(h.updates).toEqual([{ tabId: 7, props: { autoDiscardable: false } }]);
-    expect(h.alarmsCreated).toEqual([{ name: "atc-keepalive", info: { periodInMinutes: 2 } }]);
+    expect(h.alarmsCreated).toEqual([{ name: "atc-keepalive", info: { periodInMinutes: 1 } }]);
     expect(h.pulses).toEqual([7]);
 
     expect(await h.api.setTabKeepAlive(7, false)).toEqual({ ok: true, keepAlive: false });
@@ -155,5 +155,51 @@ describe("page-agent non-destructive keep-alive op", () => {
         init: { method: "HEAD", credentials: "include", cache: "no-store" },
       },
     ]);
+  });
+
+  it("falls back to read-only GET when HEAD returns 405 Method Not Allowed", async () => {
+    const source = ["page-agent-watch.js", "page-agent-actions.js", "page-agent.js"]
+      .map((name) => readFileSync(join(import.meta.dirname, "../../extension", name), "utf8"))
+      .join("\n");
+    const coords: Array<[number, number]> = [];
+    const methods: string[] = [];
+    class FakeEvent {
+      constructor(readonly type: string, init?: { clientX?: number; clientY?: number }) {
+        if (type === "pointermove" && init?.clientX !== undefined && init?.clientY !== undefined) coords.push([init.clientX, init.clientY]);
+      }
+    }
+    const context = vm.createContext({
+      URL,
+      Element: class {},
+      HTMLInputElement: class {},
+      HTMLSelectElement: class {},
+      PointerEvent: FakeEvent,
+      MouseEvent: FakeEvent,
+      CSS: { escape: (v: string) => v },
+      getComputedStyle: () => ({ display: "block", visibility: "visible", opacity: "1" }),
+      document: {
+        title: "Work",
+        documentElement: { dispatchEvent: () => undefined },
+        body: { querySelectorAll: () => [] },
+        querySelector: () => null,
+      },
+      location: { href: "https://app.example.com/portal", protocol: "https:" },
+      scrollBy: () => undefined,
+      fetch: async (_url: string, init: { method: string }) => {
+        methods.push(init.method);
+        return { status: init.method === "HEAD" ? 405 : 200 };
+      },
+      console: { log: () => undefined, info: () => undefined, warn: () => undefined, error: () => undefined },
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    });
+    vm.runInContext(source, context);
+    const agent = context.__atcAgent as { run(op: Record<string, unknown>): { ok: boolean } };
+    agent.run({ op: "keepalive" });
+    agent.run({ op: "keepalive" });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(coords).toEqual([[1, 1], [2, 2]]);
+    expect(methods).toEqual(["HEAD", "HEAD", "GET", "GET"]);
   });
 });

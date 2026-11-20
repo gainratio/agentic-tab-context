@@ -20,8 +20,10 @@ async function popup(rejectPin = false): Promise<Page> {
   await page.addInitScript(({ rejectPin }) => {
     Object.defineProperty(globalThis, "chrome", { value: {
       tabs: { query: async () => [{ id: 7, title: "Fixture tab", url: "https://example.test/" }] },
-      runtime: { sendMessage: async (message: { type: string }) => {
+      runtime: { sendMessage: async (message: { type: string; enabled?: boolean }) => {
         if (message.type === "atc:status") return { atcDaemon: true };
+        if (message.type === "atc:tab-keepalive-status") return { ok: true, keepAlive: false };
+        if (message.type === "atc:tab-keepalive") return { ok: true, keepAlive: Boolean(message.enabled) };
         if (rejectPin) throw new Error("Disconnected");
         return { ok: true, context: "ctx_fixture" };
       } },
@@ -109,4 +111,14 @@ it("opens the shared-tabs side panel for the current window", async () => {
   await page.waitForFunction(() => (globalThis as unknown as { __atcCalls: unknown[] }).__atcCalls.length === 1);
   expect(await page.evaluate(() => (globalThis as unknown as { __atcCalls: unknown[] }).__atcCalls[0])).toEqual({ windowId: 12 });
   expect(await page.evaluate(() => (globalThis as unknown as { __atcClosed: boolean }).__atcClosed)).toBe(true);
+});
+
+it("toggles per-tab keep-alive directly from the popup switch", async () => {
+  const page = await popup();
+  const toggle = page.getByRole("switch", { name: /Keep this tab signed in/i });
+  expect(await toggle.isChecked()).toBe(false);
+  await toggle.click();
+  await page.waitForFunction(() => !document.getElementById("feedback")!.hidden);
+  expect(await toggle.isChecked()).toBe(true);
+  expect(await page.locator("#feedback").innerText()).toContain("Keep-alive on");
 });

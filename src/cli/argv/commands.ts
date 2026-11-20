@@ -169,6 +169,7 @@ export const COMMANDS: Readonly<Record<string, CommandSpec>> = {
     }),
   },
   doctor: { positionals: [], flags: [], build: () => ({ method: "doctor", params: {} }) },
+  status: { positionals: [], flags: [], build: () => ({ method: "doctor", params: {} }) },
   setup: { positionals: [], flags: [], build: () => ({ setup: true }) },
   shutdown: { positionals: [], flags: [], build: () => ({ method: "shutdown", params: {} }) },
 };

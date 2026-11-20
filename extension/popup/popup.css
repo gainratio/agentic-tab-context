@@ -142,6 +142,48 @@ body {
   outline-offset: 3px;
 }
 
+.keepalive-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  cursor: pointer;
+}
+
+.keepalive-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.keepalive-copy strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.keepalive-copy small {
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+.keepalive-row input[type="checkbox"][switch] {
+  accent-color: var(--accent);
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.keepalive-row input[type="checkbox"][switch]:focus-visible {
+  outline: 3px solid var(--text);
+  outline-offset: 4px;
+}
+
 .feedback {
   font-size: 11.5px;
   padding: 8px;

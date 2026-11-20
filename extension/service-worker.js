@@ -4,7 +4,7 @@
  * sends for tabs the user shared, and brokers the side panel's membership
  * requests. No page content crosses this worker.
  */
-import { KEEPALIVE_ALARM, dropKeepAliveTab, pulseKeepAliveTabs } from "./sw/keepalive.js";
+import { KEEPALIVE_ALARM, dropKeepAliveTab, isTabKeepAlive, pulseKeepAliveTabs, refreshKeepAliveTab, setTabKeepAlive } from "./sw/keepalive.js";
 import { runConnectedCommand, setCaptureConnection } from "./sw/lifecycle.js";
 import { activateContext, connect, isConnected, requestBindings, send, setContextKeepAlive, setMessageHandler, shareTab, unshareContext } from "./sw/native.js";
 import { runPageOp, watchedTabs } from "./sw/page.js";
@@ -157,6 +157,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 });
 chrome.tabs.onUpdated.addListener((tabId, change) => {
   void reinjectWatch(tabId, change);
+  if (change.status === "complete") void refreshKeepAliveTab(tabId);
   if (change.status === "complete" || change.title || change.url) scheduleTabsChanged();
 });
 listen(chrome.tabs.onCreated, () => scheduleTabsChanged());
@@ -169,21 +170,26 @@ listen(chrome.tabs.onReplaced, () => scheduleTabsChanged());
 listen(chrome.tabs.onActivated, () => scheduleTabsChanged());
 listen(chrome.windows.onFocusChanged, () => scheduleTabsChanged());
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message?.type === "atc:pin") {
-    void pinActiveTab(message.tabId).then(sendResponse);
-    return true;
-  }
+async function handlePopupMessage(message) {
+  if (message?.type === "atc:pin") return pinActiveTab(message.tabId);
   if (message?.type === "atc:status") {
-    void chrome.storage.session.get(["atcHost", "atcDaemon"]).then(sendResponse);
+    if (!isConnected()) void start();
+    return chrome.storage.session.get(["atcHost", "atcDaemon"]);
+  }
+  if (message?.type === "atc:tab-keepalive-status") return { ok: true, keepAlive: await isTabKeepAlive(message.tabId) };
+  if (message?.type === "atc:tab-keepalive") return setTabKeepAlive(message.tabId, Boolean(message.enabled));
+  return undefined;
+}
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  const popup = ["atc:pin", "atc:status", "atc:tab-keepalive", "atc:tab-keepalive-status"].includes(message?.type);
+  if (popup) {
+    void handlePopupMessage(message).then(sendResponse, (e) => sendResponse({ ok: false, message: String(e) }));
     return true;
   }
   const request = parseSidepanelMessage(message);
   if (request === undefined) return false;
-  void handleSidepanelRequest(request).then(
-    sendResponse,
-    (error) => sendResponse({ ok: false, message: error instanceof Error ? error.message : String(error) }),
-  );
+  void handleSidepanelRequest(request).then(sendResponse, (e) => sendResponse({ ok: false, message: e instanceof Error ? e.message : String(e) }));
   return true;
 });
 

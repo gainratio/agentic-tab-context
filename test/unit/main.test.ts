@@ -104,4 +104,12 @@ describe("main", () => {
     }
     expect(result.sent).toHaveLength(0);
   });
+
+  it.each([["version"], ["--version"], ["-v"]])("prints version JSON without touching the daemon for %s", async (...argv) => {
+    const result = await runMain(argv, unreachable);
+    expect(result.code).toBe(0);
+    expect(result.json).toMatchObject({ ok: true, protocol: 2 });
+    expect(typeof result.json.version).toBe("string");
+    expect(result.sent).toHaveLength(0);
+  });
 });

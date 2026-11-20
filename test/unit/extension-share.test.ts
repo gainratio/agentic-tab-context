@@ -183,6 +183,19 @@ describe("shareFromExtension", () => {
     expect(extension.bound).toEqual([SAFE.tabId]);
   });
 
+  it("auto-targets a sole shared tab when no explicit current is set, and lists bindings when multiple exist", async () => {
+    const first = await service.shareFromExtension(MAIL.tabId);
+    expect(registry.current).toBeNull();
+    expect(await service.handle({ method: "current", params: {} })).toEqual({ ok: true, context: first });
+    expect(await service.handle({ method: "inspect", params: {} })).toMatchObject({ ok: true, context: first });
+
+    const second = await service.shareFromExtension(SAFE.tabId);
+    expect(second).not.toBe(first);
+    const ambiguous = await service.handle({ method: "inspect", params: {} });
+    expect(ambiguous).toMatchObject({ ok: false, error: "NO_CURRENT_CONTEXT" });
+    expect((ambiguous as { bindings?: unknown[] }).bindings).toHaveLength(2);
+  });
+
   it("rejects unknown tab ids and tabs from other sources", async () => {
     await expect(service.shareFromExtension("ext:chrome-0a1b2c3d:99")).rejects.toMatchObject({ code: "TARGET_NOT_FOUND" });
     await expect(service.shareFromExtension(MACOS.tabId)).rejects.toMatchObject({ code: "TARGET_NOT_FOUND" });

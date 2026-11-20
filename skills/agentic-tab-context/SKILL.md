@@ -15,12 +15,16 @@ description: >
 
 ```sh
 atc bindings                  # contexts the user has shared; start here
-atc use <ctx>                 # choose the active shared tab
-atc keepalive [on|off|status] # keep a shared tab alive against idle auto-logout / tab discard
+atc use <ctx>                 # choose the active shared tab (optional if only 1 tab is shared)
+atc keepalive [on|off|status] # keep a shared tab awake against idle auto-logout / tab discard
+atc status                    # alias for `atc doctor`; checks daemon, extension & shared tabs
+atc --version                 # print CLI and protocol version (zero daemon required)
 atc tabs                      # discover open tabs (does NOT grant access)
 ```
 
-- If `bindings` is empty, ask the user to open the Agentic Tab Context side panel and share the tab. Do not try `atc bind` on an extension tab first.
+- The extension auto-starts the `atc` daemon automatically when Chrome opens or the user clicks the extension — no terminal startup command is needed.
+- If exactly one tab is shared, `atc inspect` / `atc click` / `atc screenshot` / `atc keepalive` automatically target that shared tab without requiring `atc use <ctx>` first.
+- If `bindings` is empty, ask the user to open the Agentic Tab Context popup or side panel and share the tab. Do not try `atc bind` on an extension tab first.
 - `TAB_NOT_SHARED` means exactly that. Ask for a share; do not retry with another selector.
 - `AMBIGUOUS_TARGET` means several tabs matched. Show the user the `candidates` (title + URL), or pick by `--tab <tabId>` when it is obvious from context. Never guess.
 - Managed tabs opened by `atc open` are not extension tabs and can be bound directly.

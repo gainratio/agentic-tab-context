@@ -5,7 +5,7 @@
  */
 import { runPageOp } from "./page.js";
 
-export const KEEPALIVE_ALARM = { name: "atc-keepalive", periodInMinutes: 2 };
+export const KEEPALIVE_ALARM = { name: "atc-keepalive", periodInMinutes: 1 };
 
 const AUTH_HOST = /^(login|signin|sso|auth|id|idp)\.|(\.|^)(okta|auth0|onelogin|pingidentity|duosecurity)\.com$|^login\.microsoftonline\.com$|^accounts\.google\.com$/i;
 const AUTH_PATH = /\/(login|log-in|signin|sign-in|sso|oauth2?|authorize|authenticate|reauth)(\/|$)/i;
@@ -29,6 +29,16 @@ export function isLoginRedirectUrl(initialUrl, currentUrl) {
 export async function keepAliveEntries() {
   const { atcKeepAlive = {} } = await chrome.storage.session.get("atcKeepAlive");
   return typeof atcKeepAlive === "object" && atcKeepAlive !== null ? { ...atcKeepAlive } : {};
+}
+
+export async function isTabKeepAlive(tabId) {
+  const entries = await keepAliveEntries();
+  return Object.hasOwn(entries, String(tabId));
+}
+
+export async function refreshKeepAliveTab(tabId) {
+  if (!(await isTabKeepAlive(tabId))) return;
+  await setAutoDiscardable(tabId, false);
 }
 
 export function setTabKeepAlive(tabId, enabled) {
